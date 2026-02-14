@@ -16,8 +16,7 @@ export default function LoginPage() {
         setMsg('')
 
         try {
-            const { error } = await signInWithOtp(email)
-            if (error) throw error
+            await signInWithOtp(email)
             setMsg('Vérifiez votre boîte mail pour le lien magique ! 📧')
         } catch (error) {
             console.error(error)

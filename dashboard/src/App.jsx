@@ -38,6 +38,48 @@ function AdminLink() {
   return <NavItem to="/admin" icon={Shield} label="Admin" />
 }
 
+function PremiumLink() {
+  const { hasAccess } = useAuth()
+  // Hide if already premium/admin
+  if (hasAccess('premium')) return null
+
+  return (
+    <a
+      href={import.meta.env.VITE_STRIPE_PAYMENT_LINK || '#'}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-amber-500 hover:bg-amber-500/10 transition-colors"
+    >
+      <Trophy className="w-4 h-4" />
+      <span className="hidden sm:inline">Premium</span>
+    </a>
+  )
+}
+
+function AuthButton() {
+  const { user, signOut } = useAuth()
+
+  if (user) {
+    return (
+      <button
+        onClick={signOut}
+        className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors ml-2"
+      >
+        <span className="hidden sm:inline">Déconnexion</span>
+      </button>
+    )
+  }
+
+  return (
+    <NavLink
+      to="/login"
+      className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ml-2 shadow-sm"
+    >
+      <span>Connexion</span>
+    </NavLink>
+  )
+}
+
 function App() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
 
@@ -60,48 +102,40 @@ function App() {
                 </NavLink>
 
                 {/* Nav links */}
-                <nav className="flex items-center gap-1">
-                  <NavItem to="/" icon={Home} label="Accueil" />
-                  <NavItem to="/matchs" icon={ListChecks} label="Matchs" />
-                  <NavItem to="/performance" icon={BarChart3} label="Performance" />
-                  <a
-                    href={import.meta.env.VITE_STRIPE_PAYMENT_LINK || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-amber-500 hover:bg-amber-500/10 transition-colors"
-                  >
-                    <Trophy className="w-4 h-4" />
-                    <span className="hidden sm:inline">Premium</span>
-                  </a>
-                  <AdminLink />
-                </nav>
-              </div>
+                <NavItem to="/" icon={Home} label="Accueil" />
+                <NavItem to="/matchs" icon={ListChecks} label="Matchs" />
+                <NavItem to="/performance" icon={BarChart3} label="Performance" />
+                <PremiumLink />
+                <AdminLink />
+                <AuthButton />
+              </nav>
             </div>
-          </header>
-
-          {/* Main content */}
-          <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route
-                path="/matchs"
-                element={
-                  <DashboardPage
-                    date={date}
-                    setDate={setDate}
-                  />
-                }
-              />
-              <Route path="/performance" element={<PerformancePage />} />
-              <Route path="/match/:id" element={<MatchDetailPage />} />
-              <Route path="/equipe/:name" element={<TeamProfile />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/login" element={<LoginPage />} />
-            </Routes>
-          </main>
         </div>
-      </BrowserRouter>
-    </AuthProvider>
+      </header>
+
+      {/* Main content */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route
+            path="/matchs"
+            element={
+              <DashboardPage
+                date={date}
+                setDate={setDate}
+              />
+            }
+          />
+          <Route path="/performance" element={<PerformancePage />} />
+          <Route path="/match/:id" element={<MatchDetailPage />} />
+          <Route path="/equipe/:name" element={<TeamProfile />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/login" element={<LoginPage />} />
+        </Routes>
+      </main>
+    </div>
+      </BrowserRouter >
+    </AuthProvider >
   )
 }
 

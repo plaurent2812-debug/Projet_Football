@@ -97,7 +97,7 @@ function App() {
                     <Zap className="w-4 h-4 text-white" />
                   </div>
                   <span className="text-base font-extrabold tracking-tight">
-                    Cortex<span className="gradient-text">AI</span>
+                    Proba<span className="gradient-text">Lab</span>
                   </span>
                 </NavLink>
 

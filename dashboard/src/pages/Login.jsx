@@ -132,7 +132,7 @@ export default function LoginPage() {
                                 </>
                             ) : (
                                 <>
-                                    Rejoindre CortexAI
+                                    Rejoindre ProbaLab
                                     <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}

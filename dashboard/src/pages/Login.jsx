@@ -4,7 +4,7 @@ import { Zap, Mail, ArrowRight, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export default function LoginPage() {
-    const { signIn, signUp, signInWithOAuth } = useAuth()
+    const { signInWithOtp } = useAuth()
     const [loading, setLoading] = useState(false)
     const [email, setEmail] = useState('')
     const [msg, setMsg] = useState('')
@@ -16,7 +16,7 @@ export default function LoginPage() {
         setMsg('')
 
         try {
-            const { error } = await signIn(email)
+            const { error } = await signInWithOtp(email)
             if (error) throw error
             setMsg('Vérifiez votre boîte mail pour le lien magique ! 📧')
         } catch (error) {
@@ -25,6 +25,10 @@ export default function LoginPage() {
         } finally {
             setLoading(false)
         }
+    }
+
+    const handleSocialLogin = (provider) => {
+        alert("Connexion " + provider + " bientôt disponible ! 🚧")
     }
 
     return (
@@ -50,7 +54,7 @@ export default function LoginPage() {
                     {/* Social Login */}
                     <div className="grid grid-cols-2 gap-3 mb-6">
                         <button
-                            onClick={() => signInWithOAuth('google')}
+                            onClick={() => handleSocialLogin('Google')}
                             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm font-medium group"
                         >
                             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -74,7 +78,7 @@ export default function LoginPage() {
                             Google
                         </button>
                         <button
-                            onClick={() => signInWithOAuth('apple')}
+                            onClick={() => handleSocialLogin('Apple')}
                             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm font-medium"
                         >
                             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">

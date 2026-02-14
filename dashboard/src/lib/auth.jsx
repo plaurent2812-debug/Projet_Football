@@ -58,6 +58,16 @@ export const AuthProvider = ({ children }) => {
         if (error) throw error
     }
 
+    const signInWithOtp = async (email) => {
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                emailRedirectTo: window.location.origin,
+            },
+        })
+        if (error) throw error
+    }
+
     const signUp = async (email, password) => {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
@@ -84,6 +94,7 @@ export const AuthProvider = ({ children }) => {
         profile,
         loading,
         signIn,
+        signInWithOtp,
         signUp,
         signOut,
         signInWithOAuth,

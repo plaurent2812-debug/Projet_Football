@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables (SECRETS)
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Models / pickles
+*.pkl
+*.model
+*.joblib
+
+# Logs
+logs/
+*.log
+
+# Google Apps Script
+google_apps_script/.clasp.json
+
+# Node
+node_modules/
+
+# Coverage
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Fichiers orphelins à la racine (doublons)
+/fetch_context.py
+/fetch_players.py
+/scorer_engine.py
+/google_apps_script/

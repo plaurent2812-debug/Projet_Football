@@ -67,6 +67,16 @@ export const AuthProvider = ({ children }) => {
         await supabase.auth.signOut()
     }
 
+    const signInWithOAuth = async (provider) => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: provider,
+            options: {
+                redirectTo: window.location.origin
+            }
+        })
+        if (error) throw error
+    }
+
     const role = profile?.role || 'anonymous'
 
     const value = {
@@ -76,6 +86,7 @@ export const AuthProvider = ({ children }) => {
         signIn,
         signUp,
         signOut,
+        signInWithOAuth,
         role,
         isAnonymous: !user,
         isFree: role === 'free',

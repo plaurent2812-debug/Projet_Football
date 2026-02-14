@@ -102,40 +102,41 @@ function App() {
                 </NavLink>
 
                 {/* Nav links */}
-                <NavItem to="/" icon={Home} label="Accueil" />
-                <NavItem to="/matchs" icon={ListChecks} label="Matchs" />
-                <NavItem to="/performance" icon={BarChart3} label="Performance" />
-                <PremiumLink />
-                <AdminLink />
-                <AuthButton />
-              </nav>
+                <nav className="flex items-center gap-1">
+                  <NavItem to="/" icon={Home} label="Accueil" />
+                  <NavItem to="/matchs" icon={ListChecks} label="Matchs" />
+                  <NavItem to="/performance" icon={BarChart3} label="Performance" />
+                  <PremiumLink />
+                  <AdminLink />
+                  <AuthButton />
+                </nav>
+              </div>
             </div>
-        </div>
-      </header>
+          </header>
 
-      {/* Main content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route
-            path="/matchs"
-            element={
-              <DashboardPage
-                date={date}
-                setDate={setDate}
+          {/* Main content */}
+          <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route
+                path="/matchs"
+                element={
+                  <DashboardPage
+                    date={date}
+                    setDate={setDate}
+                  />
+                }
               />
-            }
-          />
-          <Route path="/performance" element={<PerformancePage />} />
-          <Route path="/match/:id" element={<MatchDetailPage />} />
-          <Route path="/equipe/:name" element={<TeamProfile />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/login" element={<LoginPage />} />
-        </Routes>
-      </main>
-    </div>
-      </BrowserRouter >
-    </AuthProvider >
+              <Route path="/performance" element={<PerformancePage />} />
+              <Route path="/match/:id" element={<MatchDetailPage />} />
+              <Route path="/equipe/:name" element={<TeamProfile />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/login" element={<LoginPage />} />
+            </Routes>
+          </main>
+        </div>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 

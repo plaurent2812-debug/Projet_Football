@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api'
+const API_ROOT = import.meta.env.VITE_API_URL || ''
+const API_BASE = API_ROOT.endsWith('/api') ? API_ROOT : (API_ROOT ? `${API_ROOT}/api` : '/api')
 
 export async function fetchPredictions(date) {
     const params = date ? `?date=${date}` : ''

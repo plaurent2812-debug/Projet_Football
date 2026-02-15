@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { Zap, Mail, ArrowRight, Loader2, Lock, UserPlus, LogIn, KeyRound } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 export default function LoginPage() {
     const { signIn, signUp, resetPassword, signInWithOtp } = useAuth()
+    const [searchParams] = useSearchParams()
     const [loading, setLoading] = useState(false)
-    const [mode, setMode] = useState('login') // 'login', 'register', 'reset', 'magic'
+    const [mode, setMode] = useState(searchParams.get('mode') === 'register' ? 'register' : 'login') // 'login', 'register', 'reset', 'magic'
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [msg, setMsg] = useState('')
@@ -20,10 +21,20 @@ export default function LoginPage() {
         try {
             if (mode === 'login') {
                 await signIn(email, password)
-                navigate('/dashboard')
+                // Check if we need to redirect to payment
+                if (searchParams.get('redirect') === 'payment') {
+                    window.location.href = import.meta.env.VITE_STRIPE_PAYMENT_LINK || '/abonnement'
+                } else {
+                    navigate('/dashboard')
+                }
             } else if (mode === 'register') {
                 await signUp(email, password)
-                setMsg('Compte créé ! Vérifiez votre email pour confirmer.')
+                if (searchParams.get('redirect') === 'payment') {
+                    // Give a small delay or message if needed, but for now direct redirect
+                    window.location.href = import.meta.env.VITE_STRIPE_PAYMENT_LINK || '/abonnement'
+                } else {
+                    setMsg('Compte créé ! Vérifiez votre email pour confirmer.')
+                }
             } else if (mode === 'reset') {
                 await resetPassword(email)
                 setMsg('Lien de réinitialisation envoyé par email.')

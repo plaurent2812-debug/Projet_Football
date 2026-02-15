@@ -1,7 +1,24 @@
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/lib/auth"
 import { Check, Star, Trophy, Zap, Shield, Crown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function PremiumPage() {
+    const { user } = useAuth()
+    const navigate = useNavigate()
+
+    const handleSubscribe = () => {
+        const paymentLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK || '#'
+
+        if (user) {
+            // Already logged in -> Go to Stripe
+            window.location.href = paymentLink
+        } else {
+            // Not logged in -> Go to Register, then redirect to payment
+            navigate('/login?mode=register&redirect=payment')
+        }
+    }
+
     const benefits = [
         {
             icon: Zap,
@@ -73,14 +90,12 @@ export default function PremiumPage() {
                         ))}
                     </ul>
 
-                    <a
-                        href={import.meta.env.VITE_STRIPE_PAYMENT_LINK || '#'}
-                        target="_blank"
-                        rel="noreferrer"
+                    <button
+                        onClick={handleSubscribe}
                         className="block w-full py-4 text-center font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg hover:brightness-110 transition-all shadow-lg shadow-amber-500/20 active:scale-[0.98]"
                     >
                         Profiter de l'offre maintenant
-                    </a>
+                    </button>
                     <p className="text-xs text-center text-muted-foreground mt-4">
                         Sans engagement • Annulation à tout moment
                     </p>

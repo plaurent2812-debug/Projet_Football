@@ -547,6 +547,20 @@ def run_brain() -> None:
                      final["stats_json"] = final.get("stats_json") or {}
                 final["stats_json"]["likely_scorer_reason"] = final["likely_scorer_reason"]
 
+            # Ajouter les probas manquantes dans stats_json
+            if not final.get("stats_json") or not isinstance(final.get("stats_json"), dict):
+                 final["stats_json"] = final.get("stats_json") or {}
+
+            # Injecter les probas qui n'ont pas de colonne dédiée en base
+            extra_probas = [
+                "proba_over_05", "proba_over_15", "proba_over_35",
+                "proba_dc_1x", "proba_dc_x2", "proba_dc_12",
+                "proba_penalty", "proba_correct_score"
+            ]
+            for key in extra_probas:
+                if final.get(key) is not None:
+                    final["stats_json"][key] = final[key]
+
             insert_data = {
                 "fixture_id": fix["id"],
                 "analysis_text": final.get("analysis_text", ""),
@@ -555,23 +569,15 @@ def run_brain() -> None:
                 "proba_away": final["proba_away"],
                 "proba_btts": final["proba_btts"],
                 "proba_over_2_5": final.get("proba_over_25", final.get("proba_over_2_5")),
-                # "proba_over_05": final.get("proba_over_05"), # Colonnes potentiellement manquantes
-                # "proba_over_15": final.get("proba_over_15"),
-                # "proba_over_35": final.get("proba_over_35"),
-                # "proba_penalty": final.get("proba_penalty"),
-                # "proba_dc_1x": final.get("proba_dc_1x"),
-                # "proba_dc_x2": final.get("proba_dc_x2"),
-                # "proba_dc_12": final.get("proba_dc_12"),
                 "correct_score": final.get("correct_score"),
-                # "proba_correct_score": final.get("proba_correct_score"),
                 "recommended_bet": final.get("recommended_bet", ""),
                 "confidence_score": final.get("confidence_score", 5),
                 "likely_scorer": final.get("likely_scorer"),
                 "likely_scorer_proba": final.get("likely_scorer_proba"),
-                # "likely_scorer_reason": final.get("likely_scorer_reason"), # REMOVED due to schema error
                 "model_version": final.get("model_version", "hybrid_v3"),
                 "stats_json": final.get("stats_json"),
             }
+
 
             # Utiliser UPSERT pour éviter de supprimer si l'insertion échoue
             supabase.table("predictions").upsert(insert_data, on_conflict="fixture_id").execute()

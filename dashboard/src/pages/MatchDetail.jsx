@@ -241,10 +241,10 @@ export default function MatchDetailPage() {
                                 </CardHeader>
                                 <CardContent>
                                     <StatRow label="But des 2 équipes" value={`${p.proba_btts || "—"}%`} icon={Percent} color="text-emerald-400" />
-                                    <StatRow label="Plus de 0.5" value={`${p.proba_over_05 || "—"}%`} icon={TrendingUp} color="text-blue-400" />
-                                    <StatRow label="Plus de 1.5" value={`${p.proba_over_15 || "—"}%`} icon={TrendingUp} color="text-blue-400" />
-                                    <StatRow label="Plus de 2.5" value={`${p.proba_over_25 || p.proba_over_2_5 || "—"}%`} icon={TrendingUp} color="text-amber-400" />
-                                    <StatRow label="Plus de 3.5" value={`${p.proba_over_35 || "—"}%`} icon={TrendingUp} color="text-orange-400" />
+                                    <StatRow label="Plus de 0.5" value={`${p.proba_over_05 || p.stats_json?.proba_over_05 || "—"}%`} icon={TrendingUp} color="text-blue-400" />
+                                    <StatRow label="Plus de 1.5" value={`${p.proba_over_15 || p.stats_json?.proba_over_15 || "—"}%`} icon={TrendingUp} color="text-blue-400" />
+                                    <StatRow label="Plus de 2.5" value={`${p.proba_over_25 || p.proba_over_2_5 || p.stats_json?.proba_over_2_5 || "—"}%`} icon={TrendingUp} color="text-amber-400" />
+                                    <StatRow label="Plus de 3.5" value={`${p.proba_over_35 || p.stats_json?.proba_over_35 || "—"}%`} icon={TrendingUp} color="text-orange-400" />
                                     <StatRow label="Score exact" value={p.correct_score || "—"} icon={Target} color="text-purple-400" />
                                 </CardContent>
                             </Card>

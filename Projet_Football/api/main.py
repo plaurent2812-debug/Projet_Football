@@ -210,11 +210,26 @@ def get_prediction_detail(fixture_id: str):
         except Exception:
             pass # Fail silently if DB error or missing table
 
+    # Fetch Match Stats (Shots, xG, etc.) if available
+    match_stats = []
+    if fixture and fixture.get("api_fixture_id"):
+        try:
+            match_stats = (
+                supabase.table("match_team_stats")
+                .select("*")
+                .eq("fixture_api_id", fixture["api_fixture_id"])
+                .execute()
+                .data
+            )
+        except Exception:
+            pass
+
     return {
         "fixture": fixture,
         "prediction": prediction,
         "home_scorers": home_scorers,
-        "away_scorers": away_scorers
+        "away_scorers": away_scorers,
+        "match_stats": match_stats,
     }
 
 

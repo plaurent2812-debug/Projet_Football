@@ -381,18 +381,22 @@ def blend_predictions(stats_result: dict, ai_result: dict | None) -> dict:
 # ═══════════════════════════════════════════════════════════════════
 
 
-def get_matches_to_predict() -> list[dict]:
+def get_matches_to_predict(force: bool = False) -> list[dict]:
     """Fetch upcoming fixtures that still need a hybrid-v1 prediction.
 
-    Queries Supabase for all fixtures with status ``"NS"`` (Not Started)
-    and filters out those that already have a ``hybrid_v2`` prediction in
-    the ``predictions`` table.
+    Queries Supabase for all fixtures with status ``"NS"`` (Not Started).
+    If force is True, returns all NS fixtures.
+    Otherwise, filters out those that already have a ``hybrid_v3`` prediction.
 
     Returns:
         List of fixture dicts to process.
     """
     logger.info("Récupération des matchs à venir...")
     fixtures = supabase.table("fixtures").select("*").eq("status", "NS").execute().data
+
+    if force:
+        logger.info(f"Mode FORCE activé : {len(fixtures)} matchs à re-analyser.")
+        return fixtures
 
     to_process = []
     for fix in fixtures:
@@ -437,8 +441,8 @@ def run_brain() -> None:
     except Exception as e:
         logger.warning("   ⚠️ ELO non mis à jour : %s", e)
 
-    # 2. Charger les matchs
-    matches = get_matches_to_predict()
+    # 2. Charger les matchs (FORCE=True pour être sûr de recalculer si demandé)
+    matches = get_matches_to_predict(force=True)
     logger.info("--- %s matchs à analyser ---", len(matches))
 
     # 3. Charger les noms de ligues

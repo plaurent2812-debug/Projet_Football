@@ -490,6 +490,66 @@ export default function MatchDetailPage() {
                     }
                 </div>
             )}
+
+            {/* ── Match Stats (Finished Matches) ──────────────── */}
+            {f.status === "FT" && data.match_stats && data.match_stats.length > 0 && (
+                <Card className="bg-card/50 border-border/50 mt-5">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                            <BarChart3 className="w-4 h-4 text-primary" />
+                            Statistiques du Match
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {(() => {
+                            const homeStats = data.match_stats.find(s => s.team_api_id === f.home_team_id) || {};
+                            const awayStats = data.match_stats.find(s => s.team_api_id === f.away_team_id) || {};
+
+                            const StatLine = ({ label, keyName, isPct = false }) => {
+                                let hVal = homeStats[keyName] || 0;
+                                let aVal = awayStats[keyName] || 0;
+                                if (isPct) {
+                                    hVal = typeof hVal === 'string' ? parseFloat(hVal) : hVal;
+                                    aVal = typeof aVal === 'string' ? parseFloat(aVal) : aVal;
+                                }
+                                const total = hVal + aVal;
+                                const hPct = total > 0 ? (hVal / total) * 100 : 50;
+
+                                return (
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-xs text-muted-foreground px-1">
+                                            <span className="font-bold tabular-nums text-foreground">{isPct ? hVal + '%' : hVal}</span>
+                                            <span>{label}</span>
+                                            <span className="font-bold tabular-nums text-foreground">{isPct ? aVal + '%' : aVal}</span>
+                                        </div>
+                                        <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary/30">
+                                            <div className="bg-indigo-500 transition-all" style={{ width: `${hPct}%` }} />
+                                            <div className="bg-purple-500 transition-all flex-1" />
+                                        </div>
+                                    </div>
+                                );
+                            };
+
+                            return (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                    <div className="space-y-4">
+                                        <StatLine label="Expected Goals (xG)" keyName="expected_goals" />
+                                        <StatLine label="Possession" keyName="possession" isPct />
+                                        <StatLine label="Tirs Total" keyName="shots_total" />
+                                        <StatLine label="Tirs Cadrés" keyName="shots_on_target" />
+                                    </div>
+                                    <div className="space-y-4">
+                                        <StatLine label="Passes Réussies" keyName="passes_accurate" />
+                                        <StatLine label="Fautes" keyName="fouls" />
+                                        <StatLine label="Corners" keyName="corners" />
+                                        <StatLine label="Cartons Jaunes" keyName="yellow_cards" />
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

@@ -87,6 +87,13 @@ export const AuthProvider = ({ children }) => {
         if (error) throw error
     }
 
+    const resetPassword = async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/update-password`,
+        })
+        if (error) throw error
+    }
+
     const role = profile?.role || 'anonymous'
 
     const value = {
@@ -98,6 +105,7 @@ export const AuthProvider = ({ children }) => {
         signUp,
         signOut,
         signInWithOAuth,
+        resetPassword,
         role,
         isAnonymous: !user,
         isFree: role === 'free',

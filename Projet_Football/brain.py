@@ -513,26 +513,31 @@ def run_brain() -> None:
             logger.warning("   ⚠️ JSON invalide, stats uniquement")
 
         # ── D. Fusion ────────────────────────────────────────────
-        final = blend_predictions(stats_result, ai_result)
+        try:
+            final = blend_predictions(stats_result, ai_result)
 
-        # Ajouter buteurs si dispo (top 3 avec analyse)
-        if scorers and scorers.get("likely_scorer"):
-            if not final.get("likely_scorer"):
-                final["likely_scorer"] = scorers["likely_scorer"]
-            final["likely_scorer_proba"] = scorers.get("likely_scorer_proba", 0)
+            # Ajouter buteurs si dispo (top 3 avec analyse)
+            if scorers and scorers.get("likely_scorer"):
+                if not final.get("likely_scorer"):
+                    final["likely_scorer"] = scorers["likely_scorer"]
+                final["likely_scorer_proba"] = scorers.get("likely_scorer_proba", 0)
 
-        if scorers and scorers.get("top_scorers"):
-            # Stocker les top 3 buteurs dans stats_json
-            if not final.get("stats_json") or not isinstance(final.get("stats_json"), dict):
-                final["stats_json"] = final.get("stats_json") or {}
-                if isinstance(final["stats_json"], str):
-                    import json as _json
+            if scorers and scorers.get("top_scorers"):
+                # Stocker les top 3 buteurs dans stats_json
+                if not final.get("stats_json") or not isinstance(final.get("stats_json"), dict):
+                    final["stats_json"] = final.get("stats_json") or {}
+                    if isinstance(final["stats_json"], str):
+                        import json as _json
 
-                    try:
-                        final["stats_json"] = _json.loads(final["stats_json"])
-                    except Exception:
-                        final["stats_json"] = {}
-            final["stats_json"]["top_scorers"] = scorers["top_scorers"]
+                        try:
+                            final["stats_json"] = _json.loads(final["stats_json"])
+                        except Exception:
+                            final["stats_json"] = {}
+                final["stats_json"]["top_scorers"] = scorers["top_scorers"]
+        
+        except Exception as e:
+            logger.error("⚠️ Erreur blending : %s", e)
+            continue
 
         # ── E. Sauvegarde ────────────────────────────────────────
         try:
@@ -568,7 +573,9 @@ def run_brain() -> None:
                 "stats_json": final.get("stats_json"),
             }
 
-            supabase.table("predictions").insert(insert_data).execute()
+            # Utiliser UPSERT pour éviter de supprimer si l'insertion échoue
+            supabase.table("predictions").upsert(insert_data, on_conflict="fixture_id").execute()
+            
             logger.info(
                 f"   💾 Prédiction enregistrée → {final['proba_home']}-{final['proba_draw']}-{final['proba_away']} | {final.get('recommended_bet')}"
             )
@@ -576,7 +583,7 @@ def run_brain() -> None:
         except Exception as e:
             logger.error("   ❌ Erreur sauvegarde : %s", e)
 
-        time.sleep(1)
+        time.sleep(1.5)
 
     logger.info("=" * 60)
     logger.info("  ✅ Pipeline terminé : %s matchs analysés", len(matches))

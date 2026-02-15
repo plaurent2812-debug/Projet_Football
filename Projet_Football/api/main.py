@@ -478,27 +478,34 @@ def _run_pipeline_background(mode: str):
         cmd.append(mode)
 
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             cmd,
             cwd=project_dir,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=1800,  # 30 min max
+            bufsize=1,  # Line buffered
+            universal_newlines=True,
         )
+
+        # Read output in real-time
+        for line in process.stdout:
+            with _pipeline_lock:
+                # Append new line and keep last 10k chars
+                current_logs = _pipeline_state["logs"] + line
+                _pipeline_state["logs"] = current_logs[-10000:]
+        
+        process.wait()
+
         with _pipeline_lock:
-            _pipeline_state["status"] = "done" if result.returncode == 0 else "error"
-            _pipeline_state["logs"] = (result.stdout + "\n" + result.stderr)[-5000:]  # last 5k chars
-            _pipeline_state["return_code"] = result.returncode
+            _pipeline_state["status"] = "done" if process.returncode == 0 else "error"
+            _pipeline_state["return_code"] = process.returncode
             _pipeline_state["finished_at"] = datetime.now().isoformat()
-    except subprocess.TimeoutExpired:
-        with _pipeline_lock:
-            _pipeline_state["status"] = "error"
-            _pipeline_state["logs"] = "Pipeline timed out after 30 minutes"
-            _pipeline_state["finished_at"] = datetime.now().isoformat()
+            
     except Exception as e:
         with _pipeline_lock:
             _pipeline_state["status"] = "error"
-            _pipeline_state["logs"] = str(e)
+            _pipeline_state["logs"] += f"\nInternal Error: {str(e)}"
             _pipeline_state["finished_at"] = datetime.now().isoformat()
 
 

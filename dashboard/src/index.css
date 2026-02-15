@@ -8,6 +8,7 @@
    ═══════════════════════════════════════════════════ */
 
 :root {
+  --glass-bg: oklch(0.17 0.005 260 / 0.7);
   --background: oklch(0.13 0.005 260);
   --foreground: oklch(0.95 0 0);
   --card: oklch(0.17 0.005 260);
@@ -42,6 +43,7 @@
 
 /* Light theme override */
 .light {
+  --glass-bg: oklch(1 0 0 / 0.75);
   --background: oklch(0.97 0.002 260);
   --foreground: oklch(0.15 0.01 260);
   --card: oklch(1 0 0);
@@ -125,7 +127,7 @@
 
 /* Glass effect utility */
 .glass {
-  background: oklch(0.17 0.005 260 / 0.6);
+  background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }

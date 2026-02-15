@@ -9,6 +9,7 @@ import MatchDetailPage from "@/pages/MatchDetail"
 import AdminPage from "@/pages/Admin"
 import TeamProfile from "@/pages/TeamProfile"
 import LoginPage from "@/pages/Login"
+import ThemeToggle from "@/components/ThemeToggle"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import "./App.css"
 
@@ -86,7 +87,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
           {/* Navigation bar */}
           <header className="sticky top-0 z-50 border-b border-border/50 glass">
             <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -108,6 +109,8 @@ function App() {
                   <NavItem to="/performance" icon={BarChart3} label="Performance" />
                   <PremiumLink />
                   <AdminLink />
+                  <div className="mx-1 w-px h-6 bg-border/50" />
+                  <ThemeToggle />
                   <AuthButton />
                 </nav>
               </div>

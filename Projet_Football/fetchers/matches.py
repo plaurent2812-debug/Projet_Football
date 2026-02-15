@@ -47,7 +47,7 @@ def get_next_round_fixtures(league_id: int) -> tuple[list[dict], str | None]:
     """
     url_api: str = "https://v3.football.api-sports.io/fixtures"
     # On prend 20 matchs pour être sûr de couvrir une journée complète
-    querystring: dict[str, str] = {"league": str(league_id), "season": str(SEASON), "next": "20"}
+    querystring: dict[str, str] = {"league": str(league_id), "season": str(SEASON), "next": "20", "lang": "fr"}
 
     response = requests.get(url_api, headers=headers, params=querystring)
     data = response.json()

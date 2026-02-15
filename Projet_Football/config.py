@@ -118,8 +118,12 @@ def api_get(endpoint: str, params: dict | None = None) -> dict | None:
 
     for attempt in range(API_MAX_RETRIES + 1):
         try:
+            # Force French language
+            request_params = params or {}
+            request_params["lang"] = "fr"
+            
             resp: requests.Response = requests.get(
-                url, headers=API_HEADERS, params=params or {}, timeout=15
+                url, headers=API_HEADERS, params=request_params, timeout=15
             )
             _request_count += 1
 

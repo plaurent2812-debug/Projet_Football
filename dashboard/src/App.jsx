@@ -9,6 +9,7 @@ import MatchDetailPage from "@/pages/MatchDetail"
 import AdminPage from "@/pages/Admin"
 import TeamProfile from "@/pages/TeamProfile"
 import LoginPage from "@/pages/Login"
+import PremiumPage from "@/pages/Premium"
 import ThemeToggle from "@/components/ThemeToggle"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import "./App.css"
@@ -45,15 +46,13 @@ function PremiumLink() {
   if (hasAccess('premium')) return null
 
   return (
-    <a
-      href={import.meta.env.VITE_STRIPE_PAYMENT_LINK || '#'}
-      target="_blank"
-      rel="noreferrer"
+    <NavLink
+      to="/abonnement"
       className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-amber-500 hover:bg-amber-500/10 transition-colors"
     >
       <Trophy className="w-4 h-4" />
       <span className="hidden sm:inline">Premium</span>
-    </a>
+    </NavLink>
   )
 }
 
@@ -131,6 +130,7 @@ function App() {
                 }
               />
               <Route path="/performance" element={<PerformancePage />} />
+              <Route path="/abonnement" element={<PremiumPage />} />
               <Route path="/match/:id" element={<MatchDetailPage />} />
               <Route path="/equipe/:name" element={<TeamProfile />} />
               <Route path="/admin" element={<AdminPage />} />

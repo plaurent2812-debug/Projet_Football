@@ -109,11 +109,18 @@ def fetch_events_for_fixtures(fixture_ids: list[int]) -> None:
     Returns:
         None.
     """
-    logger.info(f"=== Importation des events ({len(fixture_ids)} matchs) ===")
+    # Filtrer ceux qui ont déjà des events
+    ids_to_fetch = filter_existing_ids("match_events", "fixture_api_id", fixture_ids)
 
-    for i, fid in enumerate(fixture_ids):
+    if not ids_to_fetch:
+        logger.info("=== Events : Tout est déjà à jour ===")
+        return
+
+    logger.info(f"=== Importation des events ({len(ids_to_fetch)} matchs à traiter) ===")
+
+    for i, fid in enumerate(ids_to_fetch):
         if (i + 1) % 50 == 0 or i == 0:
-            logger.info(f"  Events : {i + 1}/{len(fixture_ids)}...")
+            logger.info(f"  Events : {i + 1}/{len(ids_to_fetch)}...")
 
         data = api_get("fixtures/events", {"fixture": fid})
         if not data or not data.get("response"):
@@ -154,6 +161,34 @@ def fetch_events_for_fixtures(fixture_ids: list[int]) -> None:
     logger.info("  ✅ Events importés.")
 
 
+def filter_existing_ids(table_name: str, id_column: str, fixture_ids: list[int]) -> list[int]:
+    """Return only fixture_ids that are NOT present in the specified table."""
+    if not fixture_ids:
+        return []
+    
+    existing_ids = set()
+    # Process in chunks of 30 to avoid URL length issues
+    chunk_size = 30
+    for i in range(0, len(fixture_ids), chunk_size):
+        chunk = fixture_ids[i:i + chunk_size]
+        try:
+            response = supabase.table(table_name)\
+                .select(id_column)\
+                .in_(id_column, chunk)\
+                .execute()
+            for row in response.data:
+                existing_ids.add(row[id_column])
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur check existance {table_name}: {e}")
+            
+    missing = [fid for fid in fixture_ids if fid not in existing_ids]
+    skipped = len(fixture_ids) - len(missing)
+    if skipped > 0:
+        logger.info(f"   ⏩ {skipped} matchs déjà en base ({table_name}), ignorés.")
+    
+    return missing
+
+
 def fetch_lineups_for_fixtures(fixture_ids: list[int]) -> None:
     """Fetch starting lineups and substitutes for a list of fixtures.
 
@@ -166,11 +201,18 @@ def fetch_lineups_for_fixtures(fixture_ids: list[int]) -> None:
     Returns:
         None.
     """
-    logger.info(f"=== Importation des compositions ({len(fixture_ids)} matchs) ===")
+    # Filtrer ceux qui ont déjà des lineups
+    ids_to_fetch = filter_existing_ids("match_lineups", "fixture_api_id", fixture_ids)
+    
+    if not ids_to_fetch:
+        logger.info("=== Compositions : Tout est déjà à jour ===")
+        return
 
-    for i, fid in enumerate(fixture_ids):
+    logger.info(f"=== Importation des compositions ({len(ids_to_fetch)} matchs à traiter) ===")
+
+    for i, fid in enumerate(ids_to_fetch):
         if (i + 1) % 50 == 0 or i == 0:
-            logger.info(f"  Lineups : {i + 1}/{len(fixture_ids)}...")
+            logger.info(f"  Lineups : {i + 1}/{len(ids_to_fetch)}...")
 
         data = api_get("fixtures/lineups", {"fixture": fid})
         if not data or not data.get("response"):
@@ -234,7 +276,14 @@ def fetch_team_stats_for_fixtures(fixture_ids: list[int]) -> None:
     Returns:
         None.
     """
-    logger.info(f"=== Importation des stats équipe ({len(fixture_ids)} matchs) ===")
+    # Filtrer ceux qui ont déjà des stats
+    ids_to_fetch = filter_existing_ids("match_team_stats", "fixture_api_id", fixture_ids)
+
+    if not ids_to_fetch:
+        logger.info("=== Stats : Tout est déjà à jour ===")
+        return
+
+    logger.info(f"=== Importation des stats équipe ({len(ids_to_fetch)} matchs à traiter) ===")
 
     def parse_stat(stats_list: list[dict], stat_name: str) -> int | float:
         """Extract a single stat value from an API statistics list.
@@ -263,9 +312,9 @@ def fetch_team_stats_for_fixtures(fixture_ids: list[int]) -> None:
                     return 0
         return 0
 
-    for i, fid in enumerate(fixture_ids):
+    for i, fid in enumerate(ids_to_fetch):
         if (i + 1) % 50 == 0 or i == 0:
-            logger.info(f"  Stats : {i + 1}/{len(fixture_ids)}...")
+            logger.info(f"  Stats : {i + 1}/{len(ids_to_fetch)}...")
 
         data = api_get("fixtures/statistics", {"fixture": fid})
         if not data or not data.get("response"):

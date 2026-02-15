@@ -236,152 +236,166 @@ def get_prediction_detail(fixture_id: str):
 @app.get("/api/performance")
 def get_performance(days: int = Query(30, description="Rolling window in days")):
     """Get model performance metrics over the last N days."""
-    cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    try:
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-    # Get finished fixtures with predictions
-    finished = (
-        supabase.table("fixtures")
-        .select("id, home_team, away_team, home_goals, away_goals, date, status")
-        .eq("status", "FT")
-        .gte("date", cutoff)
-        .order("date")
-        .execute()
-        .data
-        or []
-    )
+        # Get finished fixtures with predictions
+        finished = (
+            supabase.table("fixtures")
+            .select("id, home_team, away_team, home_goals, away_goals, date, status")
+            .eq("status", "FT")
+            .gte("date", cutoff)
+            .order("date")
+            .execute()
+            .data
+            or []
+        )
 
-    fixture_ids = [f["id"] for f in finished]
-    if not fixture_ids:
+        fixture_ids = [f["id"] for f in finished]
+        if not fixture_ids:
+            return {
+                "days": days,
+                "total_matches": 0,
+                "accuracy_1x2": 0,
+                "accuracy_btts": 0,
+                "avg_confidence": 0,
+                "value_bets": 0,
+                "daily_stats": [],
+            }
+
+        predictions = (
+            supabase.table("predictions")
+            .select("*")
+            .in_("fixture_id", fixture_ids)
+            .execute()
+            .data
+            or []
+        )
+
+        pred_by_fixture = {p["fixture_id"]: p for p in predictions}
+
+        correct_1x2 = 0
+        correct_btts = 0
+        correct_over_05 = 0
+        correct_over_15 = 0
+        correct_over_25 = 0
+        correct_over_35 = 0
+        correct_score = 0
+        total_over_05 = 0
+        total_over_15 = 0
+        total_over_25 = 0
+        total_over_35 = 0
+        total_score = 0
+        total_with_pred = 0
+        total_conf = 0
+        value_bets_count = 0
+        daily: dict[str, dict] = {}
+
+        for f in finished:
+            pred = pred_by_fixture.get(f["id"])
+            if not pred:
+                continue
+
+            # Helper to get field from top-level or stats_json
+            stats_json = pred.get("stats_json") or {}
+            def get_val(key, default=None):
+                val = pred.get(key)
+                if val is not None:
+                    return val
+                return stats_json.get(key, default)
+
+            total_with_pred += 1
+            total_conf += pred.get("confidence_score", 5)
+
+            hg = f.get("home_goals", 0) or 0
+            ag = f.get("away_goals", 0) or 0
+            total_goals = hg + ag
+            actual_result = "H" if hg > ag else ("D" if hg == ag else "A")
+            actual_btts = hg > 0 and ag > 0
+
+            # 1X2 accuracy
+            ph = get_val("proba_home", 33)
+            pd_val = get_val("proba_draw", 33)
+            pa = get_val("proba_away", 33)
+            predicted_result = "H" if ph >= pd_val and ph >= pa else ("A" if pa >= pd_val else "D")
+            if predicted_result == actual_result:
+                correct_1x2 += 1
+
+            # BTTS accuracy
+            btts_pred = (get_val("proba_btts", 50)) > 50
+            if btts_pred == actual_btts:
+                correct_btts += 1
+
+            # Over 0.5
+            p_o05 = get_val("proba_over_05")
+            if p_o05 is not None:
+                total_over_05 += 1
+                if (p_o05 > 50) == (total_goals > 0.5):
+                    correct_over_05 += 1
+
+            # Over 1.5
+            p_o15 = get_val("proba_over_15")
+            if p_o15 is not None:
+                total_over_15 += 1
+                if (p_o15 > 50) == (total_goals > 1.5):
+                    correct_over_15 += 1
+
+            # Over 2.5
+            p_o25 = get_val("proba_over_2_5") or get_val("proba_over_25")
+            if p_o25 is not None:
+                total_over_25 += 1
+                if (p_o25 > 50) == (total_goals > 2.5):
+                    correct_over_25 += 1
+
+            # Over 3.5
+            p_o35 = get_val("proba_over_35")
+            if p_o35 is not None:
+                total_over_35 += 1
+                if (p_o35 > 50) == (total_goals > 3.5):
+                    correct_over_35 += 1
+
+            # Score exact
+            pred_score = get_val("correct_score")
+            if pred_score:
+                total_score += 1
+                actual_score = f"{hg}-{ag}"
+                if str(pred_score).strip() == actual_score:
+                    correct_score += 1
+
+            # Value bets (handle both keys)
+            if pred.get("value_bet") or pred.get("is_value_bet"):
+                value_bets_count += 1
+
+            # Daily aggregation
+            day = f["date"][:10] if f.get("date") else "unknown"
+            if day not in daily:
+                daily[day] = {"date": day, "total": 0, "correct": 0}
+            daily[day]["total"] += 1
+            if predicted_result == actual_result:
+                daily[day]["correct"] += 1
+
+        def _pct(correct: int, total: int) -> float:
+            return round(correct / total * 100, 1) if total else 0
+
         return {
             "days": days,
-            "total_matches": 0,
-            "accuracy_1x2": 0,
-            "accuracy_btts": 0,
-            "avg_confidence": 0,
-            "value_bets": 0,
-            "daily_stats": [],
+            "total_matches": total_with_pred,
+            "accuracy_1x2": _pct(correct_1x2, total_with_pred),
+            "accuracy_btts": _pct(correct_btts, total_with_pred),
+            "accuracy_over_05": _pct(correct_over_05, total_over_05),
+            "accuracy_over_15": _pct(correct_over_15, total_over_15),
+            "accuracy_over_25": _pct(correct_over_25, total_over_25),
+            "accuracy_over_35": _pct(correct_over_35, total_over_35),
+            "accuracy_score": _pct(correct_score, total_score),
+            "avg_confidence": round(total_conf / total_with_pred, 1) if total_with_pred else 0,
+            "value_bets": value_bets_count,
+            "daily_stats": sorted(daily.values(), key=lambda x: x["date"]),
         }
 
-    predictions = (
-        supabase.table("predictions")
-        .select("*")
-        .in_("fixture_id", fixture_ids)
-        .execute()
-        .data
-        or []
-    )
-
-    pred_by_fixture = {p["fixture_id"]: p for p in predictions}
-
-    correct_1x2 = 0
-    correct_btts = 0
-    correct_over_05 = 0
-    correct_over_15 = 0
-    correct_over_25 = 0
-    correct_over_35 = 0
-    correct_score = 0
-    total_over_05 = 0
-    total_over_15 = 0
-    total_over_25 = 0
-    total_over_35 = 0
-    total_score = 0
-    total_with_pred = 0
-    total_conf = 0
-    value_bets_count = 0
-    daily: dict[str, dict] = {}
-
-    for f in finished:
-        pred = pred_by_fixture.get(f["id"])
-        if not pred:
-            continue
-
-        total_with_pred += 1
-        total_conf += pred.get("confidence_score", 5)
-
-        hg = f.get("home_goals", 0) or 0
-        ag = f.get("away_goals", 0) or 0
-        total_goals = hg + ag
-        actual_result = "H" if hg > ag else ("D" if hg == ag else "A")
-        actual_btts = hg > 0 and ag > 0
-
-        # 1X2 accuracy
-        ph = pred.get("proba_home", 33) or 33
-        pd_val = pred.get("proba_draw", 33) or 33
-        pa = pred.get("proba_away", 33) or 33
-        predicted_result = "H" if ph >= pd_val and ph >= pa else ("A" if pa >= pd_val else "D")
-        if predicted_result == actual_result:
-            correct_1x2 += 1
-
-        # BTTS accuracy
-        btts_pred = (pred.get("proba_btts", 50) or 50) > 50
-        if btts_pred == actual_btts:
-            correct_btts += 1
-
-
-
-        p_o05 = pred.get("proba_over_05")
-        if p_o05 is not None:
-            total_over_05 += 1
-            if (p_o05 > 50) == (total_goals > 0.5):
-                correct_over_05 += 1
-
-        # Over 1.5
-        p_o15 = pred.get("proba_over_15")
-        if p_o15 is not None:
-            total_over_15 += 1
-            if (p_o15 > 50) == (total_goals > 1.5):
-                correct_over_15 += 1
-
-        # Over 2.5
-        p_o25 = pred.get("proba_over_2_5") or pred.get("proba_over_25")
-        if p_o25 is not None:
-            total_over_25 += 1
-            if (p_o25 > 50) == (total_goals > 2.5):
-                correct_over_25 += 1
-
-        # Over 3.5
-        p_o35 = pred.get("proba_over_35")
-        if p_o35 is not None:
-            total_over_35 += 1
-            if (p_o35 > 50) == (total_goals > 3.5):
-                correct_over_35 += 1
-
-        # Score exact
-        pred_score = pred.get("correct_score")
-        if pred_score:
-            total_score += 1
-            actual_score = f"{hg}-{ag}"
-            if pred_score.strip() == actual_score:
-                correct_score += 1
-
-        if pred.get("value_bet"):
-            value_bets_count += 1
-
-        # Daily aggregation
-        day = f["date"][:10] if f.get("date") else "unknown"
-        if day not in daily:
-            daily[day] = {"date": day, "total": 0, "correct": 0}
-        daily[day]["total"] += 1
-        if predicted_result == actual_result:
-            daily[day]["correct"] += 1
-
-    def _pct(correct: int, total: int) -> float:
-        return round(correct / total * 100, 1) if total else 0
-
-    return {
-        "days": days,
-        "total_matches": total_with_pred,
-        "accuracy_1x2": _pct(correct_1x2, total_with_pred),
-        "accuracy_btts": _pct(correct_btts, total_with_pred),
-        "accuracy_over_05": _pct(correct_over_05, total_over_05),
-        "accuracy_over_15": _pct(correct_over_15, total_over_15),
-        "accuracy_over_25": _pct(correct_over_25, total_over_25),
-        "accuracy_over_35": _pct(correct_over_35, total_over_35),
-        "accuracy_score": _pct(correct_score, total_score),
-        "avg_confidence": round(total_conf / total_with_pred, 1) if total_with_pred else 0,
-        "value_bets": value_bets_count,
-        "daily_stats": sorted(daily.values(), key=lambda x: x["date"]),
-    }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ─── Team History ──────────────────────────────────────────────

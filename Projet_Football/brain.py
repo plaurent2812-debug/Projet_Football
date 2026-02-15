@@ -585,11 +585,28 @@ def run_brain() -> None:
             }
 
 
-            # Utiliser UPSERT pour éviter de supprimer si l'insertion échoue
-            supabase.table("predictions").upsert(insert_data, on_conflict="fixture_id").execute()
+            # Vérifier si une prédiction existe déjà pour ce match et ce modèle
+            existing = (
+                supabase.table("predictions")
+                .select("id")
+                .eq("fixture_id", fix["id"])
+                .eq("model_version", insert_data["model_version"])
+                .execute()
+                .data
+            )
+
+            if existing:
+                # Mise à jour
+                prediction_id = existing[0]["id"]
+                supabase.table("predictions").update(insert_data).eq("id", prediction_id).execute()
+                action_msg = f"🔄 Prédiction mise à jour (ID: {prediction_id})"
+            else:
+                # Insertion
+                supabase.table("predictions").insert(insert_data).execute()
+                action_msg = "💾 Nouvelle prédiction créée"
             
             logger.info(
-                f"   💾 Prédiction enregistrée → {final['proba_home']}-{final['proba_draw']}-{final['proba_away']} | {final.get('recommended_bet')}"
+                f"   {action_msg} → {final['proba_home']}-{final['proba_draw']}-{final['proba_away']} | {final.get('recommended_bet')}"
             )
 
         except Exception as e:

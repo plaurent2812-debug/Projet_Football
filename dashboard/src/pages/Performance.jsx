@@ -115,12 +115,17 @@ export default function PerformancePage() {
     const [data, setData] = useState(null)
     const [jours, setJours] = useState(30)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
         setLoading(true)
+        setError(null)
         fetchPerformance(jours)
             .then(setData)
-            .catch(console.error)
+            .catch(err => {
+                console.error(err)
+                setError(err.message)
+            })
             .finally(() => setLoading(false))
     }, [jours])
 
@@ -128,6 +133,26 @@ export default function PerformancePage() {
         return (
             <div className="flex items-center justify-center py-32">
                 <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center py-32 text-center space-y-4">
+                <div className="p-4 bg-destructive/10 rounded-full text-destructive">
+                    <XCircle className="w-8 h-8" />
+                </div>
+                <div>
+                    <h3 className="text-lg font-semibold">Erreur de chargement</h3>
+                    <p className="text-muted-foreground">{error}</p>
+                </div>
+                <button
+                    onClick={() => setJours(jours)}
+                    className="px-4 py-2 bg-secondary rounded-md text-sm font-medium hover:bg-secondary/80"
+                >
+                    Réessayer
+                </button>
             </div>
         )
     }

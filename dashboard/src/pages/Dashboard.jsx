@@ -33,6 +33,7 @@ function MatchRow({ match }) {
     const pred = match.prediction
     const time = match.date?.slice(11, 16) || "—"
     const isFinished = match.status === "FT"
+    const isLive = match.status === "1H" || match.status === "2H" || match.status === "HT"
 
     // Determine winner for visual weight
     const homeWon = isFinished && match.home_goals > match.away_goals
@@ -42,112 +43,94 @@ function MatchRow({ match }) {
         <div
             onClick={() => navigate(`/match/${match.id}`)}
             className={cn(
-                "group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3.5 cursor-pointer",
-                "hover:bg-accent/40 active:bg-accent/60 transition-all duration-150",
+                "group flex items-center gap-2 sm:gap-4 px-3 py-2 cursor-pointer h-10 sm:h-11", // Compact height
+                "hover:bg-accent/40 active:bg-accent/60 transition-colors duration-150",
                 "border-b border-border/30 last:border-b-0"
             )}
         >
-            {/* Time column */}
-            <div className="w-11 shrink-0 text-center">
+            {/* Star (Favorite) */}
+            <div
+                className="shrink-0 text-muted-foreground/30 hover:text-amber-400 cursor-pointer transition-colors p-1"
+                onClick={(e) => { e.stopPropagation(); /* toggle favorite */ }}
+            >
+                <Star className="w-4 h-4" />
+            </div>
+
+            {/* Time / Status */}
+            <div className="w-12 shrink-0 text-center flex flex-col justify-center">
                 {isFinished ? (
-                    <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider">
-                        Terminé
-                    </span>
+                    <span className="text-[10px] font-bold text-muted-foreground/70">Fin</span>
+                ) : isLive ? (
+                    <span className="text-[10px] font-bold text-red-500 animate-pulse">Live</span>
                 ) : (
-                    <div className="flex flex-col items-center">
-                        <Clock className="w-3 h-3 text-muted-foreground/50 mb-0.5" />
-                        <span className="text-sm font-bold tabular-nums text-foreground">
-                            {time}
-                        </span>
-                    </div>
+                    <span className="text-xs font-medium tabular-nums text-foreground/80">{time}</span>
                 )}
             </div>
 
-            {/* Separator */}
-            <div className="w-px h-8 bg-border/50 shrink-0" />
+            {/* Teams & Score Container */}
+            <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+                {/* Home Team */}
+                <span className={cn(
+                    "text-sm truncate text-right",
+                    homeWon ? "font-bold text-foreground" : "font-medium text-foreground/80",
+                    isFinished && !homeWon && "text-muted-foreground"
+                )}>
+                    {match.home_team}
+                </span>
 
-            {/* Teams + Score */}
-            <div className="flex-1 min-w-0 flex items-center">
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                        <span
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                navigate(`/equipe/${encodeURIComponent(match.home_team)}`)
-                            }}
-                            className={cn(
-                                "text-[13px] font-semibold truncate hover:text-primary hover:underline cursor-pointer transition-colors",
-                                homeWon ? "text-foreground" : isFinished ? "text-muted-foreground" : "text-foreground"
-                            )}
-                        >
-                            {match.home_team}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                navigate(`/equipe/${encodeURIComponent(match.away_team)}`)
-                            }}
-                            className={cn(
-                                "text-[13px] font-semibold truncate hover:text-primary hover:underline cursor-pointer transition-colors",
-                                awayWon ? "text-foreground" : isFinished ? "text-muted-foreground" : "text-foreground"
-                            )}
-                        >
-                            {match.away_team}
-                        </span>
-                    </div>
+                {/* Score / VS */}
+                <div className="w-12 text-center flex items-center justify-center font-bold tabular-nums text-sm bg-accent/20 rounded px-1 min-w-[40px]">
+                    {isFinished || isLive ? (
+                        <>
+                            <span className={cn(homeWon && "text-primary")}>{match.home_goals}</span>
+                            <span className="mx-1 opacity-40">-</span>
+                            <span className={cn(awayWon && "text-primary")}>{match.away_goals}</span>
+                        </>
+                    ) : (
+                        <span className="text-muted-foreground/40 text-[10px]">-</span>
+                    )}
                 </div>
 
-                {/* Score if finished */}
-                {isFinished && (
-                    <div className="w-8 shrink-0 text-center ml-2">
-                        <div className={cn("text-[13px] tabular-nums font-bold", homeWon && "text-foreground")}>
-                            {match.home_goals}
-                        </div>
-                        <div className={cn("text-[13px] tabular-nums font-bold mt-1", awayWon && "text-foreground")}>
-                            {match.away_goals}
-                        </div>
-                    </div>
-                )}
+                {/* Away Team */}
+                <span className={cn(
+                    "text-sm truncate text-left",
+                    awayWon ? "font-bold text-foreground" : "font-medium text-foreground/80",
+                    isFinished && !awayWon && "text-muted-foreground"
+                )}>
+                    {match.away_team}
+                </span>
             </div>
 
-            {/* Indicators */}
-            <div className="shrink-0 flex items-center gap-2">
+            {/* Indicators (Value Bet, etc) */}
+            <div className="w-20 shrink-0 flex justify-end">
                 {pred?.value_bet && isPremium && (
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
-                        <TrendingUp className="w-3 h-3 text-emerald-400" />
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase">Value</span>
-                    </div>
+                    <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        VAL
+                    </span>
                 )}
-                {pred && <ConfidencePill score={pred.confidence_score} />}
             </div>
-
-            {/* Arrow */}
-            <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
-        </div >
+        </div>
     )
 }
-
 
 /* ── League section ────────────────────────────────────────── */
 function LeagueSection({ leagueName, matches }) {
     return (
-        <div className="rounded-xl border border-border/50 bg-card/50 overflow-hidden">
+        <div className="rounded-lg border border-border/50 bg-card overflow-hidden shadow-sm mb-4">
             {/* League header */}
-            <div className="px-4 py-2.5 flex items-center justify-between border-b border-border/30 bg-accent/20">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-1 h-4 rounded-full bg-primary" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-foreground/90">
+            <div className="px-3 py-2 flex items-center justify-between bg-muted/30 border-b border-border/30">
+                <div className="flex items-center gap-2">
+                    {/* Flag placeholder could go here */}
+                    <span className="text-xs font-bold uppercase tracking-tight text-foreground/70">
                         {leagueName}
                     </span>
                 </div>
-                <span className="text-[11px] text-muted-foreground font-medium tabular-nums">
-                    {matches.length} match{matches.length > 1 ? "s" : ""}
+                <span className="text-[10px] text-muted-foreground font-medium tabular-nums bg-background/50 px-1.5 rounded">
+                    {matches.length}
                 </span>
             </div>
             {/* Rows */}
-            <div>
+            <div className="divide-y divide-border/10">
                 {matches.map((match) => (
                     <MatchRow key={match.id} match={match} />
                 ))}

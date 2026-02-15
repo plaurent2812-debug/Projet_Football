@@ -80,63 +80,93 @@ function AuthButton() {
   )
 }
 
+import { Sidebar } from "@/components/Sidebar"
+import { SportsNav } from "@/components/SportsNav"
+
+// ... existing imports ...
+
 function App() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [activeSport, setActiveSport] = useState("football")
 
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
-          {/* Navigation bar */}
-          <header className="sticky top-0 z-50 border-b border-border/50 glass">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans antialiased selection:bg-primary/20">
+
+          {/* Header (Top Bar) */}
+          <header className="sticky top-0 z-50 border-b border-border/40 glass backdrop-blur-md bg-background/80 supports-[backdrop-filter]:bg-background/60">
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
               <div className="flex items-center justify-between h-14">
                 {/* Logo */}
                 <NavLink to="/" className="flex items-center gap-2.5 group">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-shadow">
-                    <Zap className="w-4 h-4 text-white" />
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-all duration-300">
+                    <Zap className="w-5 h-5 text-white" />
                   </div>
-                  <span className="text-base font-extrabold tracking-tight">
-                    Proba<span className="gradient-text">Lab</span>
+                  <span className="text-lg font-black tracking-tight flex items-center gap-0.5">
+                    Proba<span className="text-primary">Lab</span>
                   </span>
                 </NavLink>
 
-                {/* Nav links */}
-                <nav className="flex items-center gap-1">
-                  <NavItem to="/" icon={Home} label="Accueil" />
-                  <NavItem to="/matchs" icon={ListChecks} label="Matchs" />
-                  <NavItem to="/performance" icon={BarChart3} label="Performance" />
-                  <PremiumLink />
-                  <AdminLink />
-                  <div className="mx-1 w-px h-6 bg-border/50" />
+                {/* Right Actions (Theme, Auth) */}
+                <div className="flex items-center gap-2">
+                  <div className="hidden md:flex items-center gap-1">
+                    <PremiumLink />
+                    <AdminLink />
+                    <div className="mx-2 w-px h-5 bg-border/50" />
+                  </div>
                   <ThemeToggle />
                   <AuthButton />
-                </nav>
+
+                  {/* Mobile Menu Button (Placeholder for now) */}
+                  <button className="md:hidden p-2 text-muted-foreground hover:bg-accent rounded-md">
+                    <ListChecks className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </header>
 
-          {/* Main content */}
-          <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route
-                path="/matchs"
-                element={
-                  <DashboardPage
-                    date={date}
-                    setDate={setDate}
-                  />
-                }
-              />
-              <Route path="/performance" element={<PerformancePage />} />
-              <Route path="/abonnement" element={<PremiumPage />} />
-              <Route path="/match/:id" element={<MatchDetailPage />} />
-              <Route path="/equipe/:name" element={<TeamProfile />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/login" element={<LoginPage />} />
-            </Routes>
-          </main>
+          {/* Main Layout Grid */}
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 transition-all duration-500 ease-in-out">
+            <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-8 items-start">
+
+              {/* Left Sidebar (Hidden on mobile for now) */}
+              <Sidebar className="hidden md:block sticky top-24" />
+
+              {/* Main Content Area */}
+              <main className="min-w-0">
+                {/* Sports Navigation Tabs */}
+                <SportsNav activeSport={activeSport} onSportChange={setActiveSport} />
+
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route
+                      path="/matchs"
+                      element={
+                        <DashboardPage
+                          date={date}
+                          setDate={setDate}
+                        />
+                      }
+                    />
+                    {/* Redirect root to /matchs or keep HomePage as landing */}
+                    {/* If we want Flashscore style, root usually shows matches directly */}
+
+                    <Route path="/performance" element={<PerformancePage />} />
+                    <Route path="/abonnement" element={<PremiumPage />} />
+                    <Route path="/match/:id" element={<MatchDetailPage />} />
+                    <Route path="/equipe/:name" element={<TeamProfile />} />
+                    <Route path="/admin" element={<AdminPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                  </Routes>
+                </div>
+              </main>
+
+            </div>
+          </div>
+
         </div>
       </BrowserRouter>
     </AuthProvider>

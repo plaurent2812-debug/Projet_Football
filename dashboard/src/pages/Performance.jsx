@@ -48,7 +48,7 @@ function AccuracyRing({ value, size = 52, strokeWidth = 5 }) {
 
 
 /* ── Market accuracy card ──────────────────────────────────── */
-function MarketCard({ label, accuracy, icon: Icon, color }) {
+function MarketCard({ label, accuracy, icon: Icon, color, isAdmin }) {
     return (
         <div className="flex items-center gap-3 p-3.5 rounded-xl bg-card/50 border border-border/40 hover:border-border/70 transition-colors">
             <div className="relative">
@@ -61,11 +61,13 @@ function MarketCard({ label, accuracy, icon: Icon, color }) {
                 <p className="text-sm font-semibold truncate">{label}</p>
                 <div className="flex items-center gap-1 mt-0.5">
                     <Icon className={cn("w-3 h-3", color)} />
-                    <span className={cn("text-[11px] font-medium",
-                        accuracy >= 70 ? "text-emerald-400" : accuracy >= 50 ? "text-amber-400" : "text-red-400"
-                    )}>
-                        {accuracy >= 70 ? "Excellent" : accuracy >= 50 ? "Correct" : "À améliorer"}
-                    </span>
+                    {isAdmin && (
+                        <span className={cn("text-[11px] font-medium",
+                            accuracy >= 70 ? "text-emerald-400" : accuracy >= 50 ? "text-amber-400" : "text-red-400"
+                        )}>
+                            {accuracy >= 70 ? "Excellent" : accuracy >= 50 ? "Correct" : "À améliorer"}
+                        </span>
+                    )}
                 </div>
             </div>
         </div>
@@ -222,6 +224,7 @@ export default function PerformancePage() {
                                 accuracy={m.accuracy}
                                 icon={m.icon}
                                 color={m.color}
+                                isAdmin={isAdmin}
                             />
                         ))}
                     </div>

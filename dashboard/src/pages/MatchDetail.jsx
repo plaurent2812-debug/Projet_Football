@@ -277,7 +277,7 @@ export default function MatchDetailPage() {
                                     </CardHeader>
                                     <CardContent className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-muted-foreground">Pari recommandé</span>
+                                            <span className="text-sm text-muted-foreground">Avis de l'expert :</span>
                                             <Badge className="bg-primary/15 text-primary hover:bg-primary/20 border-0">
                                                 {p.recommended_bet}
                                             </Badge>

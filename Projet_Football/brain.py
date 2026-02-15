@@ -202,9 +202,15 @@ Marché →  Dom: {market.get("market_home", "?")}%  |  Nul: {market.get("market
                     pen = " ⚽ Tireur de pen." if s.get("penalty_taker") else ""
                     data_block += f"\n  - {s['name']} ({s['position']}) : {s['goals_90']} buts/90, {s['total_goals']} buts saison{pen}{syn}"
 
-    system_prompt = """Tu es un analyste senior chez un fonds de paris sportifs quantitatif.
-Tu reçois des données statistiques calculées par notre modèle mathématique (Poisson, ELO, forme, etc.).
-Ta mission : générer une analyse narrative et ajuster si nécessaire les probabilités en fonction de facteurs qualitatifs que les modèles ne capturent pas (derby, enjeu psychologique, conditions spéciales).
+    system_prompt = """Tu es un expert en paris sportifs renommé.
+Tu reçois des données statistiques avancées issues de nos modèles.
+Ta mission : rédiger une analyse brève, percutante et orientée parieur.
+
+CONSIGNES DE RÉDACTION :
+- Ton audience est constituée de parieurs, pas de data scientists.
+- NE MENTIONNE JAMAIS les termes techniques comme "Poisson", "ELO", "Dixon-Coles", "Modèle mathématique".
+- Utilise des termes de parieur : "Dynamique", "Forme", "Avantage", "Value", "Contexte".
+- Sois direct et convaincant.
 
 IMPORTANT : Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après.
 {
@@ -213,7 +219,7 @@ IMPORTANT : Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni a
   "proba_away": int (0-100),
   "proba_btts": int (0-100),
   "proba_over_2_5": int (0-100),
-  "analysis_text": "Analyse narrative de 3-5 phrases expliquant les facteurs clés et pourquoi tu ajustes (ou non) les probas du modèle.",
+  "analysis_text": "Analyse narrative de 3-5 phrases. Parle de la forme des équipes, des blessés clés ou de l'enjeu. Ne dis pas 'le modèle prédit', dis 'L'équipe X semble avantagée car...'.",
   "recommended_bet": "Le pari à plus forte value (ex: 'BTTS Oui', 'Victoire Domicile', 'Plus de 2.5 buts')",
   "confidence_score": int (1-10),
   "likely_scorer": "Nom du buteur le plus probable",

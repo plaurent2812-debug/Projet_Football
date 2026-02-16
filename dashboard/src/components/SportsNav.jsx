@@ -1,16 +1,11 @@
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { Trophy, Activity, Flag } from "lucide-react"
+import { Trophy, Activity } from "lucide-react"
 
 const SPORTS = [
     { id: "football", label: "Football", icon: <Trophy className="w-4 h-4" /> },
-    { id: "basketball", label: "Basket", icon: <Activity className="w-4 h-4" />, disabled: true },
-    { id: "tennis", label: "Tennis", icon: <Activity className="w-4 h-4" />, disabled: true },
-    { id: "rugby", label: "Rugby", icon: <Flag className="w-4 h-4" />, disabled: true },
-    { id: "cricket", label: "Cricket", icon: <Activity className="w-4 h-4" />, disabled: true },
-    { id: "volleyball", label: "Volley", icon: <Activity className="w-4 h-4" />, disabled: true },
-    { id: "handball", label: "Handball", icon: <Activity className="w-4 h-4" />, disabled: true },
+    { id: "nhl", label: "NHL", icon: <Activity className="w-4 h-4" /> },
 ]
 
 export function SportsNav({ activeSport = "football", onSportChange }) {
@@ -24,14 +19,12 @@ export function SportsNav({ activeSport = "football", onSportChange }) {
                                 key={sport.id}
                                 variant="ghost"
                                 size="sm"
-                                disabled={sport.disabled}
-                                onClick={() => !sport.disabled && onSportChange?.(sport.id)}
+                                onClick={() => onSportChange?.(sport.id)}
                                 className={cn(
                                     "flex flex-col items-center justify-center gap-1 h-14 min-w-[70px] rounded-none border-b-2 transition-all hover:bg-white/10 hover:text-white",
                                     activeSport === sport.id
                                         ? "border-white bg-white/10 font-bold opacity-100"
-                                        : "border-transparent opacity-70 hover:opacity-100",
-                                    sport.disabled && "opacity-40 cursor-not-allowed"
+                                        : "border-transparent opacity-70 hover:opacity-100"
                                 )}
                             >
                                 {sport.icon}

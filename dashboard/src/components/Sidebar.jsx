@@ -9,6 +9,7 @@ import { ChevronDown, ChevronRight } from "lucide-react"
 const PINNED_LEAGUES = [
     { id: 39, name: "Premier League", country: "Angleterre", icon: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
     { id: 61, name: "Ligue 1", country: "France", icon: "🇫🇷" },
+    { id: 62, name: "Ligue 2", country: "France", icon: "🇫🇷" },
     { id: 140, name: "La Liga", country: "Espagne", icon: "🇪🇸" },
     { id: 135, name: "Serie A", country: "Italie", icon: "🇮🇹" },
     { id: 78, name: "Bundesliga", country: "Allemagne", icon: "🇩🇪" },

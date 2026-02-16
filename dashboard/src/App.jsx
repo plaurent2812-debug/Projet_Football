@@ -108,6 +108,7 @@ function AuthButton() {
 function App() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [activeSport, setActiveSport] = useState("football")
+  const [selectedLeague, setSelectedLeague] = useState(null)
 
   return (
     <AuthProvider>
@@ -154,7 +155,7 @@ function App() {
             <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_340px] gap-6 items-start">
 
               {/* Left Sidebar */}
-              <Sidebar className="hidden md:block sticky top-36" />
+              <Sidebar className="hidden md:block sticky top-36" selectedLeague={selectedLeague} onLeagueSelect={setSelectedLeague} />
 
               {/* Main Content Area */}
               <main className="min-w-0 bg-white rounded-xl shadow-sm border border-border/40 min-h-[80vh]">
@@ -168,6 +169,8 @@ function App() {
                           <DashboardPage
                             date={date}
                             setDate={setDate}
+                            selectedLeague={selectedLeague}
+                            setSelectedLeague={setSelectedLeague}
                           />
                         }
                       />

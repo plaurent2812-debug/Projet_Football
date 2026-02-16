@@ -197,7 +197,7 @@ function LeagueSection({ leagueName, matches }) {
 }
 
 /* ── Dashboard Page ────────────────────────────────────────── */
-export default function DashboardPage({ date, setDate }) {
+export default function DashboardPage({ date, setDate, selectedLeague, setSelectedLeague }) {
     const { isPremium } = useAuth()
     const [matches, setMatches] = useState([])
     const [activeTab, setActiveTab] = useState("all")
@@ -234,6 +234,7 @@ export default function DashboardPage({ date, setDate }) {
     const filteredMatches = matches.filter(m => {
         if (activeTab === "live") return ["1H", "2H", "HT", "ET", "P", "LIVE"].includes(m.status)
         if (activeTab === "value") return m.prediction?.value_bet
+        if (selectedLeague) return m.league_id === selectedLeague
         return true
     })
 
@@ -295,6 +296,25 @@ export default function DashboardPage({ date, setDate }) {
                     </Button>
                 </div>
             </div>
+
+            {/* Active League Filter Indicator */}
+            {selectedLeague && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+                    <span className="text-muted-foreground">Filtre :</span>
+                    <span className="font-semibold text-primary">
+                        {filteredMatches.length > 0 ? byLeague[Object.keys(byLeague)[0]] && Object.keys(byLeague)[0] : "Ligue sélectionnée"}
+                    </span>
+                    <span className="text-muted-foreground">({filteredMatches.length} match{filteredMatches.length !== 1 ? "s" : ""})</span>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setSelectedLeague?.(null)}
+                    >
+                        Effacer le filtre
+                    </Button>
+                </div>
+            )}
 
             {/* Content */}
             {loading ? (

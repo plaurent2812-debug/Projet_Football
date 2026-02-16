@@ -1,9 +1,10 @@
 import { useState } from "react"
+import { useNavigate, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight, Star } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 
 const PINNED_LEAGUES = [
     { id: 39, name: "Premier League", country: "Angleterre", icon: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
@@ -14,8 +15,18 @@ const PINNED_LEAGUES = [
     { id: 2, name: "Champions League", country: "Europe", icon: "🇪🇺" },
 ]
 
-export function Sidebar({ className }) {
+export function Sidebar({ className, selectedLeague, onLeagueSelect }) {
     const [myTeamsOpen, setMyTeamsOpen] = useState(true)
+    const navigate = useNavigate()
+    const location = useLocation()
+
+    const handleLeagueClick = (leagueId) => {
+        const newValue = selectedLeague === leagueId ? null : leagueId
+        onLeagueSelect?.(newValue)
+        if (location.pathname !== "/matchs") {
+            navigate("/matchs")
+        }
+    }
 
     return (
         <aside className={cn("hidden md:flex flex-col w-[240px] shrink-0 border-r bg-background", className)}>
@@ -33,7 +44,13 @@ export function Sidebar({ className }) {
                                     key={league.id}
                                     variant="ghost"
                                     size="sm"
-                                    className="w-full justify-start gap-3 h-9 font-normal text-sm"
+                                    onClick={() => handleLeagueClick(league.id)}
+                                    className={cn(
+                                        "w-full justify-start gap-3 h-9 font-normal text-sm transition-all",
+                                        selectedLeague === league.id
+                                            ? "bg-primary/10 text-primary font-semibold ring-1 ring-primary/20"
+                                            : "hover:bg-muted"
+                                    )}
                                 >
                                     <span className="text-base leading-none">{league.icon}</span>
                                     <span className="truncate">{league.name}</span>
@@ -63,27 +80,6 @@ export function Sidebar({ className }) {
                                 <p className="text-[10px] text-muted-foreground italic">Aucune équipe favorite</p>
                             </div>
                         )}
-                    </div>
-
-                    <Separator />
-
-                    {/* Countries Placeholder */}
-                    <div>
-                        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 px-2">
-                            Pays
-                        </h3>
-                        <div className="space-y-1">
-                            {["Angleterre", "France", "Espagne", "Italie", "Allemagne", "Portugal", "Pays-Bas"].map((country) => (
-                                <Button
-                                    key={country}
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-start h-8 px-2 text-muted-foreground font-normal hover:text-foreground"
-                                >
-                                    {country}
-                                </Button>
-                            ))}
-                        </div>
                     </div>
                 </div>
             </ScrollArea>

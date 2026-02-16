@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom"
 import { useState } from "react"
-import { BarChart3, Home, Zap, Trophy, ListChecks, Shield } from "lucide-react"
+import { BarChart3, Home, Zap, Trophy, ListChecks, Shield, Menu } from "lucide-react"
 import { cn } from "@/lib/utils"
 import HomePage from "@/pages/HomePage"
 import DashboardPage from "@/pages/Dashboard"
@@ -12,6 +12,9 @@ import LoginPage from "@/pages/Login"
 import PremiumPage from "@/pages/Premium"
 import ThemeToggle from "@/components/ThemeToggle"
 import { AuthProvider, useAuth } from "@/lib/auth"
+import { Sidebar } from "@/components/Sidebar"
+import { SportsNav } from "@/components/SportsNav"
+import { RightSidebar } from "@/components/RightSidebar"
 import "./App.css"
 
 function NavItem({ to, icon: Icon, label }) {
@@ -80,11 +83,6 @@ function AuthButton() {
   )
 }
 
-import { Sidebar } from "@/components/Sidebar"
-import { SportsNav } from "@/components/SportsNav"
-
-// ... existing imports ...
-
 function App() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [activeSport, setActiveSport] = useState("football")
@@ -92,53 +90,52 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans antialiased selection:bg-primary/20">
+        <div className="min-h-screen bg-[#f3f4f6] text-foreground transition-colors duration-300 font-sans antialiased selection:bg-primary/20">
 
           {/* Header (Top Bar) */}
-          <header className="sticky top-0 z-50 border-b border-border/40 glass backdrop-blur-md bg-background/80 supports-[backdrop-filter]:bg-background/60">
+          <header className="sticky top-0 z-50 bg-[#374df5] border-b border-white/10 shadow-sm">
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
               <div className="flex items-center justify-between h-14">
                 {/* Logo */}
                 <NavLink to="/" className="flex items-center gap-2.5 group">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-all duration-300">
+                  <div className="p-1.5 bg-white/10 rounded-lg">
                     <Zap className="w-5 h-5 text-white" />
                   </div>
-                  <span className="text-lg font-black tracking-tight flex items-center gap-0.5">
-                    Proba<span className="text-primary">Lab</span>
+                  <span className="text-xl font-black tracking-tight text-white flex items-center gap-0.5">
+                    Sofa<span className="opacity-80 font-bold">Score</span>
                   </span>
                 </NavLink>
 
                 {/* Right Actions (Theme, Auth) */}
-                <div className="flex items-center gap-2">
-                  <div className="hidden md:flex items-center gap-1">
-                    <PremiumLink />
-                    <AdminLink />
-                    <div className="mx-2 w-px h-5 bg-border/50" />
+                <div className="flex items-center gap-3 text-white">
+                  <div className="hidden md:flex items-center gap-2">
+                    {/* Placeholder Search */}
+                    <div className="bg-white/10 rounded-full px-3 py-1.5 flex items-center gap-2 text-sm text-white/70 min-w-[200px]">
+                      <ListChecks className="w-4 h-4" />
+                      <span>Rechercher...</span>
+                    </div>
                   </div>
-                  <ThemeToggle />
+                  <ThemeToggle className="text-white hover:bg-white/10" />
                   <AuthButton />
-
-                  {/* Mobile Menu Button (Placeholder for now) */}
-                  <button className="md:hidden p-2 text-muted-foreground hover:bg-accent rounded-md">
-                    <ListChecks className="w-5 h-5" />
+                  <button className="md:hidden p-2 hover:bg-white/10 rounded-md">
+                    <Menu className="w-6 h-6" />
                   </button>
                 </div>
               </div>
             </div>
+            {/* Sports Nav attached to header */}
+            <SportsNav activeSport={activeSport} onSportChange={setActiveSport} />
           </header>
 
           {/* Main Layout Grid */}
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 transition-all duration-500 ease-in-out">
-            <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-8 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_340px] gap-6 items-start">
 
-              {/* Left Sidebar (Hidden on mobile for now) */}
-              <Sidebar className="hidden md:block sticky top-24" />
+              {/* Left Sidebar */}
+              <Sidebar className="hidden md:block sticky top-36" />
 
               {/* Main Content Area */}
-              <main className="min-w-0">
-                {/* Sports Navigation Tabs */}
-                <SportsNav activeSport={activeSport} onSportChange={setActiveSport} />
-
+              <main className="min-w-0 bg-white rounded-xl shadow-sm border border-border/40 min-h-[80vh]">
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <Routes>
                     <Route path="/" element={<HomePage />} />
@@ -151,9 +148,6 @@ function App() {
                         />
                       }
                     />
-                    {/* Redirect root to /matchs or keep HomePage as landing */}
-                    {/* If we want Flashscore style, root usually shows matches directly */}
-
                     <Route path="/performance" element={<PerformancePage />} />
                     <Route path="/abonnement" element={<PremiumPage />} />
                     <Route path="/match/:id" element={<MatchDetailPage />} />
@@ -163,6 +157,9 @@ function App() {
                   </Routes>
                 </div>
               </main>
+
+              {/* Right Sidebar */}
+              <RightSidebar />
 
             </div>
           </div>

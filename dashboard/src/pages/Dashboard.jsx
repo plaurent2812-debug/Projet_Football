@@ -116,21 +116,21 @@ function MatchRow({ match }) {
 /* ── League section ────────────────────────────────────────── */
 function LeagueSection({ leagueName, matches }) {
     return (
-        <div className="rounded-lg border border-border/50 bg-card overflow-hidden shadow-sm mb-4">
+        <div className="bg-transparent">
             {/* League header */}
-            <div className="px-3 py-2 flex items-center justify-between bg-muted/30 border-b border-border/30">
-                <div className="flex items-center gap-2">
-                    {/* Flag placeholder could go here */}
-                    <span className="text-xs font-bold uppercase tracking-tight text-foreground/70">
+            <div className="px-4 py-2 flex items-center gap-3 bg-[#f3f4f6]/50 border-t border-b border-border/40 mt-0">
+                <div className="w-5 h-5 rounded-full bg-white border flex items-center justify-center text-[10px] text-muted-foreground font-bold shadow-sm">
+                    {leagueName.charAt(0)}
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-xs font-bold uppercase tracking-tight text-foreground/80">
                         {leagueName}
                     </span>
+                    <span className="text-[10px] text-muted-foreground">Monde</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-medium tabular-nums bg-background/50 px-1.5 rounded">
-                    {matches.length}
-                </span>
             </div>
             {/* Rows */}
-            <div className="divide-y divide-border/10">
+            <div className="divide-y divide-border/20 bg-white">
                 {matches.map((match) => (
                     <MatchRow key={match.id} match={match} />
                 ))}
@@ -184,97 +184,56 @@ export default function DashboardPage({ date, setDate }) {
 
     return (
         <div className="space-y-5 pb-12">
-            {/* Header strip */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                {/* Left: Stats */}
-                <div className="flex items-center gap-3">
-                    <div className="flex items-baseline gap-1.5">
-                        <span className="text-2xl font-black tabular-nums">{filteredMatches.length}</span>
-                        <span className="text-sm text-muted-foreground font-medium">matchs</span>
-                    </div>
-                    <div className="w-px h-5 bg-border" />
-                    <div className="flex items-baseline gap-1.5">
-                        <span className="text-lg font-bold tabular-nums text-primary">{totalAnalyzed}</span>
-                        <span className="text-xs text-muted-foreground">analysés</span>
-                    </div>
-                    {totalValue > 0 && (
-                        <>
-                            <div className="w-px h-5 bg-border" />
-                            <div className="flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                                <span className="text-lg font-bold tabular-nums text-emerald-400">{totalValue}</span>
-                                <span className="text-xs text-muted-foreground">value</span>
-                            </div>
-                        </>
+            {/* Header / Tabs */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-border/40">
+                <div className="flex items-center gap-6">
+                    <button
+                        onClick={() => setActiveTab("all")}
+                        className={cn(
+                            "text-sm font-bold uppercase tracking-wide pb-3 border-b-2 transition-colors",
+                            activeTab === "all" ? "text-[#374df5] border-[#374df5]" : "text-muted-foreground border-transparent hover:text-foreground"
+                        )}
+                    >
+                        Tous
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("live")}
+                        className={cn(
+                            "text-sm font-bold uppercase tracking-wide pb-3 border-b-2 transition-colors",
+                            activeTab === "live" ? "text-red-500 border-red-500" : "text-muted-foreground border-transparent hover:text-red-500"
+                        )}
+                    >
+                        En Direct <span className="text-[10px] align-top opacity-50 ml-0.5">({matches.filter(m => m.status === "1H" || m.status === "2H").length})</span>
+                    </button>
+                    {isPremium && (
+                        <button
+                            onClick={() => setActiveTab("value")}
+                            className={cn(
+                                "text-sm font-bold uppercase tracking-wide pb-3 border-b-2 transition-colors",
+                                activeTab === "value" ? "text-emerald-500 border-emerald-500" : "text-muted-foreground border-transparent hover:text-emerald-500"
+                            )}
+                        >
+                            Value Bets
+                        </button>
                     )}
                 </div>
 
-                {/* Right: Controls */}
-                <div className="flex items-center gap-2">
-                    {/* Filter tabs */}
-                    <div className="flex p-0.5 rounded-lg bg-secondary/50 ring-1 ring-border/50">
-                        <button
-                            onClick={() => setActiveTab("all")}
-                            className={cn(
-                                "px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
-                                activeTab === "all"
-                                    ? "bg-card text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            Tous
-                        </button>
-                        {isPremium && (
-                            <button
-                                onClick={() => setActiveTab("value")}
-                                className={cn(
-                                    "px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 flex items-center gap-1",
-                                    activeTab === "value"
-                                        ? "bg-card text-emerald-400 shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                <Sparkles className="w-3 h-3" />
-                                Value
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Date selector */}
-                    <div className="flex items-center rounded-lg bg-secondary/50 ring-1 ring-border/50 overflow-hidden">
-                        <button
-                            onClick={() => setDate(yesterday)}
-                            className="p-2 hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <input
-                            type="date"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            className="bg-transparent border-none text-xs font-semibold focus:ring-0 focus:outline-none px-1 w-28 text-center tabular-nums"
-                        />
-                        <button
-                            onClick={() => setDate(tomorrow)}
-                            className="p-2 hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground"
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
+                {/* Date Selector (Simplified) */}
+                <div className="flex items-center gap-2 bg-secondary/50 rounded-lg p-1">
+                    <button onClick={() => setDate(yesterday)} className="p-1 hover:bg-white rounded shadow-sm text-muted-foreground transition-all"><ChevronLeft className="w-4 h-4" /></button>
+                    <span className="text-xs font-bold tabular-nums min-w-[80px] text-center">{date}</span>
+                    <button onClick={() => setDate(tomorrow)} className="p-1 hover:bg-white rounded shadow-sm text-muted-foreground transition-all"><ChevronRight className="w-4 h-4" /></button>
                 </div>
             </div>
 
             {/* Match list by league */}
             {
                 loading ? (
-                    <div className="flex flex-col items-center justify-center py-32 space-y-4">
-                        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                        <p className="text-muted-foreground text-xs animate-pulse">
-                            Chargement des analyses...
-                        </p>
+                    <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                        <div className="w-8 h-8 border-2 border-[#374df5]/30 border-t-[#374df5] rounded-full animate-spin" />
                     </div>
                 ) : leagueOrder.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-0 divide-y divide-border/40">
                         {leagueOrder.map(league => (
                             <LeagueSection
                                 key={league}
@@ -284,12 +243,8 @@ export default function DashboardPage({ date, setDate }) {
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-32 rounded-xl border border-dashed border-border/50 bg-card/30">
-                        <Calendar className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-                        <h3 className="text-base font-semibold text-muted-foreground">Aucun match</h3>
-                        <p className="text-xs text-muted-foreground/70 mt-1">
-                            Essayez une autre date
-                        </p>
+                    <div className="text-center py-20">
+                        <p className="text-muted-foreground text-sm">Aucun match disponible pour cette date.</p>
                     </div>
                 )
             }

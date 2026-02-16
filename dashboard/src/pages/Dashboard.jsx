@@ -1,146 +1,202 @@
-import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
-import {
-    ChevronRight, Calendar, ChevronLeft, Sparkles, Clock,
-    TrendingUp, Target
-} from "lucide-react"
-import { useNavigate } from "react-router-dom"
-import { fetchPredictions } from "@/lib/api"
 import { useState, useEffect } from "react"
-import { useAuth } from "@/lib/auth"
+import { useNavigate } from "react-router-dom"
+import { format, addDays, subDays } from "date-fns"
+import { fr } from "date-fns/locale"
+import {
+    Calendar as CalendarIcon,
+    ChevronLeft,
+    ChevronRight,
+    Star,
+    TrendingUp,
+    Clock,
+    Trophy
+} from "lucide-react"
 
+import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth"
+import { fetchPredictions } from "@/lib/api"
+
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
 
 /* ── Confidence indicator ──────────────────────────────────── */
-function ConfidencePill({ score }) {
+function ConfidenceBadge({ score }) {
     if (score == null) return null
-    const bg = score >= 8
-        ? "bg-emerald-500/15 text-emerald-400 ring-emerald-500/20"
-        : score >= 6
-            ? "bg-amber-500/15 text-amber-400 ring-amber-500/20"
-            : "bg-zinc-500/15 text-zinc-400 ring-zinc-500/20"
+
+    let variant = "secondary"
+    let className = "bg-zinc-100 text-zinc-600"
+
+    if (score >= 8) {
+        className = "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
+    } else if (score >= 6) {
+        className = "bg-amber-100 text-amber-700 hover:bg-amber-100"
+    }
+
     return (
-        <span className={cn("text-[11px] font-bold tabular-nums px-2 py-0.5 rounded-full ring-1", bg)}>
-            {score}<span className="text-[9px] opacity-60">/10</span>
-        </span>
+        <Badge variant={variant} className={cn("h-5 px-1.5 text-[10px] tabular-nums pointer-events-none", className)}>
+            {score}/10
+        </Badge>
     )
 }
 
-
-/* ── Single match row ──────────────────────────────────────── */
+/* ── Match Row ─────────────────────────────────────────────── */
 function MatchRow({ match }) {
     const navigate = useNavigate()
     const { isPremium } = useAuth()
     const pred = match.prediction
-    const time = match.date?.slice(11, 16) || "—"
-    const isFinished = match.status === "FT"
-    const isLive = match.status === "1H" || match.status === "2H" || match.status === "HT"
 
-    // Determine winner for visual weight
+    // Status Logic
+    const isFinished = match.status === "FT" || match.status === "AET" || match.status === "PEN"
+    const isLive = ["1H", "2H", "HT", "ET", "P", "LIVE"].includes(match.status)
+    const isPostponed = match.status === "PST"
+
+    // Winner Logic
     const homeWon = isFinished && match.home_goals > match.away_goals
     const awayWon = isFinished && match.away_goals > match.home_goals
 
+    const time = match.date ? match.date.slice(11, 16) : "--:--"
+
     return (
-        <div
+        <TableRow
+            className="cursor-pointer hover:bg-muted/50 transition-colors border-b border-border/40 group"
             onClick={() => navigate(`/match/${match.id}`)}
-            className={cn(
-                "group flex items-center gap-2 sm:gap-4 px-3 py-2 cursor-pointer h-10 sm:h-11", // Compact height
-                "hover:bg-accent/40 active:bg-accent/60 transition-colors duration-150",
-                "border-b border-border/30 last:border-b-0"
-            )}
         >
-            {/* Star (Favorite) */}
-            <div
-                className="shrink-0 text-muted-foreground/30 hover:text-amber-400 cursor-pointer transition-colors p-1"
-                onClick={(e) => { e.stopPropagation(); /* toggle favorite */ }}
-            >
-                <Star className="w-4 h-4" />
-            </div>
-
             {/* Time / Status */}
-            <div className="w-12 shrink-0 text-center flex flex-col justify-center">
-                {isFinished ? (
-                    <span className="text-[10px] font-bold text-muted-foreground/70">Fin</span>
-                ) : isLive ? (
-                    <span className="text-[10px] font-bold text-red-500 animate-pulse">Live</span>
-                ) : (
-                    <span className="text-xs font-medium tabular-nums text-foreground/80">{time}</span>
-                )}
-            </div>
-
-            {/* Teams & Score Container */}
-            <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                {/* Home Team */}
-                <span className={cn(
-                    "text-sm truncate text-right",
-                    homeWon ? "font-bold text-foreground" : "font-medium text-foreground/80",
-                    isFinished && !homeWon && "text-muted-foreground"
-                )}>
-                    {match.home_team}
-                </span>
-
-                {/* Score / VS */}
-                <div className="w-12 text-center flex items-center justify-center font-bold tabular-nums text-sm bg-accent/20 rounded px-1 min-w-[40px]">
-                    {isFinished || isLive ? (
-                        <>
-                            <span className={cn(homeWon && "text-primary")}>{match.home_goals}</span>
-                            <span className="mx-1 opacity-40">-</span>
-                            <span className={cn(awayWon && "text-primary")}>{match.away_goals}</span>
-                        </>
+            <TableCell className="w-[80px] py-3 pl-4 pr-2 font-medium text-xs text-muted-foreground">
+                <div className="flex flex-col items-center justify-center gap-1">
+                    {isLive ? (
+                        <Badge variant="destructive" className="h-5 px-1.5 text-[10px] animate-pulse">LIVE</Badge>
+                    ) : isFinished ? (
+                        <span className="text-[10px] font-bold opacity-70">FIN</span>
                     ) : (
-                        <span className="text-muted-foreground/40 text-[10px]">-</span>
+                        <span className="tabular-nums font-semibold text-foreground/80">{time}</span>
                     )}
                 </div>
+            </TableCell>
 
-                {/* Away Team */}
-                <span className={cn(
-                    "text-sm truncate text-left",
-                    awayWon ? "font-bold text-foreground" : "font-medium text-foreground/80",
-                    isFinished && !awayWon && "text-muted-foreground"
-                )}>
-                    {match.away_team}
-                </span>
-            </div>
+            {/* Teams */}
+            <TableCell className="py-3 px-2">
+                <div className="flex flex-col gap-1.5">
+                    {/* Home */}
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            {/* Placeholder Logo */}
+                            <div className="w-5 h-5 rounded-full bg-muted shrink-0 flex items-center justify-center text-[8px] font-bold text-muted-foreground/50 border">
+                                {match.home_team.charAt(0)}
+                            </div>
+                            <span className={cn(
+                                "text-sm truncate transition-colors",
+                                homeWon ? "font-bold text-foreground" : "font-medium text-foreground/70",
+                                isLive && "text-foreground"
+                            )}>
+                                {match.home_team}
+                            </span>
+                        </div>
+                        <span className={cn(
+                            "text-sm font-bold tabular-nums min-w-[20px] text-center",
+                            isLive && "text-red-500",
+                            homeWon ? "text-foreground" : "text-muted-foreground/60"
+                        )}>
+                            {match.home_goals ?? "-"}
+                        </span>
+                    </div>
 
-            {/* Indicators (Value Bet, etc) */}
-            <div className="w-20 shrink-0 flex justify-end">
-                {pred?.value_bet && isPremium && (
-                    <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                        VAL
-                    </span>
-                )}
-            </div>
-        </div>
+                    {/* Away */}
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            {/* Placeholder Logo */}
+                            <div className="w-5 h-5 rounded-full bg-muted shrink-0 flex items-center justify-center text-[8px] font-bold text-muted-foreground/50 border">
+                                {match.away_team.charAt(0)}
+                            </div>
+                            <span className={cn(
+                                "text-sm truncate transition-colors",
+                                awayWon ? "font-bold text-foreground" : "font-medium text-foreground/70",
+                                isLive && "text-foreground"
+                            )}>
+                                {match.away_team}
+                            </span>
+                        </div>
+                        <span className={cn(
+                            "text-sm font-bold tabular-nums min-w-[20px] text-center",
+                            isLive && "text-red-500",
+                            awayWon ? "text-foreground" : "text-muted-foreground/60"
+                        )}>
+                            {match.away_goals ?? "-"}
+                        </span>
+                    </div>
+                </div>
+            </TableCell>
+
+            {/* Prediction / Value */}
+            <TableCell className="w-[120px] py-3 px-2 text-right hidden sm:table-cell">
+                <div className="flex flex-col items-end gap-1.5">
+                    {pred?.value_bet && isPremium && (
+                        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200 bg-emerald-50 h-5 px-1.5 gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            VALUE
+                        </Badge>
+                    )}
+                    {pred && (
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Show quick prediction hint on hover */}
+                            <span className="text-[10px] text-muted-foreground font-medium uppercase min-w-[30px] text-right">
+                                {pred.recommended_bet?.split(' ')[0] || "1N2"}
+                            </span>
+                            <ConfidenceBadge score={pred.confidence_score} />
+                        </div>
+                    )}
+                </div>
+            </TableCell>
+
+            {/* Mobile Arrow */}
+            <TableCell className="w-8 py-3 pr-4 pl-0 text-right sm:hidden">
+                <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+            </TableCell>
+        </TableRow>
     )
 }
 
-/* ── League section ────────────────────────────────────────── */
+/* ── League Section ────────────────────────────────────────── */
 function LeagueSection({ leagueName, matches }) {
+    if (!matches || matches.length === 0) return null
+
     return (
-        <div className="bg-transparent">
-            {/* League header */}
-            <div className="px-4 py-2 flex items-center gap-3 bg-[#f3f4f6]/50 border-t border-b border-border/40 mt-0">
-                <div className="w-5 h-5 rounded-full bg-white border flex items-center justify-center text-[10px] text-muted-foreground font-bold shadow-sm">
-                    {leagueName.charAt(0)}
+        <Card className="border-none shadow-none bg-transparent mb-6">
+            <div className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-muted/50 to-transparent rounded-lg mb-2">
+                <div className="w-6 h-6 rounded bg-white shadow-sm border flex items-center justify-center text-xs">
+                    {/* Placeholder Flag */}
+                    <Trophy className="w-3 h-3 text-muted-foreground" />
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-xs font-bold uppercase tracking-tight text-foreground/80">
-                        {leagueName}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">Monde</span>
+                    <span className="text-sm font-bold text-foreground tracking-tight">{leagueName}</span>
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{matches[0].country || "Monde"}</span>
                 </div>
             </div>
-            {/* Rows */}
-            <div className="divide-y divide-border/20 bg-white">
-                {matches.map((match) => (
-                    <MatchRow key={match.id} match={match} />
-                ))}
-            </div>
-        </div>
+
+            <CardContent className="p-0">
+                <Table>
+                    <TableBody>
+                        {matches.map(match => (
+                            <MatchRow key={match.id} match={match} />
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     )
 }
 
-
-/* ── Dashboard page ────────────────────────────────────────── */
+/* ── Dashboard Page ────────────────────────────────────────── */
 export default function DashboardPage({ date, setDate }) {
     const { isPremium } = useAuth()
     const [matches, setMatches] = useState([])
@@ -149,105 +205,127 @@ export default function DashboardPage({ date, setDate }) {
 
     useEffect(() => {
         setLoading(true)
+        // Fetch 48h window to match "Match of the Day" logic roughly
         const d1 = date
-        const d2 = new Date(new Date(date).getTime() + 86400000).toISOString().slice(0, 10)
+        const d2 = addDays(new Date(date), 1).toISOString().slice(0, 10)
 
         Promise.all([
             fetchPredictions(d1),
             fetchPredictions(d2)
         ]).then(([res1, res2]) => {
             const combined = [...(res1.matches || []), ...(res2.matches || [])]
+                // Deduplicate by ID just in case
+                .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
                 .sort((a, b) => a.date.localeCompare(b.date))
+
             setMatches(combined)
-        }).catch(console.error)
-            .finally(() => setLoading(false))
+        }).catch(err => {
+            console.error("Failed to fetch matches:", err)
+        }).finally(() => {
+            setLoading(false)
+        })
     }, [date])
 
-    const tomorrow = new Date(new Date(date).getTime() + 86400000).toISOString().slice(0, 10)
-    const yesterday = new Date(new Date(date).getTime() - 86400000).toISOString().slice(0, 10)
-
-    const filteredMatches = activeTab === "value"
-        ? matches.filter(m => m.prediction?.value_bet)
-        : matches
-
-    // Group by league
-    const byLeague = {}
-    for (const m of filteredMatches) {
-        const league = m.league_name || "Autre"
-        if (!byLeague[league]) byLeague[league] = []
-        byLeague[league].push(m)
+    const handleDateChange = (days) => {
+        const newDate = addDays(new Date(date), days).toISOString().slice(0, 10)
+        setDate(newDate)
     }
-    const leagueOrder = Object.keys(byLeague).sort()
 
-    const totalAnalyzed = matches.filter(m => m.prediction).length
-    const totalValue = matches.filter(m => m.prediction?.value_bet).length
+    const filteredMatches = matches.filter(m => {
+        if (activeTab === "live") return ["1H", "2H", "HT", "ET", "P", "LIVE"].includes(m.status)
+        if (activeTab === "value") return m.prediction?.value_bet
+        return true
+    })
+
+    // Grouping
+    const byLeague = {}
+    filteredMatches.forEach(m => {
+        const name = m.league_name || "Autres Compétitions"
+        if (!byLeague[name]) byLeague[name] = []
+        byLeague[name].push(m)
+    })
+    const leagues = Object.keys(byLeague).sort()
 
     return (
-        <div className="space-y-5 pb-12">
-            {/* Header / Tabs */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-border/40">
-                <div className="flex items-center gap-6">
-                    <button
-                        onClick={() => setActiveTab("all")}
-                        className={cn(
-                            "text-sm font-bold uppercase tracking-wide pb-3 border-b-2 transition-colors",
-                            activeTab === "all" ? "text-[#374df5] border-[#374df5]" : "text-muted-foreground border-transparent hover:text-foreground"
-                        )}
-                    >
-                        Tous
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("live")}
-                        className={cn(
-                            "text-sm font-bold uppercase tracking-wide pb-3 border-b-2 transition-colors",
-                            activeTab === "live" ? "text-red-500 border-red-500" : "text-muted-foreground border-transparent hover:text-red-500"
-                        )}
-                    >
-                        En Direct <span className="text-[10px] align-top opacity-50 ml-0.5">({matches.filter(m => m.status === "1H" || m.status === "2H").length})</span>
-                    </button>
-                    {isPremium && (
-                        <button
-                            onClick={() => setActiveTab("value")}
-                            className={cn(
-                                "text-sm font-bold uppercase tracking-wide pb-3 border-b-2 transition-colors",
-                                activeTab === "value" ? "text-emerald-500 border-emerald-500" : "text-muted-foreground border-transparent hover:text-emerald-500"
-                            )}
-                        >
-                            Value Bets
-                        </button>
-                    )}
-                </div>
+        <div className="space-y-6 pb-20">
 
-                {/* Date Selector (Simplified) */}
-                <div className="flex items-center gap-2 bg-secondary/50 rounded-lg p-1">
-                    <button onClick={() => setDate(yesterday)} className="p-1 hover:bg-white rounded shadow-sm text-muted-foreground transition-all"><ChevronLeft className="w-4 h-4" /></button>
-                    <span className="text-xs font-bold tabular-nums min-w-[80px] text-center">{date}</span>
-                    <button onClick={() => setDate(tomorrow)} className="p-1 hover:bg-white rounded shadow-sm text-muted-foreground transition-all"><ChevronRight className="w-4 h-4" /></button>
+            {/* Controls Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sticky top-14 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 border-b">
+
+                {/* Tabs */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
+                    <TabsList className="grid w-full sm:w-auto grid-cols-3 h-9">
+                        <TabsTrigger value="all" className="text-xs">Tous</TabsTrigger>
+                        <TabsTrigger value="live" className="text-xs gap-1.5">
+                            En Direct
+                            <span className="flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                        </TabsTrigger>
+                        <TabsTrigger value="value" disabled={!isPremium} className="text-xs gap-1.5">
+                            Value
+                            {isPremium && <TrendingUp className="w-3 h-3 text-emerald-500" />}
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
+
+                {/* Date Navigation */}
+                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-md self-end sm:self-auto">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleDateChange(-1)}
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                    </Button>
+
+                    <div className="flex items-center gap-2 px-2 min-w-[120px] justify-center">
+                        <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-semibold tabular-nums capitalize">
+                            {format(new Date(date), "EEE d MMM", { locale: fr })}
+                        </span>
+                    </div>
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleDateChange(1)}
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </Button>
                 </div>
             </div>
 
-            {/* Match list by league */}
-            {
-                loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                        <div className="w-8 h-8 border-2 border-[#374df5]/30 border-t-[#374df5] rounded-full animate-spin" />
+            {/* Content */}
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    <p className="text-xs text-muted-foreground font-medium animate-pulse">Chargement des matchs...</p>
+                </div>
+            ) : filteredMatches.length > 0 ? (
+                <div className="space-y-1">
+                    {leagues.map(league => (
+                        <LeagueSection
+                            key={league}
+                            leagueName={league}
+                            matches={byLeague[league]}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed rounded-xl bg-accent/10">
+                    <div className="p-4 bg-muted rounded-full mb-4">
+                        <CalendarIcon className="w-8 h-8 text-muted-foreground" />
                     </div>
-                ) : leagueOrder.length > 0 ? (
-                    <div className="space-y-0 divide-y divide-border/40">
-                        {leagueOrder.map(league => (
-                            <LeagueSection
-                                key={league}
-                                leagueName={league}
-                                matches={byLeague[league]}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-20">
-                        <p className="text-muted-foreground text-sm">Aucun match disponible pour cette date.</p>
-                    </div>
-                )
-            }
-        </div >
+                    <h3 className="text-lg font-bold">Aucun match trouvé</h3>
+                    <p className="text-sm text-muted-foreground max-w-[250px] mt-2">
+                        Essayez de changer de date ou de filtre pour voir plus de résultats.
+                    </p>
+                    <Button variant="outline" className="mt-6" onClick={() => setActiveTab("all")}>
+                        Voir tous les matchs
+                    </Button>
+                </div>
+            )}
+        </div>
     )
 }

@@ -30,98 +30,87 @@ SEASON = 2025
 headers = {"x-rapidapi-host": "v3.football.api-sports.io", "x-rapidapi-key": api_key}
 
 
-def get_next_round_fixtures(league_id: int) -> tuple[list[dict], str | None]:
-    """Fetch upcoming fixtures and return only those from the next round.
-
-    Retrieves up to 20 upcoming matches for the given league, groups
-    them by round name, and returns the earliest round.
+def get_fixtures_by_date(league_id: int, date_from: str, date_to: str) -> list[dict]:
+    """Fetch fixtures within a specific date range.
 
     Args:
         league_id: API league identifier.
+        date_from: Start date (YYYY-MM-DD).
+        date_to: End date (YYYY-MM-DD).
 
     Returns:
-        A tuple ``(fixtures, round_name)`` where *fixtures* is a list
-        of raw API response items for the next round and *round_name*
-        is the round label (e.g. ``"Regular Season - 25"``).  Returns
-        ``([], None)`` when no upcoming matches exist.
+        List of raw fixture items.
     """
-    url_api: str = "https://v3.football.api-sports.io/fixtures"
-    # On prend 20 matchs pour être sûr de couvrir une journée complète
-    querystring: dict[str, str] = {"league": str(league_id), "season": str(SEASON), "next": "20"}
+    url_api = "https://v3.football.api-sports.io/fixtures"
+    querystring = {
+        "league": str(league_id),
+        "season": str(SEASON),
+        "from": date_from,
+        "to": date_to,
+        "timezone": "Europe/Paris"
+    }
 
-    response = requests.get(url_api, headers=headers, params=querystring)
-    data = response.json()
-
-    if "response" not in data or not data["response"]:
-        return [], None
-
-    fixtures_list: list[dict] = data["response"]
-
-    # Grouper par journée (round)
-    by_round: defaultdict[str, list[dict]] = defaultdict(list)
-    for item in fixtures_list:
-        round_name: str = item["league"]["round"]
-        by_round[round_name].append(item)
-
-    # Prendre la première journée (la plus proche) = la prochaine
-    first_round: str = list(by_round.keys())[0]
-    return by_round[first_round], first_round
+    try:
+        response = requests.get(url_api, headers=headers, params=querystring)
+        data = response.json()
+        return data.get("response", [])
+    except Exception as e:
+        logger.error(f"Erreur API pour ligue {league_id}: {e}")
+        return []
 
 
-def fetch_and_store() -> None:
-    """Fetch next-round fixtures for every league and store them in Supabase.
+def fetch_and_store(date_from: str = None, date_to: str = None) -> None:
+    """Fetch fixtures for a specific range (defaults to next 7 days).
 
-    Iterates over :data:`LEAGUES_TO_FETCH`, calls
-    :func:`get_next_round_fixtures` for each league, upserts the league
-    metadata into ``leagues``, and upserts each fixture into ``fixtures``.
-
-    Returns:
-        None.
+    Args:
+        date_from: Start date (YYYY-MM-DD).
+        date_to: End date (YYYY-MM-DD).
     """
+    from datetime import datetime, timedelta
+
+    if not date_from:
+        date_from = datetime.now().strftime("%Y-%m-%d")
+    if not date_to:
+        date_to = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+
     logger.info(
-        f"--- Démarrage de l'importation — Prochaine journée par ligue (Saison {SEASON}) ---"
+        f"--- Démarrage de l'importation par date : {date_from} -> {date_to} ---"
     )
-    total_imported: int = 0
+    total_imported = 0
 
     for league_id in LEAGUES_TO_FETCH:
-        logger.info(f"Récupération pour la ligue {league_id}...")
-        fixtures_list, round_name = get_next_round_fixtures(league_id)
+        logger.info(f"Récupération ligue {league_id}...")
+        fixtures_list = get_fixtures_by_date(league_id, date_from, date_to)
 
         if not fixtures_list:
-            logger.info(" -> Aucun match à venir pour cette ligue.")
             continue
-
-        logger.info(f" -> Journée : {round_name} — {len(fixtures_list)} matchs")
 
         for item in fixtures_list:
             fixture = item["fixture"]
             teams = item["teams"]
             goals = item["goals"]
             league = item["league"]
-
-            # A. On s'assure que la Ligue existe dans la table 'leagues'
+            
+            # Upsert Ligue
             try:
-                supabase.table("leagues").upsert(
-                    {
-                        "api_id": league["id"],
-                        "name": league["name"],
-                        "country": league["country"],
-                        "season": league["season"],
-                    },
-                    on_conflict="api_id",
-                ).execute()
-            except Exception as e:
-                logger.info(f"Info Ligue: {e}")
+                supabase.table("leagues").upsert({
+                    "api_id": league["id"],
+                    "name": league["name"],
+                    "country": league["country"],
+                    "season": league["season"],
+                }, on_conflict="api_id").execute()
+            except Exception:
+                pass
 
-            # B. On insère le Match dans 'fixtures'
+            # Upsert Match
             try:
-                stats_raw: dict = {
+                stats_raw = {
                     "venue": fixture.get("venue"),
                     "status_short": fixture["status"]["short"],
-                    "round": round_name,
+                    "round": league.get("round"),
                 }
 
-                match_data: dict = {
+                match_data = {
                     "api_fixture_id": fixture["id"],
                     "date": fixture["date"],
                     "league_id": league["id"],
@@ -137,13 +126,12 @@ def fetch_and_store() -> None:
                     match_data, on_conflict="api_fixture_id"
                 ).execute()
 
-                logger.info(f"   [OK] {teams['home']['name']} vs {teams['away']['name']}")
                 total_imported += 1
 
             except Exception as e:
-                logger.error(f"   [ERREUR] Insertion match : {e}")
-
-    logger.info(f"--- Terminé : {total_imported} matchs importés au total ---")
+                logger.error(f"   [ERREUR] Match {fixture['id']} : {e}")
+    
+    logger.info(f"--- Terminé : {total_imported} matchs importés ---")
 
 
 if __name__ == "__main__":

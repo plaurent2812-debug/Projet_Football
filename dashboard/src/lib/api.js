@@ -1,5 +1,13 @@
+import { supabase } from '@/lib/auth'
+
 const API_ROOT = import.meta.env.VITE_API_URL || ''
 const API_BASE = API_ROOT.endsWith('/api') ? API_ROOT : (API_ROOT ? `${API_ROOT}/api` : '/api')
+
+async function getAuthHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return {}
+    return { Authorization: `Bearer ${session.access_token}` }
+}
 
 export async function fetchPredictions(date) {
     const params = date ? `?date=${date}` : ''
@@ -20,8 +28,6 @@ export async function fetchPerformance(days = 30) {
     return res.json()
 }
 
-const ADMIN_KEY = 'cortex-admin-2026'
-
 export async function fetchTeamHistory(teamName, limit = 20) {
     const res = await fetch(`${API_BASE}/team/${encodeURIComponent(teamName)}/history?limit=${limit}`)
     if (!res.ok) throw new Error(`API error: ${res.status}`)
@@ -29,9 +35,10 @@ export async function fetchTeamHistory(teamName, limit = 20) {
 }
 
 export async function triggerPipeline(mode = 'full') {
+    const headers = await getAuthHeaders()
     const res = await fetch(`${API_BASE}/admin/run-pipeline?mode=${mode}`, {
         method: 'POST',
-        headers: { 'x-admin-key': ADMIN_KEY },
+        headers,
     })
     if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -41,9 +48,8 @@ export async function triggerPipeline(mode = 'full') {
 }
 
 export async function fetchPipelineStatus() {
-    const res = await fetch(`${API_BASE}/admin/pipeline-status`, {
-        headers: { 'x-admin-key': ADMIN_KEY },
-    })
+    const headers = await getAuthHeaders()
+    const res = await fetch(`${API_BASE}/admin/pipeline-status`, { headers })
     if (!res.ok) throw new Error(`API error: ${res.status}`)
     return res.json()
 }

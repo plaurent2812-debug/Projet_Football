@@ -1,21 +1,30 @@
-import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom"
-import { useState } from "react"
+import { BrowserRouter, Routes, Route, NavLink, useNavigate } from "react-router-dom"
+import { lazy, Suspense, useState } from "react"
 import { BarChart3, Home, Zap, Trophy, ListChecks, Shield, Menu } from "lucide-react"
 import { cn } from "@/lib/utils"
-import HomePage from "@/pages/HomePage"
-import DashboardPage from "@/pages/Dashboard"
-import PerformancePage from "@/pages/Performance"
-import MatchDetailPage from "@/pages/MatchDetail"
-import AdminPage from "@/pages/Admin"
-import TeamProfile from "@/pages/TeamProfile"
-import LoginPage from "@/pages/Login"
-import PremiumPage from "@/pages/Premium"
 import ThemeToggle from "@/components/ThemeToggle"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import { Sidebar } from "@/components/Sidebar"
 import { SportsNav } from "@/components/SportsNav"
 import { RightSidebar } from "@/components/RightSidebar"
 import "./App.css"
+
+const HomePage = lazy(() => import("@/pages/HomePage"))
+const DashboardPage = lazy(() => import("@/pages/Dashboard"))
+const PerformancePage = lazy(() => import("@/pages/Performance"))
+const MatchDetailPage = lazy(() => import("@/pages/MatchDetail"))
+const AdminPage = lazy(() => import("@/pages/Admin"))
+const TeamProfile = lazy(() => import("@/pages/TeamProfile"))
+const LoginPage = lazy(() => import("@/pages/Login"))
+const PremiumPage = lazy(() => import("@/pages/Premium"))
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center py-32">
+      <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+    </div>
+  )
+}
 
 function NavItem({ to, icon: Icon, label }) {
   return (
@@ -59,7 +68,20 @@ function PremiumLink() {
   )
 }
 
+function AdminGuard({ children }) {
+  const { hasAccess } = useAuth()
+  const navigate = useNavigate()
+
+  // Simple check, redirect to home if not admin
+  if (!hasAccess('admin')) {
+    // Return null or redirect
+    return <div className="p-8 text-center text-muted-foreground">Accès non autorisé</div>
+  }
+  return children
+}
+
 function AuthButton() {
+  // ... existing code ...
   const { user, signOut } = useAuth()
 
   if (user) {
@@ -102,7 +124,7 @@ function App() {
                     <Zap className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-xl font-black tracking-tight text-white flex items-center gap-0.5">
-                    Sofa<span className="opacity-80 font-bold">Score</span>
+                    Proba<span className="opacity-80 font-bold">Lab</span>
                   </span>
                 </NavLink>
 
@@ -136,26 +158,35 @@ function App() {
 
               {/* Main Content Area */}
               <main className="min-w-0 bg-white rounded-xl shadow-sm border border-border/40 min-h-[80vh]">
-                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <Routes>
-                    <Route path="/" element={<HomePage />} />
-                    <Route
-                      path="/matchs"
-                      element={
-                        <DashboardPage
-                          date={date}
-                          setDate={setDate}
-                        />
-                      }
-                    />
-                    <Route path="/performance" element={<PerformancePage />} />
-                    <Route path="/abonnement" element={<PremiumPage />} />
-                    <Route path="/match/:id" element={<MatchDetailPage />} />
-                    <Route path="/equipe/:name" element={<TeamProfile />} />
-                    <Route path="/admin" element={<AdminPage />} />
-                    <Route path="/login" element={<LoginPage />} />
-                  </Routes>
-                </div>
+                <Suspense fallback={<PageLoader />}>
+                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <Routes>
+                      <Route path="/" element={<HomePage />} />
+                      <Route
+                        path="/matchs"
+                        element={
+                          <DashboardPage
+                            date={date}
+                            setDate={setDate}
+                          />
+                        }
+                      />
+                      <Route
+                        path="/performance"
+                        element={
+                          <AdminGuard>
+                            <PerformancePage />
+                          </AdminGuard>
+                        }
+                      />
+                      <Route path="/abonnement" element={<PremiumPage />} />
+                      <Route path="/match/:id" element={<MatchDetailPage />} />
+                      <Route path="/equipe/:name" element={<TeamProfile />} />
+                      <Route path="/admin" element={<AdminPage />} />
+                      <Route path="/login" element={<LoginPage />} />
+                    </Routes>
+                  </div>
+                </Suspense>
               </main>
 
               {/* Right Sidebar */}

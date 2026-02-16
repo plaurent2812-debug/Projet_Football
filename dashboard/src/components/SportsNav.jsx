@@ -1,34 +1,47 @@
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
+import { Trophy, Activity, Flag } from "lucide-react"
 
 const SPORTS = [
-    { id: "football", label: "Football", icon: "⚽" },
-    { id: "basketball", label: "Basket", icon: "🏀", disabled: true },
-    { id: "tennis", label: "Tennis", icon: "🎾", disabled: true },
-    { id: "rugby", label: "Rugby", icon: "🏉", disabled: true },
+    { id: "football", label: "Football", icon: <Trophy className="w-4 h-4" /> },
+    { id: "basketball", label: "Basket", icon: <Activity className="w-4 h-4" />, disabled: true },
+    { id: "tennis", label: "Tennis", icon: <Activity className="w-4 h-4" />, disabled: true },
+    { id: "rugby", label: "Rugby", icon: <Flag className="w-4 h-4" />, disabled: true },
+    { id: "cricket", label: "Cricket", icon: <Activity className="w-4 h-4" />, disabled: true },
+    { id: "volleyball", label: "Volley", icon: <Activity className="w-4 h-4" />, disabled: true },
+    { id: "handball", label: "Handball", icon: <Activity className="w-4 h-4" />, disabled: true },
 ]
 
 export function SportsNav({ activeSport = "football", onSportChange }) {
     return (
-        <nav className="w-full bg-[#374df5] text-white overflow-x-auto scrollbar-none shadow-md">
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 flex items-center gap-1">
-                {SPORTS.map((sport) => (
-                    <button
-                        key={sport.id}
-                        disabled={sport.disabled}
-                        onClick={() => !sport.disabled && onSportChange?.(sport.id)}
-                        className={cn(
-                            "flex flex-col items-center justify-center gap-0.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wide transition-all h-14 min-w-[64px]",
-                            activeSport === sport.id
-                                ? "bg-white/10 opacity-100 border-b-2 border-white"
-                                : "opacity-70 hover:opacity-100 hover:bg-white/5 border-b-2 border-transparent",
-                            sport.disabled && "opacity-40 cursor-not-allowed hover:bg-transparent"
-                        )}
-                    >
-                        <span className="text-lg leading-none mb-0.5">{sport.icon}</span>
-                        <span className="leading-none">{sport.label}</span>
-                    </button>
-                ))}
+        <div className="w-full bg-[#374df5] text-white border-b border-white/10">
+            <div className="max-w-[1400px] mx-auto">
+                <ScrollArea className="w-full whitespace-nowrap">
+                    <div className="flex w-max space-x-2 p-1 px-4">
+                        {SPORTS.map((sport) => (
+                            <Button
+                                key={sport.id}
+                                variant="ghost"
+                                size="sm"
+                                disabled={sport.disabled}
+                                onClick={() => !sport.disabled && onSportChange?.(sport.id)}
+                                className={cn(
+                                    "flex flex-col items-center justify-center gap-1 h-14 min-w-[70px] rounded-none border-b-2 transition-all hover:bg-white/10 hover:text-white",
+                                    activeSport === sport.id
+                                        ? "border-white bg-white/10 font-bold opacity-100"
+                                        : "border-transparent opacity-70 hover:opacity-100",
+                                    sport.disabled && "opacity-40 cursor-not-allowed"
+                                )}
+                            >
+                                {sport.icon}
+                                <span className="text-[10px] uppercase tracking-wide">{sport.label}</span>
+                            </Button>
+                        ))}
+                    </div>
+                    <ScrollBar orientation="horizontal" className="invisible" />
+                </ScrollArea>
             </div>
-        </nav>
+        </div>
     )
 }

@@ -1,64 +1,82 @@
-import { TrendingUp, Trophy, ArrowRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { MoveRight, TrendingUp, Award } from "lucide-react"
 
 export function RightSidebar() {
     return (
-        <aside className="hidden lg:block w-[340px] shrink-0 space-y-6">
+        <aside className="hidden lg:flex w-[340px] shrink-0 flex-col gap-6 sticky top-0 py-6">
 
             {/* Widget: Match of the Day (Promo) */}
-            <div className="rounded-xl overflow-hidden bg-gradient-to-br from-[#374df5] to-[#5b6ef7] text-white shadow-lg relative p-5">
-                <div className="absolute top-0 right-0 p-3 opacity-20">
-                    <Trophy className="w-24 h-24" />
+            <Card className="border-none bg-gradient-to-br from-[#374df5] to-[#5b6ef7] text-white shadow-lg overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
+                    <Award className="w-24 h-24" />
                 </div>
-                <div className="relative z-10">
-                    <h3 className="text-xs font-bold uppercase tracking-wider opacity-80 mb-2">Match à la Une</h3>
-                    <div className="flex items-center justify-between mt-4 mb-4">
-                        <div className="text-center">
-                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-2 font-bold">M</div>
-                            <span className="text-sm font-bold">Man City</span>
+                <CardHeader className="pb-2 relative z-10">
+                    <div className="flex justify-between items-center">
+                        <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30 border-none">
+                            MATCH À LA UNE
+                        </Badge>
+                        <span className="text-[10px] font-medium opacity-80">21:00</span>
+                    </div>
+                </CardHeader>
+                <CardContent className="relative z-10 pb-6">
+                    <div className="flex items-center justify-between text-center mt-2">
+                        <div className="flex flex-col items-center gap-1">
+                            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-sm ring-2 ring-white/20">M</div>
+                            <span className="text-sm font-bold leading-tight">Man City</span>
                         </div>
-                        <span className="text-xl font-black opacity-50">VS</span>
-                        <div className="text-center">
-                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-2 font-bold">L</div>
-                            <span className="text-sm font-bold">Liverpool</span>
+                        <div className="flex flex-col items-center">
+                            <span className="text-2xl font-black">VS</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-sm ring-2 ring-white/20">L</div>
+                            <span className="text-sm font-bold leading-tight">Liverpool</span>
                         </div>
                     </div>
-                    <button className="w-full py-2 bg-white text-[#374df5] font-bold rounded-lg text-sm hover:bg-white/90 transition-colors">
+                    <Button variant="secondary" className="w-full mt-6 bg-white text-[#374df5] hover:bg-white/90 font-bold border-none">
                         Voir l'analyse
-                    </button>
-                </div>
-            </div>
+                    </Button>
+                </CardContent>
+            </Card>
 
             {/* Widget: Value Bet */}
-            <div className="rounded-xl border border-border bg-card shadow-sm p-4">
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="p-1.5 bg-emerald-500/10 rounded-md">
-                        <TrendingUp className="w-4 h-4 text-emerald-500" />
+            <Card>
+                <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                    <div className="flex items-center gap-2 text-emerald-500">
+                        <TrendingUp className="w-5 h-5" />
+                        <CardTitle className="text-base">Value Bet du Jour</CardTitle>
                     </div>
-                    <h3 className="font-bold text-sm">Value Bet du Jour</h3>
-                </div>
-
-                <div className="space-y-3">
-                    <div className="flex justify-between items-center text-sm border-b border-border/40 pb-2">
-                        <span className="font-medium">Real Madrid - Barça</span>
-                        <span className="font-bold text-emerald-500">@2.10</span>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between py-2 border-b border-border/50">
+                        <div className="flex flex-col">
+                            <span className="text-sm font-semibold">Real Madrid - Barcam</span>
+                            <span className="text-xs text-muted-foreground">La Liga • 20:00</span>
+                        </div>
+                        <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50">
+                            @2.10
+                        </Badge>
                     </div>
-                    <div className="flex justify-between items-center text-sm border-b border-border/40 pb-2">
-                        <span className="font-medium">PSG - OM</span>
-                        <span className="font-bold text-emerald-500">@1.85</span>
+                    <div className="flex items-center justify-between py-2">
+                        <div className="flex flex-col">
+                            <span className="text-sm font-semibold">PSG - OM</span>
+                            <span className="text-xs text-muted-foreground">Ligue 1 • 21:00</span>
+                        </div>
+                        <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50">
+                            @1.85
+                        </Badge>
                     </div>
-                </div>
-
-                <button className="w-full mt-4 flex items-center justify-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors">
-                    Voir tous les value bets <ArrowRight className="w-3 h-3" />
-                </button>
-            </div>
+                    <Button variant="ghost" className="w-full text-xs text-muted-foreground h-8 mt-2">
+                        Voir tous les value bets <MoveRight className="w-3 h-3 ml-1" />
+                    </Button>
+                </CardContent>
+            </Card>
 
             {/* Widget: Ad / Promo */}
-            <div className="rounded-xl bg-accent/30 border border-transparent p-4 text-center">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Publicité</span>
-                <div className="h-32 flex items-center justify-center text-muted-foreground/40 text-sm italic">
-                    Espace Partenaire
-                </div>
+            <div className="rounded-xl bg-accent/30 border border-transparent p-8 text-center">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold block mb-2">Publicité</span>
+                <p className="text-sm text-muted-foreground italic">Espace Partenaire</p>
             </div>
 
         </aside>

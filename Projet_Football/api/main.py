@@ -1,5 +1,5 @@
 """
-FastAPI backend for the Football Predictions Dashboard.
+ProbaLab API — FastAPI backend for football predictions.
 
 Serves prediction data from Supabase to the React frontend.
 """
@@ -24,11 +24,11 @@ from config import supabase
 
 from api.routers import stripe_webhook
 
-app = FastAPI(title="Football Predictions API", version="1.0.0")
+app = FastAPI(title="ProbaLab API", version="1.0.0")
 
 app.include_router(stripe_webhook.router)
 
-origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:4173").split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,6 +36,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Railway / monitoring."""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
 
 @app.get("/api/predictions")
@@ -122,9 +128,6 @@ def get_predictions(
     return {"date": date, "matches": matches}
 
 
-from fastapi import FastAPI, Query, HTTPException
-
-# ...
 
 @app.get("/api/predictions/{fixture_id}")
 def get_prediction_detail(fixture_id: str):
@@ -482,9 +485,37 @@ def get_team_history(team_name: str, limit: int = Query(20, ge=1, le=50)):
         },
     }
 
-# ─── Admin Endpoints ────────────────────────────────────────────
+# ─── Admin Auth Helper ──────────────────────────────────────────
 
-ADMIN_KEY = os.getenv("ADMIN_API_KEY", "cortex-admin-2026")
+
+def _require_admin(authorization: Optional[str]) -> dict:
+    """Verify the Supabase JWT and check the user has admin role."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+
+    token = authorization.removeprefix("Bearer ").strip()
+    try:
+        user_resp = supabase.auth.get_user(token)
+        user_id = user_resp.user.id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    profile = (
+        supabase.table("profiles")
+        .select("role")
+        .eq("id", str(user_id))
+        .single()
+        .execute()
+        .data
+    )
+
+    if not profile or profile.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    return profile
+
+
+# ─── Admin Endpoints ────────────────────────────────────────────
 
 # In-memory pipeline state
 _pipeline_state = {
@@ -541,11 +572,10 @@ def _run_pipeline_background(mode: str):
 @app.post("/api/admin/run-pipeline")
 def admin_run_pipeline(
     mode: str = Query("full", description="Pipeline mode: full, data, or analyze"),
-    x_admin_key: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
 ):
-    """Trigger the pipeline (admin only)."""
-    if x_admin_key != ADMIN_KEY:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    """Trigger the pipeline (admin only, requires Supabase JWT)."""
+    _require_admin(authorization)
 
     if mode not in ("full", "data", "analyze"):
         raise HTTPException(status_code=400, detail="Mode must be: full, data, or analyze")
@@ -568,10 +598,9 @@ def admin_run_pipeline(
 
 
 @app.get("/api/admin/pipeline-status")
-def admin_pipeline_status(x_admin_key: Optional[str] = Header(None)):
-    """Get current pipeline status (admin only)."""
-    if x_admin_key != ADMIN_KEY:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+def admin_pipeline_status(authorization: Optional[str] = Header(None)):
+    """Get current pipeline status (admin only, requires Supabase JWT)."""
+    _require_admin(authorization)
 
     with _pipeline_lock:
         return dict(_pipeline_state)

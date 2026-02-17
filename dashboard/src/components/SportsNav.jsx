@@ -3,9 +3,29 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Trophy, Activity } from "lucide-react"
 
+// Custom Hockey Stick Icon
+function HockeyStick(props) {
+    return (
+        <svg
+            {...props}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M16 3v13a4 4 0 0 1-4 4H4" />
+        </svg>
+    )
+}
+
 const SPORTS = [
     { id: "football", label: "Football", icon: <Trophy className="w-4 h-4" /> },
-    { id: "nhl", label: "NHL", icon: <Activity className="w-4 h-4" /> },
+    { id: "nhl", label: "NHL", icon: <HockeyStick className="w-4 h-4" /> },
 ]
 
 export function SportsNav({ activeSport = "football", onSportChange }) {

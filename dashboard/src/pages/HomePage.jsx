@@ -183,7 +183,7 @@ export default function HomePage() {
 
                     {/* Title */}
                     <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter leading-[1.1]">
-                        Prédictions football{" "}
+                        Analyses sportives{" "}
                         <span className="gradient-text">augmentées par l'IA</span>
                     </h1>
 
@@ -276,7 +276,7 @@ export default function HomePage() {
                         <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                     </div>
                 ) : topMatches.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {topMatches.map((match, i) => (
                             <FeaturedMatch key={match.id} match={match} rank={i + 1} />
                         ))}

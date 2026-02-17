@@ -22,11 +22,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import supabase
 
-from api.routers import stripe_webhook
+from api.routers import stripe_webhook, nhl
 
 app = FastAPI(title="ProbaLab API", version="1.0.0")
 
 app.include_router(stripe_webhook.router)
+app.include_router(nhl.router)
 
 origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:4173").split(",")
 

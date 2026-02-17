@@ -17,6 +17,8 @@ const AdminPage = lazy(() => import("@/pages/Admin"))
 const TeamProfile = lazy(() => import("@/pages/TeamProfile"))
 const LoginPage = lazy(() => import("@/pages/Login"))
 const PremiumPage = lazy(() => import("@/pages/Premium"))
+const NHLPage = lazy(() => import("@/pages/NHL/NHLPage"))
+const NHLMatchDetail = lazy(() => import("@/pages/NHL/NHLMatchDetail"))
 
 function PageLoader() {
   return (
@@ -162,6 +164,9 @@ function App() {
                 <Suspense fallback={<PageLoader />}>
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                     <Routes>
+                      <Route path="/nhl" element={<NHLPage date={date} setDate={setDate} />} />
+                      <Route path="/nhl/match/:id" element={<NHLMatchDetail />} />
+
                       <Route path="/" element={<HomePage />} />
                       <Route
                         path="/matchs"

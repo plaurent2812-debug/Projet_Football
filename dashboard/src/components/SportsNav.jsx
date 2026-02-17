@@ -19,7 +19,17 @@ export function SportsNav({ activeSport = "football", onSportChange }) {
                                 key={sport.id}
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => onSportChange?.(sport.id)}
+                                onClick={() => {
+                                    onSportChange?.(sport.id)
+                                    // Simple navigation logic based on sport ID
+                                    if (sport.id === 'nhl') {
+                                        window.location.href = '/nhl' // Using href for full reload/clear clarity or navigate if available
+                                        // But wait, SportsNav is inside Router in App.jsx? Yes.
+                                        // Ideally we should use useNavigate, but SportsNav might need it passed or hook
+                                    } else {
+                                        window.location.href = '/matchs'
+                                    }
+                                }}
                                 className={cn(
                                     "flex flex-col items-center justify-center gap-1 h-14 min-w-[70px] rounded-none border-b-2 transition-all hover:bg-white/10 hover:text-white",
                                     activeSport === sport.id

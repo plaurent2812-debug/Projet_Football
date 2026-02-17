@@ -67,7 +67,7 @@ _game_win_features = []
 def _load_game_win_model():
     """Charge le modèle de probabilité de match si disponible."""
     global _game_win_model, _game_win_features
-    model_path = "models/best_game_win_predictor.pkl"
+    model_path = "Projet_Football/models/best_game_win_predictor.pkl"
     if os.path.isfile(model_path):
         try:
             with open(model_path, "rb") as f:
@@ -90,7 +90,7 @@ if ENHANCED_ML_AVAILABLE and load_all_models:
     except Exception as e:
         print(f"Error loading models: {e}")
 else:
-    goal_predictor.load("models/best_goal_predictor.pkl")
+    goal_predictor.load("Projet_Football/models/best_goal_predictor.pkl")
 
 
 # =============================================================================

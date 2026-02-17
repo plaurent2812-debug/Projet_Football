@@ -236,7 +236,7 @@ def load_all_models() -> Dict[str, EnhancedGoalPredictor]:
     # On suppose que les modèles sont dans un dossier "models" à la racine ou relatif
     
     # Pour le moment, on utilise un chemin relatif simple, à adapter selon le déploiement
-    base_path = "models"
+    base_path = "Projet_Football/models"
     
     models = {
         'GOAL': (f'{base_path}/best_goal_predictor.pkl', goal_predictor),

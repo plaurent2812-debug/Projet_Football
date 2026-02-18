@@ -11,7 +11,16 @@ import sys
 import threading
 import time
 import xml.etree.ElementTree as ET
+from contextlib import asynccontextmanager
 from pathlib import Path
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+    import pytz
+    SCHEDULER_AVAILABLE = True
+except ImportError:
+    SCHEDULER_AVAILABLE = False
 
 # Add the parent package to the path so we can import config
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -35,7 +44,56 @@ from config import supabase
 
 from api.routers import stripe_webhook, nhl
 
-app = FastAPI(title="ProbaLab API", version="1.0.0")
+# ── Scheduler ────────────────────────────────────────────────
+def _scheduled_update_scores():
+    """Called by APScheduler every 15 min between 18h-23h Paris."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from fetchers.results import fetch_and_update_results
+        from datetime import date
+        print(f"[scheduler] Mise à jour des scores — {date.today()}")
+        fetch_and_update_results()
+    except Exception as e:
+        print(f"[scheduler] Erreur: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app_instance):
+    """Start/stop APScheduler with the FastAPI app."""
+    scheduler = None
+    if SCHEDULER_AVAILABLE:
+        try:
+            paris_tz = pytz.timezone("Europe/Paris")
+            scheduler = BackgroundScheduler(timezone=paris_tz)
+            # Toutes les 15 min entre 18h00 et 23h45 heure Paris
+            scheduler.add_job(
+                _scheduled_update_scores,
+                trigger=CronTrigger(
+                    hour="18-23",
+                    minute="0,15,30,45",
+                    timezone=paris_tz,
+                ),
+                id="update_scores",
+                name="Mise à jour scores football",
+                replace_existing=True,
+                misfire_grace_time=300,  # 5 min de tolérance
+            )
+            scheduler.start()
+            print("[scheduler] ✅ Démarré — mise à jour scores toutes les 15 min (18h-23h45 Paris)")
+        except Exception as e:
+            print(f"[scheduler] ⚠️  Impossible de démarrer: {e}")
+            scheduler = None
+    else:
+        print("[scheduler] ⚠️  APScheduler non disponible (pip install apscheduler pytz)")
+
+    yield  # L'app tourne ici
+
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)
+        print("[scheduler] Arrêté.")
+
+
+app = FastAPI(title="ProbaLab API", version="1.0.0", lifespan=lifespan)
 
 app.include_router(stripe_webhook.router)
 app.include_router(nhl.router)

@@ -16,6 +16,7 @@ const AdminPage = lazy(() => import("@/pages/Admin"))
 const LoginPage = lazy(() => import("@/pages/Login"))
 const PremiumPage = lazy(() => import("@/pages/Premium"))
 const TeamProfile = lazy(() => import("@/pages/TeamProfile"))
+const ProfilePage = lazy(() => import("@/pages/Profile"))
 
 
 function PageLoader() {

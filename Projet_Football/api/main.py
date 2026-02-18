@@ -346,6 +346,20 @@ def get_predictions(
     )
     league_map = {str(l["api_id"]): l["name"] for l in leagues}
 
+    # Get team logos
+    team_names_set = set()
+    for f in fixtures:
+        team_names_set.add(f.get("home_team", ""))
+        team_names_set.add(f.get("away_team", ""))
+    teams_data = (
+        supabase.table("teams")
+        .select("name, logo_url")
+        .execute()
+        .data
+        or []
+    )
+    logo_map = {t["name"]: t.get("logo_url") for t in teams_data if t.get("logo_url")}
+
     pred_by_fixture = {p["fixture_id"]: p for p in predictions}
 
     matches = []
@@ -367,6 +381,8 @@ def get_predictions(
             "id": f["id"],
             "home_team": f.get("home_team", "?"),
             "away_team": f.get("away_team", "?"),
+            "home_logo": logo_map.get(f.get("home_team", "")),
+            "away_logo": logo_map.get(f.get("away_team", "")),
             "date": f.get("date"),
             "status": f.get("status"),
             "home_goals": f.get("home_goals"),
@@ -514,6 +530,24 @@ def get_prediction_detail(fixture_id: str):
             )
         except Exception:
             pass
+
+    # Add team logos to fixture
+    if fixture:
+        for side, team_col in [("home_logo", "home_team"), ("away_logo", "away_team")]:
+            name = fixture.get(team_col)
+            if name:
+                try:
+                    team_row = (
+                        supabase.table("teams")
+                        .select("logo_url")
+                        .eq("name", name)
+                        .limit(1)
+                        .execute()
+                        .data
+                    )
+                    fixture[side] = team_row[0]["logo_url"] if team_row else None
+                except Exception:
+                    fixture[side] = None
 
     return {
         "fixture": fixture,

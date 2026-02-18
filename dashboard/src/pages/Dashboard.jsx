@@ -47,9 +47,13 @@ function MatchRow({ match }) {
                     <span className={cn("text-sm truncate text-right", homeWon ? "font-bold" : "font-medium text-foreground/80")}>
                         {match.home_team}
                     </span>
-                    <div className="w-5 h-5 rounded-full bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
-                        {match.home_team?.charAt(0)}
-                    </div>
+                    {match.home_logo ? (
+                        <img src={match.home_logo} alt="" className="w-5 h-5 shrink-0 object-contain" loading="lazy" />
+                    ) : (
+                        <div className="w-5 h-5 rounded-full bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
+                            {match.home_team?.charAt(0)}
+                        </div>
+                    )}
                 </div>
 
                 {/* Score / VS */}
@@ -70,9 +74,13 @@ function MatchRow({ match }) {
 
                 {/* Away team */}
                 <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                    <div className="w-5 h-5 rounded-full bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
-                        {match.away_team?.charAt(0)}
-                    </div>
+                    {match.away_logo ? (
+                        <img src={match.away_logo} alt="" className="w-5 h-5 shrink-0 object-contain" loading="lazy" />
+                    ) : (
+                        <div className="w-5 h-5 rounded-full bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
+                            {match.away_team?.charAt(0)}
+                        </div>
+                    )}
                     <span className={cn("text-sm truncate", awayWon ? "font-bold" : "font-medium text-foreground/80")}>
                         {match.away_team}
                     </span>

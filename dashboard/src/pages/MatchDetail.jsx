@@ -195,6 +195,9 @@ export default function MatchDetailPage() {
                     </div>
                     <div className="flex items-center justify-between gap-4 mt-3">
                         <div className="flex-1 text-center">
+                            {fixture?.home_logo && (
+                                <img src={fixture.home_logo} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
+                            )}
                             <p className="text-xl font-black leading-tight">{fixture?.home_team}</p>
                             {fixture?.home_goals != null && (
                                 <p className="text-3xl font-black text-primary mt-1">{fixture.home_goals}</p>
@@ -204,6 +207,9 @@ export default function MatchDetailPage() {
                             <span className="text-sm font-bold text-muted-foreground/40">VS</span>
                         </div>
                         <div className="flex-1 text-center">
+                            {fixture?.away_logo && (
+                                <img src={fixture.away_logo} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
+                            )}
                             <p className="text-xl font-black leading-tight">{fixture?.away_team}</p>
                             {fixture?.away_goals != null && (
                                 <p className="text-3xl font-black text-primary mt-1">{fixture.away_goals}</p>

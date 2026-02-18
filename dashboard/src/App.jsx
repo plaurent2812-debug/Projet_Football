@@ -29,9 +29,6 @@ function PageLoader() {
   )
 }
 
-// ── Theme Toggle ──────────────────────────────────────────────
-
-
 // ── Header ────────────────────────────────────────────────────
 function Header({ mobileOpen, setMobileOpen }) {
   const { user, signOut, role, isPremium, isAdmin } = useAuth()
@@ -102,8 +99,6 @@ function Header({ mobileOpen, setMobileOpen }) {
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
-            {/* Theme toggle */}
-            {/* Theme toggle */}
             <ModeToggle />
 
             {/* Premium badge */}
@@ -223,8 +218,32 @@ function AdminGuard({ children }) {
   return children
 }
 
+// ── Protected Route Guard ─────────────────────────────────────
+function Protected({ children }) {
+  const { user, loading } = useAuth()
+
+  if (loading) return <PageLoader />
+
+  if (!user) {
+    // Rediriger vers login si non connecté
+    return <LoginRedirect />
+  }
+
+  return children
+}
+
+// Separation to use useNavigate hook
+function LoginRedirect() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    navigate('/login')
+  }, [navigate])
+  return null
+}
+
 // ── Main App ──────────────────────────────────────────────────
 function AppContent() {
+  const { user, loading } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [selectedLeague, setSelectedLeague] = useState(null)

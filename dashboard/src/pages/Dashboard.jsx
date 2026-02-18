@@ -202,6 +202,8 @@ function LeagueSidebar({ leagues, selectedLeague, onSelect }) {
 export default function FootballPage({ date, setDate, selectedLeague, setSelectedLeague }) {
     const [matches, setMatches] = useState([])
     const [loading, setLoading] = useState(true)
+    const [minConfidence, setMinConfidence] = useState(0)
+    const [marketFilter, setMarketFilter] = useState('all') // all, 1x2, btts, over
 
     useEffect(() => {
         setLoading(true)
@@ -215,26 +217,53 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
         setDate(addDays(new Date(date), days).toISOString().slice(0, 10))
     }
 
-    // Build league list
+    // Filter matches
+    const filteredMatches = matches.filter(m => {
+        const pred = m.prediction
+        const conf = pred?.confidence_score || 0
+        if (conf < minConfidence) return false
+
+        if (marketFilter !== 'all') {
+            const bet = (pred?.recommended_bet || "").toLowerCase()
+            if (marketFilter === '1x2' && !/victoire|match nul|vainqueur|1|2|n/.test(bet)) return false
+            if (marketFilter === 'btts' && !/btts|les deux|both teams/.test(bet)) return false
+            if (marketFilter === 'over' && !/over|plus de/.test(bet)) return false
+        }
+        return true
+    })
+
+    // Build league list from filtered matches
     const byLeague = {}
-    matches.forEach(m => {
+    filteredMatches.forEach(m => {
         const key = m.league_id || "other"
         if (!byLeague[key]) byLeague[key] = { name: m.league_name || "Autres", id: key, matches: [] }
         byLeague[key].matches.push(m)
     })
+
+    // Sort leagues alphabetically
     const leagues = Object.values(byLeague)
-        .map(l => ({ ...l, count: l.matches.length }))
         .sort((a, b) => a.name.localeCompare(b.name))
 
-    const filteredLeagues = selectedLeague
+    // Apply sidebar league selection
+    const displayedLeagues = selectedLeague
         ? leagues.filter(l => l.id === selectedLeague)
         : leagues
 
-    const totalMatches = filteredLeagues.reduce((s, l) => s + l.matches.length, 0)
+    const totalMatches = displayedLeagues.reduce((s, l) => s + l.matches.length, 0)
+    const totalRaw = matches.length
 
     return (
         <div className="flex gap-6 animate-fade-in-up">
-            {/* Sidebar championnats */}
+            {/* Sidebar championnats - computed from ALL matches to confirm available leagues? 
+                Actually better to show only available leagues for the day.
+                But if we filter by confidence, we might hide leagues. 
+                Let's keep the sidebar showing leagues from *current date* matches, 
+                but maybe we should pass 'matches' to sidebar instead of 'leagues' (filtered)? 
+                
+                Standard UX: Sidebar shows all leagues for the day. 
+                However, if I filter "Confidence > 8", I probably only want to see leagues that have such matches.
+                So passing 'leagues' (filtered by confidence/market) is correct.
+            */}
             <LeagueSidebar
                 leagues={leagues}
                 selectedLeague={selectedLeague}
@@ -243,29 +272,77 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
 
             {/* Main content */}
             <div className="flex-1 min-w-0">
-                {/* Header controls */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-                    <div>
-                        <h1 className="text-xl font-black tracking-tight">⚽ Football</h1>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                            {totalMatches} match{totalMatches !== 1 ? 's' : ''} analysé{totalMatches !== 1 ? 's' : ''}
-                        </p>
+                {/* Header controls: Title + Filters + Date */}
+                <div className="flex flex-col gap-4 mb-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div>
+                            <h1 className="text-xl font-black tracking-tight">⚽ Football</h1>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                {totalMatches} match{totalMatches !== 1 ? 's' : ''} affiché{totalMatches !== 1 ? 's' : ''}
+                                {totalMatches !== totalRaw && <span className="opacity-60"> (sur {totalRaw})</span>}
+                            </p>
+                        </div>
+
+                        {/* Date navigation */}
+                        <div className="flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shadow-sm">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDateChange(-1)}>
+                                <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <div className="flex items-center gap-2 px-3 min-w-[140px] justify-center">
+                                <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-sm font-bold capitalize">
+                                    {format(new Date(date), "EEE d MMM", { locale: fr })}
+                                </span>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDateChange(1)}>
+                                <ChevronRight className="w-4 h-4" />
+                            </Button>
+                        </div>
                     </div>
 
-                    {/* Date navigation */}
-                    <div className="flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shadow-sm">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDateChange(-1)}>
-                            <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <div className="flex items-center gap-2 px-3 min-w-[140px] justify-center">
-                            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-sm font-bold capitalize">
-                                {format(new Date(date), "EEE d MMM", { locale: fr })}
-                            </span>
+                    {/* Filter Bar */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* Confidence Filter */}
+                        <div className="relative">
+                            <select
+                                value={minConfidence}
+                                onChange={(e) => setMinConfidence(Number(e.target.value))}
+                                className="appearance-none pl-8 pr-8 py-2 bg-card border border-border/50 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-border transition-colors cursor-pointer"
+                            >
+                                <option value={0}>Toutes confiances</option>
+                                <option value={6}>Confiance 6+</option>
+                                <option value={7}>Confiance 7+ (Hot)</option>
+                                <option value={8}>Confiance 8+ (Safe)</option>
+                            </select>
+                            <Activity className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                            <ChevronRight className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rotate-90 text-muted-foreground/50 pointer-events-none" />
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDateChange(1)}>
-                            <ChevronRight className="w-4 h-4" />
-                        </Button>
+
+                        {/* Market Filter */}
+                        <div className="relative">
+                            <select
+                                value={marketFilter}
+                                onChange={(e) => setMarketFilter(e.target.value)}
+                                className="appearance-none pl-8 pr-8 py-2 bg-card border border-border/50 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-border transition-colors cursor-pointer"
+                            >
+                                <option value="all">Tous les paris</option>
+                                <option value="1x2">1X2 (Victoire)</option>
+                                <option value="btts">Les deux marquent / BTTS</option>
+                                <option value="over">Over / Under</option>
+                            </select>
+                            <Target className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                            <ChevronRight className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rotate-90 text-muted-foreground/50 pointer-events-none" />
+                        </div>
+
+                        {/* Reset Filters */}
+                        {(minConfidence > 0 || marketFilter !== 'all') && (
+                            <button
+                                onClick={() => { setMinConfidence(0); setMarketFilter('all'); }}
+                                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                Réinitialiser
+                            </button>
+                        )}
                     </div>
                 </div>
 

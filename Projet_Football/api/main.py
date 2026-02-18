@@ -57,6 +57,21 @@ def _scheduled_update_scores():
         print(f"[scheduler] Erreur: {e}")
 
 
+def _startup_update_scores():
+    """Run on startup: update scores for the last 3 days (catch up)."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from fetchers.results import fetch_and_update_results
+        from datetime import date, timedelta
+        print("[scheduler] 🚀 Rattrapage des scores au démarrage (J, J-1, J-2)...")
+        for delta in range(3):
+            d = (date.today() - timedelta(days=delta)).isoformat()
+            fetch_and_update_results(d)
+        print("[scheduler] ✅ Rattrapage terminé.")
+    except Exception as e:
+        print(f"[scheduler] Erreur rattrapage: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app_instance):
     """Start/stop APScheduler with the FastAPI app."""
@@ -78,8 +93,17 @@ async def lifespan(app_instance):
                 replace_existing=True,
                 misfire_grace_time=300,  # 5 min de tolérance
             )
+            # Rattrapage immédiat 10s après le démarrage
+            from datetime import datetime as _dt, timedelta as _td
+            scheduler.add_job(
+                _startup_update_scores,
+                trigger="date",
+                run_date=_dt.now() + _td(seconds=10),
+                id="startup_catchup",
+                name="Rattrapage scores au démarrage",
+            )
             scheduler.start()
-            print("[scheduler] ✅ Démarré — mise à jour scores toutes les 15 min (18h-23h45 Paris)")
+            print("[scheduler] ✅ Démarré — scores auto (18h-23h45) + rattrapage dans 10s")
         except Exception as e:
             print(f"[scheduler] ⚠️  Impossible de démarrer: {e}")
             scheduler = None

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/lib/auth"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -14,16 +14,19 @@ export default function ProfilePage() {
     const navigate = useNavigate()
     const [loading, setLoading] = useState(false)
 
+    useEffect(() => {
+        if (!user && !loading) {
+            navigate("/login")
+        }
+    }, [user, loading, navigate])
+
     const handleSignOut = async () => {
         setLoading(true)
         await signOut()
         navigate("/login")
     }
 
-    if (!user) {
-        navigate("/login")
-        return null
-    }
+    if (!user) return null
 
     const joinDate = user.created_at ? new Date(user.created_at) : new Date()
     const isPremium = role === 'premium' || role === 'admin'

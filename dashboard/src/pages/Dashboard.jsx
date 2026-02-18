@@ -89,26 +89,50 @@ function MatchRow({ match }) {
 
             {/* Prediction info */}
             <div className="shrink-0 flex flex-col items-end gap-1 min-w-[72px]">
-                {isHot && (
-                    <div className="flex items-center gap-1">
-                        <Flame className="w-3.5 h-3.5 text-orange-500 flame-badge" />
-                        <span className="text-[10px] font-bold text-orange-500">HOT</span>
-                    </div>
-                )}
-                {!isFinished && pred?.recommended_bet && (
-                    <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded truncate max-w-[72px]">
-                        {pred.recommended_bet.split(' ').slice(0, 2).join(' ')}
-                    </span>
-                )}
-                {pred?.confidence_score != null && !isFinished && (
-                    <Badge className={cn(
-                        "text-[10px] h-4 px-1.5 border-0",
-                        pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" :
-                            pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
-                                "bg-muted text-muted-foreground"
-                    )}>
-                        {pred.confidence_score}/10
-                    </Badge>
+                {isFinished && pred ? (() => {
+                    // Determine predicted outcome from 1X2 probas
+                    const pH = pred.proba_home ?? 0
+                    const pD = pred.proba_draw ?? 0
+                    const pA = pred.proba_away ?? 0
+                    const predicted = pH >= pD && pH >= pA ? "H" : pA >= pH && pA >= pD ? "A" : "D"
+                    const hg = match.home_goals ?? 0
+                    const ag = match.away_goals ?? 0
+                    const actual = hg > ag ? "H" : ag > hg ? "A" : "D"
+                    const correct = predicted === actual
+                    return (
+                        <Badge className={cn(
+                            "text-[10px] h-5 px-1.5 border-0 gap-1",
+                            correct
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                : "bg-red-500/10 text-red-500"
+                        )}>
+                            {correct ? "✅" : "❌"} {correct ? "Correct" : "Raté"}
+                        </Badge>
+                    )
+                })() : (
+                    <>
+                        {isHot && (
+                            <div className="flex items-center gap-1">
+                                <Flame className="w-3.5 h-3.5 text-orange-500 flame-badge" />
+                                <span className="text-[10px] font-bold text-orange-500">HOT</span>
+                            </div>
+                        )}
+                        {!isFinished && pred?.recommended_bet && (
+                            <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded truncate max-w-[72px]">
+                                {pred.recommended_bet.split(' ').slice(0, 2).join(' ')}
+                            </span>
+                        )}
+                        {pred?.confidence_score != null && !isFinished && (
+                            <Badge className={cn(
+                                "text-[10px] h-4 px-1.5 border-0",
+                                pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" :
+                                    pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
+                                        "bg-muted text-muted-foreground"
+                            )}>
+                                {pred.confidence_score}/10
+                            </Badge>
+                        )}
+                    </>
                 )}
             </div>
 

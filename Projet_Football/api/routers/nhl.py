@@ -474,3 +474,103 @@ def suivi_stats():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# NHL MATCH TOP PLAYERS
+# =============================================================================
+
+@router.get("/match/{fixture_id}/top_players")
+def get_nhl_match_top_players(fixture_id: str):
+    """
+    Return top 5 players per category (goal, assist, point, SOG) for a given NHL fixture.
+    Reads from nhl_data_lake for the fixture's date.
+    """
+    # 1. Get fixture date
+    try:
+        fixture_data = (
+            supabase.table("nhl_fixtures")
+            .select("date, home_team, away_team")
+            .eq("api_fixture_id", fixture_id)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if not fixture_data:
+            # Try by id
+            fixture_data = (
+                supabase.table("nhl_fixtures")
+                .select("date, home_team, away_team")
+                .eq("id", fixture_id)
+                .limit(1)
+                .execute()
+                .data
+            )
+        if not fixture_data:
+            raise HTTPException(status_code=404, detail="Fixture not found")
+        fixture = fixture_data[0]
+        match_date = fixture["date"][:10]  # YYYY-MM-DD
+        home_team = fixture.get("home_team", "")
+        away_team = fixture.get("away_team", "")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # 2. Fetch players from nhl_data_lake for that date
+    try:
+        rows = (
+            supabase.table("nhl_data_lake")
+            .select("player_id, player_name, team, python_prob, algo_score_goal, algo_score_shot, is_home")
+            .eq("date", match_date)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        rows = []
+
+    # Filter to players from these two teams only
+    teams = {home_team.lower(), away_team.lower()}
+    if teams - {""}:
+        rows = [r for r in rows if (r.get("team") or "").lower() in teams or not teams - {""}]
+
+    def _top5(rows_sorted: list) -> list:
+        seen = set()
+        result = []
+        for r in rows_sorted:
+            pid = r.get("player_id") or r.get("player_name", "")
+            if pid not in seen:
+                seen.add(pid)
+                result.append({
+                    "player_id": r.get("player_id", ""),
+                    "player_name": r.get("player_name", "Inconnu"),
+                    "team": r.get("team", ""),
+                    "prob": round(float(r.get("python_prob", 0)) * 100, 1),
+                    "algo_score_goal": r.get("algo_score_goal", 0),
+                    "algo_score_shot": r.get("algo_score_shot", 0),
+                })
+            if len(result) >= 5:
+                break
+        return result
+
+    # Sort by different criteria for each category
+    by_goal = sorted(rows, key=lambda r: float(r.get("python_prob", 0)), reverse=True)
+    by_shot = sorted(rows, key=lambda r: int(r.get("algo_score_shot", 0)), reverse=True)
+    # For point and assist, use a combined score
+    by_point = sorted(rows, key=lambda r: float(r.get("python_prob", 0)) * 0.6 + int(r.get("algo_score_goal", 0)) * 0.4 / 100, reverse=True)
+    by_assist = sorted(rows, key=lambda r: int(r.get("algo_score_goal", 0)), reverse=True)
+
+    return {
+        "fixture_id": fixture_id,
+        "date": match_date,
+        "home_team": home_team,
+        "away_team": away_team,
+        "top_players": {
+            "goal": _top5(by_goal),
+            "assist": _top5(by_assist),
+            "point": _top5(by_point),
+            "sog": _top5(by_shot),
+        }
+    }
+

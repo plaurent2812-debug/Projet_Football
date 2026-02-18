@@ -1,64 +1,28 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { fetchPredictionDetail } from "@/lib/api"
-import { useParams, useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
+import { useParams, useNavigate } from "react-router-dom"
 import {
-    ArrowLeft, Target, TrendingUp, Shield, Swords,
-    BarChart3, Percent, AlertTriangle, Flame, BrainCircuit,
-    Zap, Activity, MessageSquareText
+    ArrowLeft, Flame, Lock, Trophy, Target, Zap,
+    TrendingUp, Users, BrainCircuit, ChevronRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
-import { Lock } from "lucide-react"
-
-/* ── Premium Blur Component ────────────────────────────────── */
-function PremiumBlur({ children, label = "Réservé aux membres Premium" }) {
-    return (
-        <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/30">
-            <div className="filter blur-sm select-none pointer-events-none opacity-50">
-                {children}
-            </div>
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/10 backdrop-blur-[2px] z-10">
-                <div className="p-3 rounded-full bg-primary/10 text-primary mb-2 ring-1 ring-primary/20">
-                    <Lock className="w-5 h-5" />
-                </div>
-                <p className="text-sm font-bold text-foreground">{label}</p>
-                <button className="mt-3 px-4 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors">
-                    Passer Premium
-                </button>
-            </div>
-        </div>
-    )
-}
-
-
-/* ── Stat row ──────────────────────────────────────────────── */
-function StatRow({ label, value, icon: Icon, color }) {
-    return (
-        <div className="flex items-center justify-between py-2.5 border-b border-border/30 last:border-0">
-            <div className="flex items-center gap-2.5 text-muted-foreground">
-                {Icon && <Icon className={cn("w-4 h-4", color || "text-muted-foreground/60")} />}
-                <span className="text-sm">{label}</span>
-            </div>
-            <span className="font-semibold text-sm">{value}</span>
-        </div>
-    )
-}
-
+import { fetchPredictionDetail } from "@/lib/api"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 /* ── Probability bar ───────────────────────────────────────── */
 function ProbBar({ label, value, color = "bg-primary" }) {
-    const pct = Math.min(value, 100)
+    const pct = value ?? 0
     return (
         <div className="space-y-1.5">
-            <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{label}</span>
-                <span className="font-bold tabular-nums">{value}%</span>
+            <div className="flex justify-between items-center">
+                <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                <span className="text-sm font-bold tabular-nums">{pct}%</span>
             </div>
-            <div className="h-2 w-full rounded-full bg-secondary/60 overflow-hidden">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                    className={cn("h-full rounded-full transition-all duration-1000 ease-out", color)}
+                    className={cn("h-full rounded-full prob-bar-fill", color)}
                     style={{ width: `${pct}%` }}
                 />
             </div>
@@ -66,27 +30,75 @@ function ProbBar({ label, value, color = "bg-primary" }) {
     )
 }
 
-
-/* ── Scorer row ────────────────────────────────────────────── */
-function ScorerRow({ player, rank }) {
+/* ── Stat row ──────────────────────────────────────────────── */
+function StatRow({ label, value, icon: Icon }) {
+    const display = value != null ? `${value}%` : "—%"
     return (
-        <div className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-accent/30 transition-colors">
-            <span className="text-xs font-bold text-muted-foreground/50 w-4 tabular-nums">{rank}</span>
-            <img
-                src={player.photo}
-                alt={player.name}
-                className="w-8 h-8 rounded-full object-cover bg-secondary ring-1 ring-border/50"
-                onError={(e) => { e.target.style.display = 'none' }}
-            />
-            <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{player.name}</p>
-                <p className="text-[11px] text-muted-foreground">{player.apps} matchs</p>
+        <div className="flex items-center justify-between py-2.5 border-b border-border/30 last:border-0">
+            <div className="flex items-center gap-2">
+                {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground" />}
+                <span className="text-sm text-foreground">{label}</span>
             </div>
-            <span className="text-sm font-bold tabular-nums text-primary">{player.goals} ⚽</span>
+            <span className={cn(
+                "text-sm font-bold tabular-nums",
+                value >= 70 ? "text-emerald-600 dark:text-emerald-400" :
+                    value >= 50 ? "text-amber-600 dark:text-amber-400" :
+                        "text-foreground"
+            )}>
+                {display}
+            </span>
         </div>
     )
 }
 
+/* ── Premium Blur Wrapper ──────────────────────────────────── */
+function PremiumSection({ children, title, icon: Icon }) {
+    const { isPremium, isAdmin } = useAuth()
+    const navigate = useNavigate()
+
+    if (isPremium || isAdmin) {
+        return (
+            <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        {Icon && <Icon className="w-4 h-4 text-primary" />}
+                        {title}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>{children}</CardContent>
+            </Card>
+        )
+    }
+
+    return (
+        <Card className="border-amber-500/20 bg-gradient-to-b from-card to-amber-500/3 overflow-hidden">
+            <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
+                    {title}
+                    <Lock className="w-3.5 h-3.5 text-amber-500 ml-auto" />
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="relative">
+                <div className="premium-blur select-none pointer-events-none">
+                    {children}
+                </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/60 backdrop-blur-[2px] rounded-b-xl">
+                    <Lock className="w-6 h-6 text-amber-500 mb-2" />
+                    <p className="text-sm font-bold mb-3">Contenu Premium</p>
+                    <Button
+                        size="sm"
+                        className="bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-lg shadow-amber-500/20"
+                        onClick={() => navigate('/premium')}
+                    >
+                        <Trophy className="w-3.5 h-3.5 mr-1.5" />
+                        Passer Premium
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
 
 /* ═══════════════════════════════════════════════════════════
    Match Detail Page
@@ -94,462 +106,225 @@ function ScorerRow({ player, rank }) {
 export default function MatchDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
-    const { hasAccess, isPremium, isAdmin } = useAuth()
+    const { isPremium, isAdmin } = useAuth()
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
         fetchPredictionDetail(id)
             .then(setData)
-            .catch(console.error)
+            .catch(e => setError(e.message))
             .finally(() => setLoading(false))
     }, [id])
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center py-32">
-                <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            </div>
-        )
-    }
+    if (loading) return (
+        <div className="flex items-center justify-center py-32">
+            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+    )
 
-    if (!data?.fixture) {
-        return (
-            <div className="text-center py-32">
-                <AlertTriangle className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-muted-foreground">Match introuvable</p>
-            </div>
-        )
-    }
+    if (error || !data) return (
+        <div className="text-center py-20">
+            <p className="text-muted-foreground">Match introuvable</p>
+            <Button variant="outline" className="mt-4" onClick={() => navigate('/football')}>
+                Retour aux matchs
+            </Button>
+        </div>
+    )
 
-    const f = data.fixture
-    const p = data.prediction
-    const time = f.date?.slice(11, 16) || ""
-    const dateStr = f.date?.slice(0, 10) || ""
+    const { fixture, prediction: p } = data
+    const isHot = p?.confidence_score >= 7
+    const time = fixture?.date?.slice(11, 16) || "—"
+    const dateStr = fixture?.date ? new Date(fixture.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) : ""
+
+    // Stats from stats_json fallback
+    const sj = p?.stats_json || {}
+    const get = (key, alt) => p?.[key] ?? sj?.[key] ?? p?.[alt] ?? sj?.[alt] ?? null
+
+    const proba_over_05 = get('proba_over_05')
+    const proba_over_15 = get('proba_over_15')
+    const proba_over_25 = get('proba_over_25') ?? get('proba_over_2_5')
+    const proba_over_35 = get('proba_over_35')
+    const proba_btts = get('proba_btts')
+    const proba_penalty = get('proba_penalty')
+    const xg_home = get('xg_home') ?? sj?.xg_home
+    const xg_away = get('xg_away') ?? sj?.xg_away
+
+    // Scorers
+    const scorers = p?.top_scorers || sj?.top_scorers || []
 
     return (
-        <div className="space-y-5 max-w-4xl mx-auto pb-12">
+        <div className="max-w-2xl mx-auto space-y-4 animate-fade-in-up pb-12">
+
             {/* Back button */}
             <button
-                onClick={() => navigate(-1)}
-                className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm group"
+                onClick={() => navigate('/football')}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-                Retour
+                <ArrowLeft className="w-4 h-4" />
+                Retour aux matchs
             </button>
 
-            {/* ── Match header ──────────────────────────────── */}
-            <div className="rounded-xl border border-border/50 bg-card/50 overflow-hidden">
-                <div className="relative px-6 py-8">
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-purple-500/5" />
-
-                    <div className="relative flex items-center justify-between">
-                        <div className="flex-1 text-center">
-                            <p className="text-xl sm:text-2xl font-black leading-tight">{f.home_team}</p>
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mt-1.5 inline-block">
-                                Domicile
-                            </span>
-                        </div>
-
-                        <div className="px-6 text-center shrink-0">
-                            {f.status === "FT" ? (
-                                <div>
-                                    <p className="text-4xl sm:text-5xl font-black tabular-nums tracking-tight">
-                                        {f.home_goals} <span className="text-muted-foreground/40">-</span> {f.away_goals}
-                                    </p>
-                                    <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">
-                                        Terminé
-                                    </span>
+            {/* Match header */}
+            <Card className="border-border/50 overflow-hidden">
+                <div className="bg-gradient-to-r from-primary/10 to-primary/5 px-5 py-4 border-b border-border/30">
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                            {fixture?.league_name || "Football"}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            {isHot && (
+                                <div className="flex items-center gap-1">
+                                    <Flame className="w-3.5 h-3.5 text-orange-500 flame-badge" />
+                                    <span className="text-[10px] font-bold text-orange-500">HOT</span>
                                 </div>
-                            ) : (
-                                <div>
-                                    <p className="text-2xl font-bold text-muted-foreground/50">VS</p>
-                                    <div className="mt-2 flex items-center gap-1.5 justify-center text-muted-foreground">
-                                        <span className="text-xs font-medium">{dateStr}</span>
-                                        <span className="text-muted-foreground/30">•</span>
-                                        <span className="text-sm font-bold text-foreground">{time}</span>
+                            )}
+                            <span className="text-xs text-muted-foreground capitalize">{dateStr} · {time}</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 mt-3">
+                        <div className="flex-1 text-center">
+                            <p className="text-xl font-black leading-tight">{fixture?.home_team}</p>
+                            {fixture?.home_goals != null && (
+                                <p className="text-3xl font-black text-primary mt-1">{fixture.home_goals}</p>
+                            )}
+                        </div>
+                        <div className="shrink-0 text-center">
+                            <span className="text-sm font-bold text-muted-foreground/40">VS</span>
+                        </div>
+                        <div className="flex-1 text-center">
+                            <p className="text-xl font-black leading-tight">{fixture?.away_team}</p>
+                            {fixture?.away_goals != null && (
+                                <p className="text-3xl font-black text-primary mt-1">{fixture.away_goals}</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Pari recommandé + confiance — FREE */}
+                {p && (
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs text-muted-foreground mb-1">Pari recommandé</p>
+                                <p className="text-base font-bold text-primary">{p.recommended_bet || "—"}</p>
+                            </div>
+                            {p.confidence_score != null && (
+                                <div className="text-center">
+                                    <p className="text-xs text-muted-foreground mb-1">Confiance</p>
+                                    <div className={cn(
+                                        "text-2xl font-black tabular-nums",
+                                        p.confidence_score >= 8 ? "text-emerald-600 dark:text-emerald-400" :
+                                            p.confidence_score >= 6 ? "text-amber-600 dark:text-amber-400" :
+                                                "text-foreground"
+                                    )}>
+                                        {p.confidence_score}<span className="text-sm text-muted-foreground font-normal">/10</span>
                                     </div>
                                 </div>
                             )}
                         </div>
-
-                        <div className="flex-1 text-center">
-                            <p className="text-xl sm:text-2xl font-black leading-tight">{f.away_team}</p>
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mt-1.5 inline-block">
-                                Extérieur
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                {p && (
-                    <div className="border-t border-border/30 px-6 py-2.5 flex items-center justify-between bg-accent/20">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Zap className="w-3.5 h-3.5 text-primary" />
-                            <span className="font-medium">{p.recommended_bet || "Analyse disponible"}</span>
-                        </div>
-                        <div className={cn(
-                            "text-xs font-bold px-2.5 py-1 rounded-full ring-1",
-                            p.confidence_score >= 7
-                                ? "bg-emerald-500/15 text-emerald-400 ring-emerald-500/20"
-                                : p.confidence_score >= 5
-                                    ? "bg-amber-500/15 text-amber-400 ring-amber-500/20"
-                                    : "bg-zinc-500/15 text-zinc-400 ring-zinc-500/20"
-                        )}>
-                            Confiance {p.confidence_score}/10
-                        </div>
-                    </div>
+                    </CardContent>
                 )}
-            </div>
+            </Card>
 
-            {/* No prediction */}
-            {!p && (
-                <div className="rounded-xl border border-dashed border-border/50 bg-card/30 p-8 text-center">
-                    <AlertTriangle className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                    <p className="text-muted-foreground text-sm">Pas de prédiction disponible</p>
-                </div>
-            )}
-
-            {/* ── Prediction panels ────────────────────────── */}
+            {/* Probabilités 1X2 — FREE */}
             {p && (
-                <div className="space-y-4">
-                    {/* Row 1: 1X2 + Markets */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* 1X2 - Visible for Free+ */}
-                        <Card className="bg-card/50 border-border/50">
-                            <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Swords className="w-4 h-4 text-primary" />
-                                    Résultat 1X2
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3.5">
-                                <ProbBar label="Domicile" value={p.proba_home || 0} color="bg-indigo-500" />
-                                <ProbBar label="Nul" value={p.proba_draw || 0} color="bg-zinc-500" />
-                                <ProbBar label="Extérieur" value={p.proba_away || 0} color="bg-purple-500" />
-                            </CardContent>
-                        </Card>
-
-                        {/* Markets - Premium Only */}
-                        {hasAccess('premium') ? (
-                            <Card className="bg-card/50 border-border/50">
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <BarChart3 className="w-4 h-4 text-primary" />
-                                        Marchés
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <StatRow label="But des 2 équipes" value={`${p.proba_btts || "—"}%`} icon={Percent} color="text-emerald-400" />
-                                    <StatRow label="Plus de 0.5" value={`${p.proba_over_05 || p.stats_json?.proba_over_05 || "—"}%`} icon={TrendingUp} color="text-blue-400" />
-                                    <StatRow label="Plus de 1.5" value={`${p.proba_over_15 || p.stats_json?.proba_over_15 || "—"}%`} icon={TrendingUp} color="text-blue-400" />
-                                    <StatRow label="Plus de 2.5" value={`${p.proba_over_25 || p.proba_over_2_5 || p.stats_json?.proba_over_2_5 || "—"}%`} icon={TrendingUp} color="text-amber-400" />
-                                    <StatRow label="Plus de 3.5" value={`${p.proba_over_35 || p.stats_json?.proba_over_35 || "—"}%`} icon={TrendingUp} color="text-orange-400" />
-                                    <StatRow label="Score exact" value={p.correct_score || "—"} icon={Target} color="text-purple-400" />
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <PremiumBlur label="Stats avancées (Premium)">
-                                <Card className="h-full">
-                                    <CardHeader className="pb-3"><CardTitle>Marchés</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <StatRow label="But des 2 équipes" value="65%" />
-                                        <StatRow label="Plus de 1.5" value="80%" />
-                                        <StatRow label="Plus de 2.5" value="55%" />
-                                        <StatRow label="Score exact" value="2-1" />
-                                    </CardContent>
-                                </Card>
-                            </PremiumBlur>
-                        )}
-                    </div>
-
-                    {/* Row 2: Recommendation + Expected Goals */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Recommendation - Premium Only */}
-                        {hasAccess('premium') ? (
-                            p.recommended_bet && (
-                                <Card className="bg-card/50 border-border/50">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="flex items-center gap-2 text-sm">
-                                            <Target className="w-4 h-4 text-primary" />
-                                            Recommandation
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-muted-foreground">Avis de l'expert :</span>
-                                            <Badge className="bg-primary/15 text-primary hover:bg-primary/20 border-0">
-                                                {p.recommended_bet}
-                                            </Badge>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm text-muted-foreground">Confiance</span>
-                                            <span className="text-base font-bold tabular-nums">{p.confidence_score}/10</span>
-                                        </div>
-                                        {p.kelly_edge != null && (
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-muted-foreground">Avantage Kelly</span>
-                                                <span className={cn(
-                                                    "font-bold tabular-nums text-sm",
-                                                    p.kelly_edge > 0 ? "text-emerald-400" : "text-red-400"
-                                                )}>
-                                                    {p.kelly_edge > 0 ? "+" : ""}{(p.kelly_edge * 100).toFixed(1)}%
-                                                </span>
-                                            </div>
-                                        )}
-                                        {p.value_bet && (
-                                            <div className="mt-2 p-2.5 rounded-lg bg-emerald-500/10 ring-1 ring-emerald-500/20 text-center">
-                                                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                                                    🎯 Pari Value détecté
-                                                </span>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )
-                        ) : (
-                            <PremiumBlur label="Recommandations & Value (Premium)">
-                                <Card className="h-full">
-                                    <CardHeader className="pb-3"><CardTitle>Recommandation</CardTitle></CardHeader>
-                                    <CardContent className="space-y-3">
-                                        <div className="flex justify-between"><span className="text-sm">Pari</span><Badge>Premium</Badge></div>
-                                        <div className="flex justify-between"><span className="text-sm">Confiance</span><span>8/10</span></div>
-                                    </CardContent>
-                                </Card>
-                            </PremiumBlur>
-                        )}
-
-                        {/* Expected Goals - Premium Only */}
-                        {hasAccess('premium') ? (
-                            <Card className="bg-card/50 border-border/50">
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <Activity className="w-4 h-4 text-primary" />
-                                        Expected Goals
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4">
-                                        {/* xG Home */}
-                                        <div className="space-y-1.5">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-muted-foreground">{f.home_team}</span>
-                                                <span className="font-bold tabular-nums">{p.stats_json?.xg_home || "—"}</span>
-                                            </div>
-                                            {p.stats_json?.xg_home && (
-                                                <div className="h-2 w-full rounded-full bg-secondary/60 overflow-hidden">
-                                                    <div
-                                                        className="h-full rounded-full bg-indigo-500 transition-all duration-1000"
-                                                        style={{ width: `${Math.min((p.stats_json.xg_home / 4) * 100, 100)}%` }}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                        {/* xG Away */}
-                                        <div className="space-y-1.5">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-muted-foreground">{f.away_team}</span>
-                                                <span className="font-bold tabular-nums">{p.stats_json?.xg_away || "—"}</span>
-                                            </div>
-                                            {p.stats_json?.xg_away && (
-                                                <div className="h-2 w-full rounded-full bg-secondary/60 overflow-hidden">
-                                                    <div
-                                                        className="h-full rounded-full bg-purple-500 transition-all duration-1000"
-                                                        style={{ width: `${Math.min((p.stats_json.xg_away / 4) * 100, 100)}%` }}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <PremiumBlur label="Expected Goals (Premium)">
-                                <Card className="h-full"><CardHeader><CardTitle>xG</CardTitle></CardHeader></Card>
-                            </PremiumBlur>
-                        )}
-                    </div>
-                    {/* Scorer Prediction */}
-                    {/* Scorer Prediction - Free+ Only */}
-                    {
-                        hasAccess('free') && p.likely_scorer && (
-                            <Card className="bg-card/50 border-border/50">
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <Target className="w-4 h-4 text-primary" />
-                                        Buteur Probable
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-lg ring-1 ring-primary/20">
-                                                ⚽
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-sm">{p.likely_scorer}</p>
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-xs text-muted-foreground">Probabilité IA</span>
-                                                    <span className="text-xs font-bold text-primary">{p.likely_scorer_proba}%</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {p.likely_scorer_reason && (
-                                        <div className="text-xs text-muted-foreground bg-accent/20 p-3 rounded-lg border border-border/30 leading-relaxed">
-                                            <BrainCircuit className="w-3 h-3 inline mr-1.5 text-primary/70 -mt-0.5" />
-                                            {p.likely_scorer_reason}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )
-                    }
-
-
-                    {/* Row 3: AI Analysis — full width, prominent */}
-                    {/* Row 3: AI Analysis — Premium Only */}
-                    {
-                        hasAccess('premium') ? (
-                            p.analysis_text && (
-                                <Card className="bg-card/50 border-border/50 glow-primary">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="flex items-center gap-2 text-sm">
-                                            <BrainCircuit className="w-4 h-4 text-primary" />
-                                            Analyse du match
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="relative rounded-lg bg-accent/20 ring-1 ring-border/30 p-5">
-                                            {/* Subtle gradient accent */}
-                                            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-                                            <div className="flex gap-3">
-                                                <MessageSquareText className="w-5 h-5 text-primary/60 shrink-0 mt-0.5" />
-                                                <p className="text-sm leading-relaxed text-foreground/85 whitespace-pre-line">
-                                                    {p.analysis_text.replace(/[#*]/g, '')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )
-                        ) : (
-                            <PremiumBlur label="Analyse IA complète (Premium)">
-                                <Card className="bg-card/50">
-                                    <CardHeader><CardTitle>Analyse du match</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <p className="blur-sm text-sm">
-                                            Le match s'annonce serré avec un avantage léger pour l'équipe à domicile en raison de leur forme récente...
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            </PremiumBlur>
-                        )
-                    }
-
-                    {/* Row 4: Top Scorers */}
-                    {
-                        (data.home_scorers?.length > 0 || data.away_scorers?.length > 0) && (
-                            <Card className="bg-card/50 border-border/50">
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <Flame className="w-4 h-4 text-orange-400" />
-                                        Meilleurs Buteurs
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <h4
-                                            onClick={() => navigate(`/equipe/${encodeURIComponent(f.home_team)}`)}
-                                            className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 text-center hover:text-primary cursor-pointer transition-colors"
-                                        >
-                                            {f.home_team}
-                                        </h4>
-                                        <div className="space-y-0.5">
-                                            {data.home_scorers?.map((scorer, i) => (
-                                                <ScorerRow key={i} player={scorer} rank={i + 1} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h4
-                                            onClick={() => navigate(`/equipe/${encodeURIComponent(f.away_team)}`)}
-                                            className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 text-center hover:text-primary cursor-pointer transition-colors"
-                                        >
-                                            {f.away_team}
-                                        </h4>
-                                        <div className="space-y-0.5">
-                                            {data.away_scorers?.map((scorer, i) => (
-                                                <ScorerRow key={i} player={scorer} rank={i + 1} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )
-                    }
-                </div>
-            )}
-
-            {/* ── Match Stats (Finished Matches) ──────────────── */}
-            {f.status === "FT" && data.match_stats && data.match_stats.length > 0 && (
-                <Card className="bg-card/50 border-border/50 mt-5">
+                <Card className="border-border/50">
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-sm">
-                            <BarChart3 className="w-4 h-4 text-primary" />
-                            Statistiques du Match
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <BarChart3Icon className="w-4 h-4 text-primary" />
+                            Probabilités 1X2
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        {(() => {
-                            const homeStats = data.match_stats.find(s => s.team_api_id === f.home_team_id) || {};
-                            const awayStats = data.match_stats.find(s => s.team_api_id === f.away_team_id) || {};
-
-                            const StatLine = ({ label, keyName, isPct = false }) => {
-                                let hVal = homeStats[keyName] || 0;
-                                let aVal = awayStats[keyName] || 0;
-                                if (isPct) {
-                                    hVal = typeof hVal === 'string' ? parseFloat(hVal) : hVal;
-                                    aVal = typeof aVal === 'string' ? parseFloat(aVal) : aVal;
-                                }
-                                const total = hVal + aVal;
-                                const hPct = total > 0 ? (hVal / total) * 100 : 50;
-
-                                return (
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-xs text-muted-foreground px-1">
-                                            <span className="font-bold tabular-nums text-foreground">{isPct ? hVal + '%' : hVal}</span>
-                                            <span>{label}</span>
-                                            <span className="font-bold tabular-nums text-foreground">{isPct ? aVal + '%' : aVal}</span>
-                                        </div>
-                                        <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-secondary/30">
-                                            <div className="bg-indigo-500 transition-all" style={{ width: `${hPct}%` }} />
-                                            <div className="bg-purple-500 transition-all flex-1" />
-                                        </div>
-                                    </div>
-                                );
-                            };
-
-                            return (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                                    <div className="space-y-4">
-                                        <StatLine label="Expected Goals (xG)" keyName="expected_goals" />
-                                        <StatLine label="Possession" keyName="possession" isPct />
-                                        <StatLine label="Tirs Total" keyName="shots_total" />
-                                        <StatLine label="Tirs Cadrés" keyName="shots_on_target" />
-                                    </div>
-                                    <div className="space-y-4">
-                                        <StatLine label="Passes Réussies" keyName="passes_accurate" />
-                                        <StatLine label="Fautes" keyName="fouls" />
-                                        <StatLine label="Corners" keyName="corners" />
-                                        <StatLine label="Cartons Jaunes" keyName="yellow_cards" />
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                    <CardContent className="space-y-3">
+                        <ProbBar label={`Victoire ${fixture?.home_team}`} value={p.proba_home} color="bg-primary" />
+                        <ProbBar label="Match nul" value={p.proba_draw} color="bg-slate-400" />
+                        <ProbBar label={`Victoire ${fixture?.away_team}`} value={p.proba_away} color="bg-blue-400" />
                     </CardContent>
                 </Card>
             )}
+
+            {/* Marchés — PREMIUM */}
+            <PremiumSection title="Marchés & Statistiques" icon={Target}>
+                <div className="space-y-0">
+                    <StatRow label="Les deux équipes marquent (BTTS)" value={proba_btts} />
+                    <StatRow label="Plus de 0.5 buts" value={proba_over_05} />
+                    <StatRow label="Plus de 1.5 buts" value={proba_over_15} />
+                    <StatRow label="Plus de 2.5 buts" value={proba_over_25} />
+                    <StatRow label="Plus de 3.5 buts" value={proba_over_35} />
+                    <StatRow label="But sur penalty" value={proba_penalty} />
+                    {p?.correct_score && (
+                        <div className="flex items-center justify-between py-2.5">
+                            <span className="text-sm">Score exact probable</span>
+                            <span className="text-sm font-bold text-primary">{p.correct_score}</span>
+                        </div>
+                    )}
+                </div>
+            </PremiumSection>
+
+            {/* xG — PREMIUM */}
+            <PremiumSection title="Expected Goals (xG)" icon={TrendingUp}>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-accent/30 rounded-xl">
+                        <p className="text-xs text-muted-foreground mb-1">{fixture?.home_team}</p>
+                        <p className="text-2xl font-black text-primary">{xg_home ?? "—"}</p>
+                        <p className="text-[10px] text-muted-foreground">xG domicile</p>
+                    </div>
+                    <div className="text-center p-3 bg-accent/30 rounded-xl">
+                        <p className="text-xs text-muted-foreground mb-1">{fixture?.away_team}</p>
+                        <p className="text-2xl font-black text-primary">{xg_away ?? "—"}</p>
+                        <p className="text-[10px] text-muted-foreground">xG extérieur</p>
+                    </div>
+                </div>
+            </PremiumSection>
+
+            {/* Buteurs probables — PREMIUM */}
+            <PremiumSection title="Buteurs probables" icon={Users}>
+                {scorers.length > 0 ? (
+                    <div className="space-y-2">
+                        {scorers.slice(0, 2).map((s, i) => (
+                            <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                        {i + 1}
+                                    </div>
+                                    <span className="text-sm font-semibold">{s.player_name || s.name}</span>
+                                </div>
+                                <Badge className="bg-primary/10 text-primary border-0 font-bold">
+                                    {s.probability ?? s.prob ?? "—"}%
+                                </Badge>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center py-2">Données non disponibles</p>
+                )}
+            </PremiumSection>
+
+            {/* Analyse IA — PREMIUM */}
+            <PremiumSection title="Analyse IA" icon={BrainCircuit}>
+                {p?.analysis_text ? (
+                    <p className="text-sm text-foreground/80 leading-relaxed">{p.analysis_text}</p>
+                ) : (
+                    <p className="text-sm text-muted-foreground">Analyse en cours de génération...</p>
+                )}
+            </PremiumSection>
+
+            {/* Disclaimer */}
+            <p className="disclaimer-text text-center px-4">
+                Les probabilités affichées sont calculées par des modèles statistiques à titre informatif uniquement.
+                Elles ne constituent pas des conseils de paris. Jouez de manière responsable. 18+
+            </p>
         </div>
+    )
+}
+
+// Local icon component to avoid import issues
+function BarChart3Icon({ className }) {
+    return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
     )
 }

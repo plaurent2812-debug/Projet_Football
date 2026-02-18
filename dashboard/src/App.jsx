@@ -1,24 +1,21 @@
-import { BrowserRouter, Routes, Route, NavLink, useNavigate } from "react-router-dom"
-import { lazy, Suspense, useState } from "react"
-import { BarChart3, Home, Zap, Trophy, ListChecks, Shield, Menu } from "lucide-react"
+import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom"
+import { lazy, Suspense, useState, useEffect } from "react"
+import { Zap, Trophy, Shield, Menu, X, Sun, Moon, LogOut, User, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import ThemeToggle from "@/components/ThemeToggle"
 import { AuthProvider, useAuth } from "@/lib/auth"
-import { Sidebar } from "@/components/Sidebar"
-import { SportsNav } from "@/components/SportsNav"
-import { RightSidebar } from "@/components/RightSidebar"
 import "./App.css"
 
+// ── Lazy pages ────────────────────────────────────────────────
 const HomePage = lazy(() => import("@/pages/HomePage"))
-const DashboardPage = lazy(() => import("@/pages/Dashboard"))
-const PerformancePage = lazy(() => import("@/pages/Performance"))
-const MatchDetailPage = lazy(() => import("@/pages/MatchDetail"))
-const AdminPage = lazy(() => import("@/pages/Admin"))
-const TeamProfile = lazy(() => import("@/pages/TeamProfile"))
-const LoginPage = lazy(() => import("@/pages/Login"))
-const PremiumPage = lazy(() => import("@/pages/Premium"))
+const FootballPage = lazy(() => import("@/pages/Dashboard"))
+const MatchDetail = lazy(() => import("@/pages/MatchDetail"))
 const NHLPage = lazy(() => import("@/pages/NHL/NHLPage"))
 const NHLMatchDetail = lazy(() => import("@/pages/NHL/NHLMatchDetail"))
+const PerformancePage = lazy(() => import("@/pages/Performance"))
+const AdminPage = lazy(() => import("@/pages/Admin"))
+const LoginPage = lazy(() => import("@/pages/Login"))
+const PremiumPage = lazy(() => import("@/pages/Premium"))
+const TeamProfile = lazy(() => import("@/pages/TeamProfile"))
 
 function PageLoader() {
   return (
@@ -28,182 +25,263 @@ function PageLoader() {
   )
 }
 
-function NavItem({ to, icon: Icon, label }) {
+// ── Theme Toggle ──────────────────────────────────────────────
+function useTheme() {
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('probalab-theme') || 'light'
+    }
+    return 'light'
+  })
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.remove('light', 'dark')
+    root.classList.add(theme)
+    localStorage.setItem('probalab-theme', theme)
+  }, [theme])
+
+  return [theme, setTheme]
+}
+
+// ── Header ────────────────────────────────────────────────────
+function Header({ theme, setTheme, mobileOpen, setMobileOpen }) {
+  const { user, signOut, role, isPremium, isAdmin } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const navLinks = [
+    { to: "/", label: "Accueil", exact: true },
+    { to: "/football", label: "⚽ Football" },
+    { to: "/nhl", label: "🏒 NHL" },
+    { to: "/performance", label: "Performance" },
+  ]
+
   return (
-    <NavLink
-      to={to}
-      end
-      className={({ isActive }) =>
-        cn(
-          "flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-          isActive
-            ? "bg-primary/15 text-primary"
-            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-        )
-      }
-    >
-      <Icon className="w-4 h-4" />
-      <span className="hidden sm:inline">{label}</span>
-    </NavLink>
+    <header className="sticky top-0 z-50 border-b border-border/60 bg-card/80 backdrop-blur-xl shadow-sm">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
+        <div className="flex items-center justify-between h-14">
+
+          {/* Logo */}
+          <NavLink to="/" className="flex items-center gap-2 group shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/30">
+              <Zap className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="text-lg font-black tracking-tight text-foreground">
+              Proba<span className="text-primary">Lab</span>
+            </span>
+          </NavLink>
+
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {navLinks.map(link => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.exact}
+                className={({ isActive }) => cn(
+                  "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
+                  isActive
+                    ? "bg-primary/10 text-primary font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                )}
+              >
+                {link.label}
+              </NavLink>
+            ))}
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) => cn(
+                  "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
+                  isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                )}
+              >
+                <Shield className="w-3.5 h-3.5 inline mr-1" />Admin
+              </NavLink>
+            )}
+          </nav>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-2">
+            {/* Theme toggle */}
+            <button
+              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            {/* Premium badge */}
+            {!isPremium && !isAdmin && (
+              <button
+                onClick={() => navigate('/premium')}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors border border-amber-500/20"
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                Premium
+              </button>
+            )}
+
+            {/* Auth */}
+            {user ? (
+              <div className="flex items-center gap-1">
+                <span className="hidden sm:block text-xs text-muted-foreground px-2">
+                  {isPremium ? '⭐ Premium' : isAdmin ? '🛡️ Admin' : 'Free'}
+                </span>
+                <button
+                  onClick={signOut}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                  title="Déconnexion"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <NavLink
+                to="/login"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm shadow-primary/20"
+              >
+                Connexion
+              </NavLink>
+            )}
+
+            {/* Mobile menu toggle */}
+            <button
+              className="md:hidden p-2 rounded-lg text-muted-foreground hover:bg-accent/60 transition-colors"
+              onClick={() => setMobileOpen(o => !o)}
+            >
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-border/40 bg-card/95 backdrop-blur-xl px-4 py-3 space-y-1">
+          {navLinks.map(link => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.exact}
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) => cn(
+                "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/60"
+              )}
+            >
+              {link.label}
+              <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+            </NavLink>
+          ))}
+          {!isPremium && !isAdmin && (
+            <NavLink
+              to="/premium"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-bold text-amber-600 bg-amber-500/10"
+            >
+              <Trophy className="w-4 h-4" /> Passer Premium
+            </NavLink>
+          )}
+        </div>
+      )}
+    </header>
   )
 }
 
-function AdminLink() {
-  const { hasAccess } = useAuth()
-  if (!hasAccess('admin')) return null
-  return <NavItem to="/admin" icon={Shield} label="Admin" />
-}
-
-function PremiumLink() {
-  const { hasAccess } = useAuth()
-  // Hide if already premium/admin
-  if (hasAccess('premium')) return null
-
+// ── Footer ────────────────────────────────────────────────────
+function Footer() {
   return (
-    <NavLink
-      to="/abonnement"
-      className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-amber-500 hover:bg-amber-500/10 transition-colors"
-    >
-      <Trophy className="w-4 h-4" />
-      <span className="hidden sm:inline">Premium</span>
-    </NavLink>
+    <footer className="border-t border-border/40 bg-card/50 mt-auto">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Zap className="w-3.5 h-3.5 text-primary" />
+            <span className="text-sm font-bold text-foreground">ProbaLab</span>
+          </div>
+          <p className="disclaimer-text text-center max-w-lg">
+            ProbaLab fournit des analyses statistiques à titre informatif uniquement.
+            Ce site ne constitue pas un conseil en paris sportifs. Jouez de manière responsable. 18+
+          </p>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <a href="#" className="hover:text-foreground transition-colors">CGU</a>
+            <a href="#" className="hover:text-foreground transition-colors">Confidentialité</a>
+            <a href="#" className="hover:text-foreground transition-colors">Contact</a>
+          </div>
+        </div>
+      </div>
+    </footer>
   )
 }
 
+// ── Admin Guard ───────────────────────────────────────────────
 function AdminGuard({ children }) {
   const { hasAccess } = useAuth()
-  const navigate = useNavigate()
-
-  // Simple check, redirect to home if not admin
   if (!hasAccess('admin')) {
-    // Return null or redirect
-    return <div className="p-8 text-center text-muted-foreground">Accès non autorisé</div>
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-center">
+        <Shield className="w-12 h-12 text-muted-foreground/30 mb-4" />
+        <p className="text-muted-foreground font-medium">Accès réservé aux administrateurs</p>
+      </div>
+    )
   }
   return children
 }
 
-function AuthButton() {
-  // ... existing code ...
-  const { user, signOut } = useAuth()
+// ── Main App ──────────────────────────────────────────────────
+function AppContent() {
+  const [theme, setTheme] = useTheme()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [selectedLeague, setSelectedLeague] = useState(null)
+  const location = useLocation()
 
-  if (user) {
-    return (
-      <button
-        onClick={signOut}
-        className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors ml-2"
-      >
-        <span className="hidden sm:inline">Déconnexion</span>
-      </button>
-    )
-  }
+  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
   return (
-    <NavLink
-      to="/login"
-      className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ml-2 shadow-sm"
-    >
-      <span>Connexion</span>
-    </NavLink>
+    <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-300">
+      <Header theme={theme} setTheme={setTheme} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+
+      <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-6">
+        <Suspense fallback={<PageLoader />}>
+          <div className="animate-fade-in-up">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/football" element={
+                <FootballPage
+                  date={date} setDate={setDate}
+                  selectedLeague={selectedLeague} setSelectedLeague={setSelectedLeague}
+                />
+              } />
+              <Route path="/football/match/:id" element={<MatchDetail />} />
+              {/* Legacy route */}
+              <Route path="/match/:id" element={<MatchDetail />} />
+              <Route path="/nhl" element={<NHLPage date={date} setDate={setDate} />} />
+              <Route path="/nhl/match/:id" element={<NHLMatchDetail />} />
+              <Route path="/performance" element={<PerformancePage />} />
+              <Route path="/premium" element={<PremiumPage />} />
+              <Route path="/abonnement" element={<PremiumPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/equipe/:name" element={<TeamProfile />} />
+              <Route path="/admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
+            </Routes>
+          </div>
+        </Suspense>
+      </main>
+
+      <Footer />
+    </div>
   )
 }
 
 function App() {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [activeSport, setActiveSport] = useState("football")
-  const [selectedLeague, setSelectedLeague] = useState(null)
-
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-[#f3f4f6] text-foreground transition-colors duration-300 font-sans antialiased selection:bg-primary/20">
-
-          {/* Header (Top Bar) */}
-          <header className="sticky top-0 z-50 bg-[#374df5] border-b border-white/10 shadow-sm">
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
-              <div className="flex items-center justify-between h-14">
-                {/* Logo */}
-                <NavLink to="/" className="flex items-center gap-2.5 group">
-                  <div className="p-1.5 bg-white/10 rounded-lg">
-                    <Zap className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-xl font-black tracking-tight text-white flex items-center gap-0.5">
-                    Proba<span className="opacity-80 font-bold">Lab</span>
-                  </span>
-                </NavLink>
-
-                {/* Right Actions (Theme, Auth) */}
-                <div className="flex items-center gap-3 text-white">
-                  <div className="hidden md:flex items-center gap-2">
-                    {/* Placeholder Search */}
-                    <div className="bg-white/10 rounded-full px-3 py-1.5 flex items-center gap-2 text-sm text-white/70 min-w-[200px]">
-                      <ListChecks className="w-4 h-4" />
-                      <span>Rechercher...</span>
-                    </div>
-                  </div>
-                  <ThemeToggle className="text-white hover:bg-white/10" />
-                  <AuthButton />
-                  <button className="md:hidden p-2 hover:bg-white/10 rounded-md">
-                    <Menu className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-            </div>
-            {/* Sports Nav attached to header */}
-            <SportsNav activeSport={activeSport} onSportChange={setActiveSport} />
-          </header>
-
-          {/* Main Layout Grid */}
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 transition-all duration-500 ease-in-out">
-            <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_340px] gap-6 items-start">
-
-              {/* Left Sidebar */}
-              <Sidebar className="hidden md:block sticky top-36" selectedLeague={selectedLeague} onLeagueSelect={setSelectedLeague} />
-
-              {/* Main Content Area */}
-              <main className="min-w-0 bg-white rounded-xl shadow-sm border border-border/40 min-h-[80vh]">
-                <Suspense fallback={<PageLoader />}>
-                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                    <Routes>
-                      <Route path="/nhl" element={<NHLPage date={date} setDate={setDate} />} />
-                      <Route path="/nhl/match/:id" element={<NHLMatchDetail />} />
-
-                      <Route path="/" element={<HomePage />} />
-                      <Route
-                        path="/matchs"
-                        element={
-                          <DashboardPage
-                            date={date}
-                            setDate={setDate}
-                            selectedLeague={selectedLeague}
-                            setSelectedLeague={setSelectedLeague}
-                          />
-                        }
-                      />
-                      <Route
-                        path="/performance"
-                        element={
-                          <AdminGuard>
-                            <PerformancePage />
-                          </AdminGuard>
-                        }
-                      />
-                      <Route path="/abonnement" element={<PremiumPage />} />
-                      <Route path="/match/:id" element={<MatchDetailPage />} />
-                      <Route path="/equipe/:name" element={<TeamProfile />} />
-                      <Route path="/admin" element={<AdminPage />} />
-                      <Route path="/login" element={<LoginPage />} />
-                    </Routes>
-                  </div>
-                </Suspense>
-              </main>
-
-              {/* Right Sidebar */}
-              <RightSidebar />
-
-            </div>
-          </div>
-
-        </div>
+        <AppContent />
       </BrowserRouter>
     </AuthProvider>
   )

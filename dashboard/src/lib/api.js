@@ -53,3 +53,15 @@ export async function fetchPipelineStatus() {
     if (!res.ok) throw new Error(`API error: ${res.status}`)
     return res.json()
 }
+
+export async function fetchNews() {
+    const res = await fetch(`${API_BASE}/news`)
+    if (!res.ok) return { news: [] }
+    return res.json()
+}
+
+export async function fetchNHLMatchTopPlayers(fixtureId) {
+    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/nhl/match/${fixtureId}/top_players`)
+    if (!res.ok) return null
+    return res.json()
+}

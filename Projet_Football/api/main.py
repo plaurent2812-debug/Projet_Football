@@ -9,13 +9,24 @@ import os
 import subprocess
 import sys
 import threading
+import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 # Add the parent package to the path so we can import config
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Union
+
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM = os.getenv("RESEND_FROM", "ProbaLab <noreply@probalab.fr>")
 
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,6 +54,168 @@ app.add_middleware(
 def health_check():
     """Health check endpoint for Railway / monitoring."""
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+
+# ─── News RSS Cache ─────────────────────────────────────────────
+
+_news_cache: dict = {"data": [], "fetched_at": 0}
+_NEWS_TTL = 3600  # 1 hour
+
+RSS_FEEDS = [
+    {"url": "https://www.lequipe.fr/rss/actu_rss.xml", "source": "L'Équipe"},
+    {"url": "https://rmcsport.bfmtv.com/rss/football/", "source": "RMC Sport"},
+    {"url": "https://www.nhl.com/rss/news.xml", "source": "NHL.com"},
+]
+
+
+def _fetch_rss_news() -> list:
+    """Fetch and parse RSS feeds, return list of news items."""
+    if not HTTPX_AVAILABLE:
+        return []
+    items = []
+    for feed in RSS_FEEDS:
+        try:
+            resp = httpx.get(feed["url"], timeout=5.0, follow_redirects=True)
+            root = ET.fromstring(resp.text)
+            channel = root.find("channel")
+            if channel is None:
+                continue
+            for item in channel.findall("item")[:3]:
+                title = item.findtext("title", "").strip()
+                link = item.findtext("link", "").strip()
+                pub_date = item.findtext("pubDate", "").strip()
+                if title and link:
+                    items.append({
+                        "title": title,
+                        "link": link,
+                        "source": feed["source"],
+                        "pub_date": pub_date,
+                    })
+        except Exception:
+            pass
+    return items[:6]
+
+
+@app.get("/api/news")
+def get_news():
+    """Get latest sports news from RSS feeds (cached 1h)."""
+    global _news_cache
+    now = time.time()
+    if now - _news_cache["fetched_at"] > _NEWS_TTL or not _news_cache["data"]:
+        _news_cache["data"] = _fetch_rss_news()
+        _news_cache["fetched_at"] = now
+    return {"news": _news_cache["data"]}
+
+
+# ─── Resend Email Helpers ───────────────────────────────────────
+
+def _send_resend_email(to: str, subject: str, html: str) -> bool:
+    """Send an email via Resend API. Returns True on success."""
+    if not RESEND_API_KEY or not HTTPX_AVAILABLE:
+        return False
+    try:
+        resp = httpx.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+            json={"from": RESEND_FROM, "to": [to], "subject": subject, "html": html},
+            timeout=10.0,
+        )
+        return resp.status_code in (200, 201)
+    except Exception:
+        return False
+
+
+@app.post("/api/resend/welcome")
+def send_welcome_email(payload: dict):
+    """Send welcome email after registration."""
+    email = payload.get("email", "")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email required")
+    html = f"""
+    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f8faff">
+      <div style="text-align:center;margin-bottom:32px">
+        <h1 style="color:#1E40AF;font-size:28px;margin:0">⚡ ProbaLab</h1>
+        <p style="color:#64748b;margin-top:8px">Analyses sportives augmentées par l'IA</p>
+      </div>
+      <div style="background:white;border-radius:12px;padding:32px;border:1px solid #e2e8f0">
+        <h2 style="color:#1e293b;margin-top:0">Bienvenue sur ProbaLab ! 🎉</h2>
+        <p style="color:#475569;line-height:1.6">
+          Votre compte est créé. Vous avez maintenant accès aux probabilités 1X2 et aux paris recommandés
+          pour tous les matchs de football et de NHL.
+        </p>
+        <p style="color:#475569;line-height:1.6">
+          Passez en <strong style="color:#1E40AF">Premium</strong> pour débloquer toutes les statistiques avancées :
+          BTTS, Over/Under, buteurs probables, analyse IA et bien plus.
+        </p>
+        <div style="text-align:center;margin-top:24px">
+          <a href="https://probalab.fr/football" style="background:#1E40AF;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+            Voir les matchs →
+          </a>
+        </div>
+      </div>
+      <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px">
+        ProbaLab fournit des analyses statistiques à titre informatif uniquement. Ce site ne constitue pas un conseil en paris sportifs.
+      </p>
+    </div>
+    """
+    ok = _send_resend_email(email, "Bienvenue sur ProbaLab ⚡", html)
+    return {"sent": ok}
+
+
+@app.post("/api/resend/premium-confirm")
+def send_premium_confirm_email(payload: dict):
+    """Send premium confirmation email after payment."""
+    email = payload.get("email", "")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email required")
+    html = f"""
+    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f8faff">
+      <div style="text-align:center;margin-bottom:32px">
+        <h1 style="color:#1E40AF;font-size:28px;margin:0">⚡ ProbaLab</h1>
+      </div>
+      <div style="background:white;border-radius:12px;padding:32px;border:1px solid #e2e8f0">
+        <h2 style="color:#1e293b;margin-top:0">Votre abonnement Premium est actif ! 🏆</h2>
+        <p style="color:#475569;line-height:1.6">
+          Félicitations ! Vous avez maintenant accès à toutes les fonctionnalités ProbaLab Premium :
+        </p>
+        <ul style="color:#475569;line-height:2">
+          <li>✅ BTTS, Over 0.5 / 1.5 / 2.5 / 3.5</li>
+          <li>✅ Score exact et penalty</li>
+          <li>✅ Buteurs probables avec probabilités</li>
+          <li>✅ Analyse IA complète de chaque match</li>
+          <li>✅ Expected Goals (xG)</li>
+          <li>✅ NHL : Top 5 buteurs, passeurs, tirs</li>
+        </ul>
+        <div style="text-align:center;margin-top:24px">
+          <a href="https://probalab.fr/football" style="background:#1E40AF;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+            Accéder à ProbaLab →
+          </a>
+        </div>
+      </div>
+      <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:24px">
+        ProbaLab fournit des analyses statistiques à titre informatif uniquement.
+      </p>
+    </div>
+    """
+    ok = _send_resend_email(email, "Votre abonnement Premium ProbaLab est actif 🏆", html)
+    return {"sent": ok}
+
+
+
+
+def _ensure_dict(data: Union[dict, str, None]) -> dict:
+    """Helper to safely parse JSON field from Supabase that might be stringified."""
+    if not data:
+        return {}
+    if isinstance(data, dict):
+        return data
+    if isinstance(data, str):
+        import json
+        try:
+            return json.loads(data)
+        except Exception:
+            return {}
+    return {}
 
 
 @app.get("/api/predictions")
@@ -97,6 +270,17 @@ def get_predictions(
     for f in fixtures:
         pred = pred_by_fixture.get(f["id"])
         league_id = f.get("league_id")
+        
+        # Parse stats_json safely
+        stats = _ensure_dict(pred.get("stats_json") if pred else None)
+        
+        # Helper to get value from top-level OR stats_json
+        def get_val(key, default=None):
+            if not pred: return default
+            val = pred.get(key)
+            if val is not None: return val
+            return stats.get(key, default)
+
         matches.append({
             "id": f["id"],
             "home_team": f.get("home_team", "?"),
@@ -108,21 +292,22 @@ def get_predictions(
             "league_id": league_id,
             "league_name": league_map.get(str(league_id), "Ligue"),
             "prediction": {
-                "proba_home": pred.get("proba_home") if pred else None,
-                "proba_draw": pred.get("proba_draw") if pred else None,
-                "proba_away": pred.get("proba_away") if pred else None,
-                "proba_btts": pred.get("proba_btts") if pred else None,
-                "proba_over_25": pred.get("proba_over_25") if pred else (pred.get("proba_over_2_5") if pred else None),
-                "recommended_bet": pred.get("recommended_bet") if pred else None,
-                "confidence_score": pred.get("confidence_score") if pred else None,
-                "kelly_edge": pred.get("kelly_edge") if pred else None,
-                "value_bet": pred.get("value_bet") if pred else None,
-                "model_version": pred.get("model_version") if pred else None,
-                "correct_score": pred.get("correct_score") if pred else None,
-                "analysis_text": pred.get("analysis_text") if pred else None,
-                "proba_penalty": pred.get("proba_penalty") if pred else None,
-                "proba_over_05": pred.get("proba_over_05") if pred else None,
-                "proba_over_15": pred.get("proba_over_15") if pred else None,
+                "proba_home": get_val("proba_home"),
+                "proba_draw": get_val("proba_draw"),
+                "proba_away": get_val("proba_away"),
+                "proba_btts": get_val("proba_btts"),
+                "proba_over_25": get_val("proba_over_2_5") or get_val("proba_over_25"),
+                "recommended_bet": get_val("recommended_bet"),
+                "confidence_score": get_val("confidence_score"),
+                "kelly_edge": get_val("kelly_edge"),
+                "value_bet": get_val("value_bet"),
+                "model_version": get_val("model_version"),
+                "correct_score": get_val("correct_score"),
+                "analysis_text": get_val("analysis_text"),
+                "proba_penalty": get_val("proba_penalty"),
+                "proba_over_05": get_val("proba_over_05"),
+                "proba_over_15": get_val("proba_over_15"),
+                "proba_over_35": get_val("proba_over_35"),
             } if pred else None,
         })
 
@@ -158,6 +343,10 @@ def get_prediction_detail(fixture_id: str):
         .data
     )
     prediction = prediction_data[0] if prediction_data else None
+
+    # Parse stats_json if present
+    if prediction:
+        prediction["stats_json"] = _ensure_dict(prediction.get("stats_json"))
 
     # Fetch Top Scorers Logic
     home_scorers = []

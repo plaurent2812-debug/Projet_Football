@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+import httpx
 import stripe
 from fastapi import APIRouter, Header, HTTPException, Request
 
@@ -92,15 +95,16 @@ def _handle_checkout_session(session: dict) -> None:
     """Upgrade user to premium after successful checkout."""
     user_id = session.get("client_reference_id")
     customer_id = session.get("customer")
+    customer_email = session.get("customer_email", "")
 
     if not user_id:
-        email = session.get("customer_email")
+        email = customer_email
         if email:
             user_id = _find_user_id_by_email(email)
         if not user_id:
             logger.warning(
                 "Checkout completed but could not resolve user_id "
-                f"(client_reference_id missing, email={session.get('customer_email')})"
+                f"(client_reference_id missing, email={customer_email})"
             )
             return
 
@@ -110,6 +114,26 @@ def _handle_checkout_session(session: dict) -> None:
         "stripe_customer_id": customer_id,
         "subscription_status": "active",
     })
+
+    # Send premium confirmation email via Resend
+    if customer_email:
+        resend_key = os.getenv("RESEND_API_KEY", "")
+        resend_from = os.getenv("RESEND_FROM", "ProbaLab <noreply@probalab.fr>")
+        if resend_key:
+            try:
+                httpx.post(
+                    "https://api.resend.com/emails",
+                    headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                    json={
+                        "from": resend_from,
+                        "to": [customer_email],
+                        "subject": "Votre abonnement Premium ProbaLab est actif 🏆",
+                        "html": f"<p>Félicitations ! Votre compte Premium ProbaLab est maintenant actif. Profitez de toutes les analyses avancées sur <a href='https://probalab.fr'>probalab.fr</a></p>",
+                    },
+                    timeout=8.0,
+                )
+            except Exception as e:
+                logger.warning(f"Resend email failed: {e}")
 
 
 def _handle_subscription_deleted(subscription: dict) -> None:

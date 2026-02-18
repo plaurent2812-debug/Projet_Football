@@ -1,123 +1,149 @@
 import { useNavigate } from "react-router-dom"
+import { Check, X, Trophy, Zap, ArrowRight } from "lucide-react"
 import { useAuth } from "@/lib/auth"
-import { Check, Star, Trophy, Zap, Shield, Crown } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+
+const STRIPE_PAYMENT_LINK = import.meta.env.VITE_STRIPE_PAYMENT_LINK || "#"
+
+const features = [
+    { label: "Voir les matchs Football & NHL", free: true, premium: true },
+    { label: "Probabilités 1X2", free: true, premium: true },
+    { label: "Pari recommandé", free: true, premium: true },
+    { label: "Top 5 Points NHL", free: true, premium: true },
+    { label: "BTTS (les deux équipes marquent)", free: false, premium: true },
+    { label: "Over 0.5 / 1.5 / 2.5 / 3.5 buts", free: false, premium: true },
+    { label: "But sur penalty", free: false, premium: true },
+    { label: "Score exact probable", free: false, premium: true },
+    { label: "Expected Goals (xG)", free: false, premium: true },
+    { label: "Top 2 buteurs probables (Football)", free: false, premium: true },
+    { label: "Top 5 Buteurs NHL", free: false, premium: true },
+    { label: "Top 5 Passeurs NHL", free: false, premium: true },
+    { label: "Top 5 Tirs (SOG) NHL", free: false, premium: true },
+    { label: "Analyse IA complète de chaque match", free: false, premium: true },
+    { label: "Page Performance du modèle", free: true, premium: true },
+]
+
+const faqs = [
+    {
+        q: "Comment fonctionne l'abonnement Premium ?",
+        a: "Après paiement via Stripe, votre compte est automatiquement mis à niveau. Vous accédez immédiatement à toutes les fonctionnalités Premium."
+    },
+    {
+        q: "Les probabilités sont-elles des conseils de paris ?",
+        a: "Non. ProbaLab fournit des analyses statistiques à titre informatif uniquement. Nos modèles calculent des probabilités basées sur des données historiques et des algorithmes ML."
+    },
+    {
+        q: "Puis-je annuler mon abonnement ?",
+        a: "Oui, à tout moment depuis votre espace Stripe. L'accès Premium reste actif jusqu'à la fin de la période payée."
+    },
+]
 
 export default function PremiumPage() {
-    const { user } = useAuth()
+    const { user, isPremium, isAdmin } = useAuth()
     const navigate = useNavigate()
 
-    const handleSubscribe = () => {
-        const paymentLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK || '#'
-
-        if (user) {
-            // Already logged in -> Go to Stripe
-            window.location.href = paymentLink
-        } else {
-            // Not logged in -> Go to Register, then redirect to payment
-            navigate('/login?mode=register&redirect=payment')
-        }
+    const handleUpgrade = () => {
+        if (!user) { navigate('/login'); return }
+        // Stripe payment link with client_reference_id for user tracking
+        const url = `${STRIPE_PAYMENT_LINK}?client_reference_id=${user.id}`
+        window.open(url, '_blank')
     }
 
-    const benefits = [
-        {
-            icon: Zap,
-            title: "Prédictions IA Avancées",
-            description: "Accès à toutes les prédictions détaillées (Score exact, Buteurs, Corners)."
-        },
-        {
-            icon: Trophy,
-            title: "Value Bets",
-            description: "Détection automatique des cotes mal ajustées par les bookmakers."
-        },
-        {
-            icon: Star,
-            title: "Confiance & indices",
-            description: "Voir l'indice de confiance et le Kelly Criterion pour gérer vos mises."
-        },
-        {
-            icon: Shield,
-            title: "Zéro Publicité",
-            description: "Une expérience fluide et sans distraction pour vos analyses."
-        }
-    ]
-
     return (
-        <div className="max-w-4xl mx-auto space-y-12 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="max-w-3xl mx-auto space-y-10 py-8 animate-fade-in-up">
 
             {/* Header */}
-            <div className="text-center space-y-4">
-                <div className="inline-flex items-center justify-center p-3 bg-amber-500/10 rounded-2xl mb-4 ring-1 ring-amber-500/20 shadow-lg shadow-amber-500/10">
-                    <Crown className="w-10 h-10 text-amber-500" />
+            <div className="text-center">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 mb-4">
+                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">ProbaLab Premium</span>
                 </div>
-                <h1 className="text-4xl md:text-5xl font-black tracking-tight">
-                    Devenez membre <span className="text-amber-500">Premium</span>
+                <h1 className="text-3xl font-black tracking-tight mb-3">
+                    Débloquez toutes les analyses
                 </h1>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                    Débloquez la puissance totale de l'IA et maximisez vos gains avec nos outils d'analyse professionnels.
+                <p className="text-muted-foreground max-w-md mx-auto">
+                    Accédez aux statistiques avancées, aux buteurs probables et aux analyses IA complètes pour chaque match.
                 </p>
             </div>
 
-            {/* Pricing Card */}
-            <div className="relative max-w-md mx-auto">
-                <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl blur opacity-30 animate-pulse" />
-                <div className="relative bg-card border border-amber-500/30 rounded-xl p-8 shadow-2xl">
-                    <div className="absolute top-0 right-0 transform translate-x-2 -translate-y-2">
-                        <span className="bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg uppercase tracking-wider">
-                            Offre Limitée
-                        </span>
-                    </div>
-
-                    <div className="text-center space-y-2 mb-8">
-                        <h3 className="text-lg font-medium text-muted-foreground">Abonnement Mensuel</h3>
-                        <div className="flex items-baseline justify-center gap-2">
-                            <span className="text-5xl font-black">2€</span>
-                            <span className="text-xl text-muted-foreground line-through decoration-destructive/50">10€</span>
-                        </div>
-                        <p className="text-sm font-medium text-emerald-500">
-                            Pendant 2 mois, puis 10€/mois
-                        </p>
-                    </div>
-
-                    <ul className="space-y-4 mb-8">
-                        {benefits.map((benefit, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                                <div className="mt-1 bg-amber-500/10 p-1 rounded-full">
-                                    <Check className="w-3 h-3 text-amber-500" />
-                                </div>
-                                <span className="text-sm font-medium">{benefit.title}</span>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <button
-                        onClick={handleSubscribe}
-                        className="block w-full py-4 text-center font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg hover:brightness-110 transition-all shadow-lg shadow-amber-500/20 active:scale-[0.98]"
-                    >
-                        Profiter de l'offre maintenant
-                    </button>
-                    <p className="text-xs text-center text-muted-foreground mt-4">
-                        Sans engagement • Annulation à tout moment
+            {/* Already premium */}
+            {(isPremium || isAdmin) && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <Check className="w-5 h-5 text-emerald-500 shrink-0" />
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                        Vous avez déjà accès à toutes les fonctionnalités Premium !
                     </p>
                 </div>
-            </div>
+            )}
 
-            {/* Detailed Benefits Grid */}
-            <div className="grid md:grid-cols-2 gap-6">
-                {benefits.map((b, i) => (
-                    <div key={i} className="flex gap-4 p-6 rounded-xl bg-card/50 border border-border/50 hover:bg-card hover:border-amber-500/20 transition-all duration-300 group">
-                        <div className="shrink-0 w-12 h-12 rounded-lg bg-secondary flex items-center justify-center group-hover:bg-amber-500/10 group-hover:scale-110 transition-all duration-300">
-                            <b.icon className="w-6 h-6 text-muted-foreground group-hover:text-amber-500 transition-colors" />
+            {/* Comparison table */}
+            <Card className="border-border/50 overflow-hidden">
+                <div className="grid grid-cols-3 bg-accent/30 border-b border-border/40">
+                    <div className="p-4 text-sm font-bold text-muted-foreground">Fonctionnalité</div>
+                    <div className="p-4 text-center">
+                        <span className="text-sm font-bold">Gratuit</span>
+                    </div>
+                    <div className="p-4 text-center bg-primary/5 border-l border-primary/10">
+                        <div className="flex items-center justify-center gap-1.5">
+                            <Trophy className="w-4 h-4 text-amber-500" />
+                            <span className="text-sm font-bold text-primary">Premium</span>
                         </div>
-                        <div>
-                            <h3 className="font-bold text-lg mb-1 group-hover:text-amber-500 transition-colors">{b.title}</h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                                {b.description}
-                            </p>
+                    </div>
+                </div>
+                {features.map((f, i) => (
+                    <div key={i} className={`grid grid-cols-3 border-b border-border/30 last:border-0 ${i % 2 === 0 ? '' : 'bg-accent/10'}`}>
+                        <div className="p-3 text-sm text-foreground/80">{f.label}</div>
+                        <div className="p-3 flex items-center justify-center">
+                            {f.free
+                                ? <Check className="w-4 h-4 text-emerald-500" />
+                                : <X className="w-4 h-4 text-muted-foreground/40" />
+                            }
+                        </div>
+                        <div className="p-3 flex items-center justify-center bg-primary/3 border-l border-primary/10">
+                            <Check className="w-4 h-4 text-emerald-500" />
                         </div>
                     </div>
                 ))}
+            </Card>
+
+            {/* CTA */}
+            {!isPremium && !isAdmin && (
+                <div className="text-center space-y-4">
+                    <Button
+                        size="lg"
+                        className="bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-xl shadow-amber-500/25 px-8 py-6 text-base font-bold"
+                        onClick={handleUpgrade}
+                    >
+                        <Trophy className="w-5 h-5 mr-2" />
+                        Passer Premium
+                        <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                        Paiement sécurisé via Stripe · Annulation à tout moment
+                    </p>
+                </div>
+            )}
+
+            {/* FAQ */}
+            <div className="space-y-4">
+                <h2 className="text-lg font-bold tracking-tight">Questions fréquentes</h2>
+                {faqs.map((faq, i) => (
+                    <Card key={i} className="border-border/50">
+                        <CardContent className="p-4">
+                            <p className="text-sm font-bold mb-1.5">{faq.q}</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
+
+            {/* Legal */}
+            <p className="disclaimer-text text-center">
+                ProbaLab fournit des analyses statistiques à titre informatif uniquement.
+                Ce site ne constitue pas un conseil en paris sportifs. Jouez de manière responsable. 18+
+            </p>
         </div>
     )
 }

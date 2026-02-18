@@ -461,6 +461,28 @@ def get_prediction_detail(fixture_id: str):
         if prediction.get("proba_over_25") is None:
             prediction["proba_over_25"] = prediction.get("proba_over_2_5") or sj.get("proba_over_2_5") or sj.get("proba_over_25")
 
+        # Enrich top_scorers with photos if available
+        scorers = prediction.get("top_scorers") or sj.get("top_scorers")
+        if scorers and isinstance(scorers, list):
+            p_names = [s.get("name") for s in scorers if s.get("name")]
+            if p_names:
+                try:
+                    p_photos = (
+                        supabase.table("players")
+                        .select("name, photo_url")
+                        .in_("name", p_names)
+                        .execute()
+                        .data
+                    )
+                    photo_map = {p["name"]: p["photo_url"] for p in p_photos}
+                    for s in scorers:
+                        if s.get("name") in photo_map:
+                            s["photo"] = photo_map[s["name"]]
+                    # Update prediction object with enriched scorers
+                    prediction["top_scorers"] = scorers
+                except Exception:
+                    pass
+
 
     # Fetch Top Scorers Logic
     home_scorers = []

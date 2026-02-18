@@ -301,11 +301,18 @@ export default function MatchDetailPage() {
                     <div className="space-y-2">
                         {scorers.slice(0, 2).map((s, i) => (
                             <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                                        {i + 1}
+                                <div className="flex items-center gap-3">
+                                    {s.photo ? (
+                                        <img src={s.photo} alt={s.name} className="w-8 h-8 rounded-full object-cover border border-border/50 shrink-0" />
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0 border border-border/50">
+                                            {i + 1}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <p className="text-sm font-semibold leading-tight">{s.player_name || s.name}</p>
+                                        {s.team && <p className="text-[10px] text-muted-foreground">{s.team}</p>}
                                     </div>
-                                    <span className="text-sm font-semibold">{s.player_name || s.name}</span>
                                 </div>
                                 <Badge className="bg-primary/10 text-primary border-0 font-bold">
                                     {s.probability ?? s.prob ?? "—"}%

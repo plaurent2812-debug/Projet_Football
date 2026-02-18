@@ -113,7 +113,17 @@ export default function MatchDetailPage() {
 
     useEffect(() => {
         fetchPredictionDetail(id)
-            .then(setData)
+            .then(raw => {
+                // Flatten stats_json keys to top-level for robust fallback
+                if (raw?.prediction) {
+                    const sj = raw.prediction.stats_json || {}
+                    const merged = { ...sj, ...raw.prediction } // prediction wins over sj
+                    // Also normalise over_2_5 vs over_25
+                    if (!merged.proba_over_25) merged.proba_over_25 = merged.proba_over_2_5
+                    raw = { ...raw, prediction: merged }
+                }
+                setData(raw)
+            })
             .catch(e => setError(e.message))
             .finally(() => setLoading(false))
     }, [id])

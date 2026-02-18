@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom"
 import { lazy, Suspense, useState, useEffect } from "react"
-import { Zap, Trophy, Shield, Menu, X, Sun, Moon, LogOut, User, ChevronRight } from "lucide-react"
+import { Zap, Trophy, Shield, Menu, X, LogOut, User, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AuthProvider, useAuth } from "@/lib/auth"
+import { ThemeProvider } from "@/components/theme-provider"
+import { ModeToggle } from "@/components/mode-toggle"
 import "./App.css"
 
 // ── Lazy pages ────────────────────────────────────────────────
@@ -28,26 +30,10 @@ function PageLoader() {
 }
 
 // ── Theme Toggle ──────────────────────────────────────────────
-function useTheme() {
-  const [theme, setTheme] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('probalab-theme') || 'light'
-    }
-    return 'light'
-  })
 
-  useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove('light', 'dark')
-    root.classList.add(theme)
-    localStorage.setItem('probalab-theme', theme)
-  }, [theme])
-
-  return [theme, setTheme]
-}
 
 // ── Header ────────────────────────────────────────────────────
-function Header({ theme, setTheme, mobileOpen, setMobileOpen }) {
+function Header({ mobileOpen, setMobileOpen }) {
   const { user, signOut, role, isPremium, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -117,13 +103,8 @@ function Header({ theme, setTheme, mobileOpen, setMobileOpen }) {
           {/* Right Actions */}
           <div className="flex items-center gap-2">
             {/* Theme toggle */}
-            <button
-              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            {/* Theme toggle */}
+            <ModeToggle />
 
             {/* Premium badge */}
             {!isPremium && !isAdmin && (
@@ -244,7 +225,6 @@ function AdminGuard({ children }) {
 
 // ── Main App ──────────────────────────────────────────────────
 function AppContent() {
-  const [theme, setTheme] = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [selectedLeague, setSelectedLeague] = useState(null)
@@ -255,7 +235,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-300">
-      <Header theme={theme} setTheme={setTheme} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <Header mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
 
       <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-6">
         <Suspense fallback={<PageLoader />}>
@@ -293,9 +273,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </ThemeProvider>
     </AuthProvider>
   )
 }

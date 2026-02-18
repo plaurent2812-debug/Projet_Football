@@ -54,7 +54,6 @@ function Header({ theme, setTheme, mobileOpen, setMobileOpen }) {
     { to: "/", label: "Accueil", exact: true },
     { to: "/football", label: "⚽ Football" },
     { to: "/nhl", label: "🏒 NHL" },
-    { to: "/performance", label: "Performance" },
   ]
 
   return (
@@ -90,15 +89,26 @@ function Header({ theme, setTheme, mobileOpen, setMobileOpen }) {
               </NavLink>
             ))}
             {isAdmin && (
-              <NavLink
-                to="/admin"
-                className={({ isActive }) => cn(
-                  "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
-                  isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-                )}
-              >
-                <Shield className="w-3.5 h-3.5 inline mr-1" />Admin
-              </NavLink>
+              <>
+                <NavLink
+                  to="/performance"
+                  className={({ isActive }) => cn(
+                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
+                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                  )}
+                >
+                  Performance
+                </NavLink>
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) => cn(
+                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
+                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                  )}
+                >
+                  <Shield className="w-3.5 h-3.5 inline mr-1" />Admin
+                </NavLink>
+              </>
             )}
           </nav>
 
@@ -261,7 +271,7 @@ function AppContent() {
               <Route path="/match/:id" element={<MatchDetail />} />
               <Route path="/nhl" element={<NHLPage date={date} setDate={setDate} />} />
               <Route path="/nhl/match/:id" element={<NHLMatchDetail />} />
-              <Route path="/performance" element={<PerformancePage />} />
+              <Route path="/performance" element={<AdminGuard><PerformancePage /></AdminGuard>} />
               <Route path="/premium" element={<PremiumPage />} />
               <Route path="/abonnement" element={<PremiumPage />} />
               <Route path="/login" element={<LoginPage />} />

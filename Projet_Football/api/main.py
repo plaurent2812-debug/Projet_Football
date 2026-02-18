@@ -777,14 +777,14 @@ def _run_pipeline_background(mode: str):
 
 @app.post("/api/admin/run-pipeline")
 def admin_run_pipeline(
-    mode: str = Query("full", description="Pipeline mode: full, data, or analyze"),
+    mode: str = Query("full", description="Pipeline mode: full, data, analyze, or results"),
     authorization: Optional[str] = Header(None),
 ):
     """Trigger the pipeline (admin only, requires Supabase JWT)."""
     _require_admin(authorization)
 
-    if mode not in ("full", "data", "analyze"):
-        raise HTTPException(status_code=400, detail="Mode must be: full, data, or analyze")
+    if mode not in ("full", "data", "analyze", "results"):
+        raise HTTPException(status_code=400, detail="Mode must be: full, data, analyze, or results")
 
     with _pipeline_lock:
         if _pipeline_state["status"] == "running":
@@ -810,3 +810,42 @@ def admin_pipeline_status(authorization: Optional[str] = Header(None)):
 
     with _pipeline_lock:
         return dict(_pipeline_state)
+
+
+@app.post("/api/admin/update-scores")
+def admin_update_scores(
+    date: Optional[str] = Query(None, description="Date YYYY-MM-DD (default: today)"),
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Update match scores for a given date from API Football.
+    Designed to be called by a CRON job every 15 minutes during match hours.
+    No auth required when called internally (Railway CRON), but JWT accepted.
+    """
+    # Allow unauthenticated calls from Railway CRON (internal network)
+    # If Authorization header is present, validate it
+    if authorization:
+        try:
+            _require_admin(authorization)
+        except HTTPException:
+            raise
+
+    import threading as _threading
+
+    def _run_scores():
+        try:
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+            from fetchers.results import fetch_and_update_results
+            fetch_and_update_results(date)
+        except Exception as e:
+            print(f"[update-scores] Error: {e}")
+
+    t = _threading.Thread(target=_run_scores, daemon=True)
+    t.start()
+
+    from datetime import date as _date
+    target = date or _date.today().isoformat()
+    return {"message": f"Score update started for {target}"}
+

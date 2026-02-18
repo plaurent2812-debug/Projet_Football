@@ -6,6 +6,8 @@ Usage :
   python3 run_pipeline.py          → Pipeline complet (données + analyse)
   python3 run_pipeline.py data     → Seulement la collecte de données
   python3 run_pipeline.py analyze  → Seulement l'analyse (stats + IA)
+  python3 run_pipeline.py results  → Mise à jour des scores du jour (CRON 15min)
+  python3 run_pipeline.py results --date 2025-02-18  → Date spécifique
 """
 
 import sys
@@ -97,8 +99,31 @@ def run_analysis():
     run_brain()
 
 
+def run_results(date: str | None = None):
+    """Met à jour les scores des matchs du jour depuis l'API Football."""
+    logger.info("=" * 60)
+    logger.info("🔄 PHASE SCORES : Mise à jour des résultats")
+    logger.info("=" * 60)
+
+    from fetchers.results import fetch_and_update_results
+
+    stats = fetch_and_update_results(date)
+    logger.info(
+        "✅ Scores : %d mis à jour | %d ignorés | %d erreurs",
+        stats["updated"], stats["skipped"], stats["errors"]
+    )
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "full"
+
+    # Support --date pour le mode results
+    date_arg = None
+    for i, arg in enumerate(sys.argv[2:]):
+        if arg == "--date" and i + 1 < len(sys.argv) - 2:
+            date_arg = sys.argv[i + 3]
+        elif arg.startswith("20"):
+            date_arg = arg
 
     logger.info("╔══════════════════════════════════════════════════════════╗")
     logger.info("║          ⚽ FOOTBALL IA — Pipeline v2                   ║")
@@ -112,6 +137,9 @@ if __name__ == "__main__":
         run_data_pipeline()
     elif mode == "analyze":
         run_analysis()
+    elif mode == "results":
+        run_results(date_arg)
     else:
         logger.info("Mode inconnu : %s", mode)
-        logger.info("Usage : python3 run_pipeline.py [full|data|analyze]")
+        logger.info("Usage : python3 run_pipeline.py [full|data|analyze|results]")
+        logger.info("        python3 run_pipeline.py results --date 2025-02-18")

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { fetchPerformance } from "@/lib/api"
 import {
     BarChart3, Target, TrendingUp, Percent, Calendar,
-    CheckCircle2, XCircle, Trophy, Zap, Activity
+    CheckCircle2, XCircle, Trophy, Zap, Activity, Swords
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import {
@@ -249,7 +249,7 @@ export default function PerformancePage() {
                                 accuracy={m.accuracy}
                                 icon={m.icon}
                                 color={m.color}
-                                isAdmin={isAdmin}
+                                isAdmin={true}
                             />
                         ))}
                     </div>
@@ -341,5 +341,4 @@ export default function PerformancePage() {
     )
 }
 
-/* lucide icon used in markets but not imported at top — import inline */
-import { Swords } from "lucide-react"
+

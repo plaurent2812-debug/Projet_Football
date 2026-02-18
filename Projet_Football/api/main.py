@@ -346,7 +346,23 @@ def get_prediction_detail(fixture_id: str):
 
     # Parse stats_json if present
     if prediction:
-        prediction["stats_json"] = _ensure_dict(prediction.get("stats_json"))
+        sj = _ensure_dict(prediction.get("stats_json"))
+        prediction["stats_json"] = sj
+
+        # Promote missing fields from stats_json to top-level
+        _proba_fields = [
+            "proba_over_05", "proba_over_15", "proba_over_25", "proba_over_2_5",
+            "proba_over_35", "proba_btts", "proba_penalty",
+            "confidence_score", "recommended_bet", "correct_score",
+            "analysis_text", "xg_home", "xg_away",
+        ]
+        for field in _proba_fields:
+            if prediction.get(field) is None and sj.get(field) is not None:
+                prediction[field] = sj[field]
+        # Normalise over_2_5 vs over_25
+        if prediction.get("proba_over_25") is None:
+            prediction["proba_over_25"] = prediction.get("proba_over_2_5") or sj.get("proba_over_2_5") or sj.get("proba_over_25")
+
 
     # Fetch Top Scorers Logic
     home_scorers = []

@@ -17,6 +17,7 @@ const LoginPage = lazy(() => import("@/pages/Login"))
 const PremiumPage = lazy(() => import("@/pages/Premium"))
 const TeamProfile = lazy(() => import("@/pages/TeamProfile"))
 
+
 function PageLoader() {
   return (
     <div className="flex items-center justify-center py-32">
@@ -136,18 +137,18 @@ function Header({ theme, setTheme, mobileOpen, setMobileOpen }) {
 
             {/* Auth */}
             {user ? (
-              <div className="flex items-center gap-1">
-                <span className="hidden sm:block text-xs text-muted-foreground px-2">
-                  {isPremium ? '⭐ Premium' : isAdmin ? '🛡️ Admin' : 'Free'}
-                </span>
-                <button
-                  onClick={signOut}
-                  className="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                  title="Déconnexion"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
+              <NavLink
+                to="/profile"
+                className={({ isActive }) => cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border",
+                  isActive
+                    ? "bg-primary/10 text-primary border-primary/20"
+                    : "bg-accent/40 text-foreground border-border/50 hover:bg-accent/60"
+                )}
+              >
+                <User className="w-4 h-4" />
+                <span className="hidden lg:inline">Mon compte</span>
+              </NavLink>
             ) : (
               <NavLink
                 to="/login"
@@ -277,6 +278,7 @@ function AppContent() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/equipe/:name" element={<TeamProfile />} />
               <Route path="/admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
+              <Route path="/profile" element={<Protected><ProfilePage /></Protected>} />
             </Routes>
           </div>
         </Suspense>

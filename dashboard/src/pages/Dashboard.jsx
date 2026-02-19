@@ -4,7 +4,7 @@ import { format, addDays } from "date-fns"
 import { fr } from "date-fns/locale"
 import {
     ChevronLeft, ChevronRight, Flame, Clock,
-    Trophy, Calendar, Filter, X
+    Trophy, Calendar, Filter, X, Activity, Target
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { fetchPredictions } from "@/lib/api"
@@ -252,18 +252,10 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
     const totalMatches = displayedLeagues.reduce((s, l) => s + l.matches.length, 0)
     const totalRaw = matches.length
 
+    console.log("Dashboard Render:", { date, matches: matches.length, loading, leagues: leagues.length, displayed: displayedLeagues.length })
+
     return (
-        <div className="flex gap-6 animate-fade-in-up">
-            {/* Sidebar championnats - computed from ALL matches to confirm available leagues? 
-                Actually better to show only available leagues for the day.
-                But if we filter by confidence, we might hide leagues. 
-                Let's keep the sidebar showing leagues from *current date* matches, 
-                but maybe we should pass 'matches' to sidebar instead of 'leagues' (filtered)? 
-                
-                Standard UX: Sidebar shows all leagues for the day. 
-                However, if I filter "Confidence > 8", I probably only want to see leagues that have such matches.
-                So passing 'leagues' (filtered by confidence/market) is correct.
-            */}
+        <div className="flex gap-6">
             <LeagueSidebar
                 leagues={leagues}
                 selectedLeague={selectedLeague}
@@ -369,8 +361,8 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
                             <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                             <p className="text-xs text-muted-foreground animate-pulse">Chargement des matchs...</p>
                         </div>
-                    ) : filteredLeagues.length > 0 ? (
-                        filteredLeagues.map(league => (
+                    ) : displayedLeagues.length > 0 ? (
+                        displayedLeagues.map(league => (
                             <LeagueSection
                                 key={league.id}
                                 leagueName={league.name}

@@ -200,6 +200,73 @@ export default function NHLMatchDetailPage() {
                 </CardContent>
             </Card>
 
+            {/* Post-Match: Predictions vs Results */}
+            {(() => {
+                const isFinished = ["FT", "Final", "FINAL", "OFF"].includes(fixture?.status)
+                if (!isFinished || fixture?.home_goals == null) return null
+
+                const hg = fixture.home_goals
+                const ag = fixture.away_goals
+                const predictions = fixture?.predictions_json || {}
+                const predHome = homeProb ?? predictions.proba_home
+                const predAway = awayProb ?? predictions.proba_away
+
+                // Determine predicted and actual winner
+                const predicted = predHome > predAway ? "home" : "away"
+                const actual = hg > ag ? "home" : ag > hg ? "away" : "draw"
+                const predCorrect = predicted === actual
+
+                const predictedLabel = predicted === "home" ? fixture.home_team : fixture.away_team
+                const actualLabel = actual === "home" ? fixture.home_team : actual === "away" ? fixture.away_team : "Match nul"
+
+                return (
+                    <Card className={cn(
+                        "border overflow-hidden",
+                        predCorrect ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"
+                    )}>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                {predCorrect ? "✅" : "❌"} Bilan du Match
+                                <Badge className={cn(
+                                    "ml-auto text-[10px] border-0",
+                                    predCorrect
+                                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                        : "bg-red-500/10 text-red-500"
+                                )}>
+                                    {predCorrect ? "Prédiction correcte" : "Prédiction incorrecte"}
+                                </Badge>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {/* Predicted vs Actual */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="p-3 rounded-lg bg-card border border-border/30">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Prédit</p>
+                                    <p className="text-sm font-bold">{predictedLabel}</p>
+                                    {predHome != null && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {fixture.home_team} {predHome}% — {fixture.away_team} {predAway}%
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="p-3 rounded-lg bg-card border border-border/30">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Résultat</p>
+                                    <p className="text-sm font-bold">{actualLabel}</p>
+                                    <p className="text-lg font-black text-primary mt-0.5">
+                                        {hg} - {ag}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Score breakdown */}
+                            <div className="text-xs text-muted-foreground text-center pt-1 border-t border-border/30">
+                                Score final: <span className="font-bold text-foreground">{fixture.home_team} {hg}</span> — <span className="font-bold text-foreground">{fixture.away_team} {ag}</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )
+            })()}
+
             {/* Top Players — 4 tabs */}
             <Card className="border-border/50">
                 <CardHeader className="pb-3">

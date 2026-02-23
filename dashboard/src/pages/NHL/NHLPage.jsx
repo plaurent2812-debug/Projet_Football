@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 function NHLMatchRow({ match }) {
     const navigate = useNavigate()
     const time = match.date ? new Date(match.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "--:--"
-    const isFinished = match.status === "FT" || match.status === "Final"
+    const isFinished = ["FT", "Final", "FINAL", "OFF"].includes(match.status)
     const isLive = ["1P", "2P", "3P", "OT", "SO", "LIVE"].includes(match.status)
     const homeWon = isFinished && match.home_goals > match.away_goals
     const awayWon = isFinished && match.away_goals > match.home_goals
@@ -29,7 +29,7 @@ function NHLMatchRow({ match }) {
                 {isLive ? (
                     <Badge variant="destructive" className="text-[10px] px-1.5 h-5 animate-pulse">LIVE</Badge>
                 ) : isFinished ? (
-                    <span className="text-[10px] font-bold text-muted-foreground">FIN</span>
+                    <Badge className="text-[10px] px-1.5 h-5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0">Terminé</Badge>
                 ) : (
                     <span className="text-xs font-bold tabular-nums text-foreground/80">{time}</span>
                 )}

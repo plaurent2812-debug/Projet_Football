@@ -34,7 +34,7 @@ function MatchRow({ match }) {
                 {isLive ? (
                     <Badge variant="destructive" className="text-[10px] px-1.5 h-5 animate-pulse">LIVE</Badge>
                 ) : isFinished ? (
-                    <span className="text-[10px] font-bold text-muted-foreground">FIN</span>
+                    <Badge className="text-[10px] px-1.5 h-5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0">Terminé</Badge>
                 ) : (
                     <span className="text-xs font-bold tabular-nums text-foreground/80">{time}</span>
                 )}

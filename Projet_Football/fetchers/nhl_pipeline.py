@@ -191,6 +191,107 @@ def detect_back_to_back(games: list[dict]) -> set[str]:
     return tired_teams & today_teams
 
 
+# ─── Player Game Logs (L5 Form + H2H) ───────────────────────────
+
+def fetch_player_game_log(player_id: str) -> list[dict]:
+    """Fetch a player's game log for the current season."""
+    data = _fetch_json(f"/player/{player_id}/game-log/now")
+    if not data or "gameLog" not in data:
+        return []
+    return data["gameLog"]
+
+
+def calculate_l5_form(game_log: list[dict]) -> dict:
+    """Calculate last-5-games form factor from game log.
+
+    Compares L5 per-game stats vs season average.
+    Returns multipliers for goal, assist, point, shot.
+    """
+    if len(game_log) < 5:
+        return {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0, "hot": False, "cold": False}
+
+    # Last 5 games (game log is sorted newest first)
+    last5 = game_log[:5]
+    all_games = game_log
+
+    season_gp = max(1, len(all_games))
+    season_goals = sum(g.get("goals", 0) for g in all_games)
+    season_assists = sum(g.get("assists", 0) for g in all_games)
+    season_points = sum(g.get("points", 0) for g in all_games)
+    season_shots = sum(g.get("shots", 0) for g in all_games)
+
+    l5_goals = sum(g.get("goals", 0) for g in last5)
+    l5_assists = sum(g.get("assists", 0) for g in last5)
+    l5_points = sum(g.get("points", 0) for g in last5)
+    l5_shots = sum(g.get("shots", 0) for g in last5)
+
+    def _ratio(l5_val, season_val, n_games):
+        """L5 per game / season per game ratio, clamped."""
+        season_pg = season_val / season_gp if season_gp > 0 else 0
+        l5_pg = l5_val / 5
+        if season_pg < 0.05:  # Too low baseline
+            return 1.0
+        ratio = l5_pg / season_pg
+        return max(0.7, min(ratio, 1.5))  # Clamp between 0.7x and 1.5x
+
+    goal_factor = _ratio(l5_goals, season_goals, season_gp)
+    assist_factor = _ratio(l5_assists, season_assists, season_gp)
+    point_factor = _ratio(l5_points, season_points, season_gp)
+    shot_factor = _ratio(l5_shots, season_shots, season_gp)
+
+    is_hot = point_factor > 1.2
+    is_cold = point_factor < 0.8
+
+    return {
+        "goal": round(goal_factor, 3),
+        "assist": round(assist_factor, 3),
+        "point": round(point_factor, 3),
+        "shot": round(shot_factor, 3),
+        "hot": is_hot,
+        "cold": is_cold,
+        "l5_pts": l5_points,
+        "l5_goals": l5_goals,
+        "l5_shots": l5_shots,
+    }
+
+
+def calculate_h2h_factor(game_log: list[dict], opponent: str) -> dict:
+    """Calculate head-to-head factor vs specific opponent.
+
+    If a player historically performs well against this opponent, boost the scores.
+    """
+    h2h_games = [g for g in game_log if g.get("opponentAbbrev", "") == opponent]
+
+    if len(h2h_games) < 2:
+        return {"goal": 1.0, "point": 1.0, "shot": 1.0, "games": 0}
+
+    all_gp = max(1, len(game_log))
+    h2h_gp = len(h2h_games)
+
+    # Per-game rates: H2H vs season
+    season_ppg = sum(g.get("points", 0) for g in game_log) / all_gp
+    h2h_ppg = sum(g.get("points", 0) for g in h2h_games) / h2h_gp
+
+    season_gpg = sum(g.get("goals", 0) for g in game_log) / all_gp
+    h2h_gpg = sum(g.get("goals", 0) for g in h2h_games) / h2h_gp
+
+    season_spg = sum(g.get("shots", 0) for g in game_log) / all_gp
+    h2h_spg = sum(g.get("shots", 0) for g in h2h_games) / h2h_gp
+
+    def _h2h_ratio(h2h_val, season_val):
+        if season_val < 0.05:
+            return 1.0
+        ratio = h2h_val / season_val
+        return max(0.8, min(ratio, 1.4))  # Clamp: don't over-weight H2H
+
+    return {
+        "goal": round(_h2h_ratio(h2h_gpg, season_gpg), 3),
+        "point": round(_h2h_ratio(h2h_ppg, season_ppg), 3),
+        "shot": round(_h2h_ratio(h2h_spg, season_spg), 3),
+        "games": h2h_gp,
+    }
+
+
 # ─── AI Game Context (Claude) ───────────────────────────────────
 
 def get_ai_game_context(games: list[dict], standings: dict) -> dict:
@@ -250,7 +351,7 @@ def get_ai_game_context(games: list[dict], standings: dict) -> dict:
 
 def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: dict,
                   is_home: bool, goalie_form: dict, tired_teams: set,
-                  ai_factors: dict) -> dict:
+                  ai_factors: dict, l5_form: dict = None, h2h: dict = None) -> dict:
     """Score a single player for goal, assist, point, shot probabilities.
 
     Uses: per-game rates, TOI, opponent GAA, goalie form, PP%, PK%,
@@ -298,9 +399,14 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     # AI offensive factor
     ai_factor = ai_factors.get(team, 1.0)
 
+    # L5 form + H2H adjustments
+    l5 = l5_form or {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0}
+    h2h_adj = h2h or {"goal": 1.0, "point": 1.0, "shot": 1.0}
+
     # ─── Goal probability ───
     base_goal_prob = min(gpg * 100, 60)
     base_goal_prob *= defense_factor * (1 + goalie_adj) * pp_boost * b2b_penalty * ai_factor
+    base_goal_prob *= l5["goal"] * h2h_adj["goal"]  # L5 + H2H
     if is_home:
         base_goal_prob *= 1.05
     if toi_minutes > 20:
@@ -311,6 +417,7 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     # ─── Assist probability ───
     base_assist_prob = min(apg * 100, 60)
     base_assist_prob *= defense_factor * pp_boost * b2b_penalty * ai_factor
+    base_assist_prob *= l5["assist"]  # L5 form
     if is_home:
         base_assist_prob *= 1.03
     if toi_minutes > 19:
@@ -319,12 +426,13 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     # ─── Point probability ───
     base_point_prob = min(ppg * 100, 80)
     base_point_prob *= defense_factor * (1 + goalie_adj * 0.5) * pp_boost * b2b_penalty * ai_factor
+    base_point_prob *= l5["point"] * h2h_adj["point"]  # L5 + H2H
     if is_home:
         base_point_prob *= 1.05
 
     # ─── Shot probability (2.5+ SOG) ───
     base_shot_prob = min(shots_per_game / 2.5 * 50, 90)
-    base_shot_prob *= b2b_penalty * ai_factor
+    base_shot_prob *= b2b_penalty * ai_factor * l5["shot"] * h2h_adj["shot"]  # L5 + H2H
     if toi_minutes > 19:
         base_shot_prob *= 1.15
     if is_home:
@@ -350,6 +458,8 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
         "ai_factor": ai_factor,
         "b2b": team in tired_teams,
         "pp_boost": round(pp_boost, 3),
+        "l5_form": l5,
+        "h2h": h2h_adj,
     }
 
 
@@ -469,18 +579,74 @@ def run_nhl_pipeline() -> dict:
         h_stats = standings.get(home_abbrev, {})
         a_stats = standings.get(away_abbrev, {})
 
-        # Score players
+        # Score players — PASS 1: base scoring (no game logs)
+        match_players = []
         for skater in home_roster:
             player = _score_player(skater, home_abbrev, away_abbrev, h_stats, a_stats,
                                    True, goalie_form, tired_teams, ai_factors)
             if player["prob_goal"] > 5 or player["prob_shot"] > 15:
-                all_players.append(player)
+                player["_skater"] = skater  # Keep reference for pass 2
+                match_players.append(player)
 
         for skater in away_roster:
             player = _score_player(skater, away_abbrev, home_abbrev, a_stats, h_stats,
                                    False, goalie_form, tired_teams, ai_factors)
             if player["prob_goal"] > 5 or player["prob_shot"] > 15:
-                all_players.append(player)
+                player["_skater"] = skater
+                match_players.append(player)
+
+        # PASS 2: Fetch game logs for top ~15 players per match (L5 form + H2H)
+        match_players.sort(key=lambda p: p["prob_point"], reverse=True)
+        top_players_for_logs = match_players[:15]
+        enhanced_count = 0
+
+        for player in top_players_for_logs:
+            pid = player["player_id"]
+            opp_abbrev = player["opp"]
+            if not pid or pid == "0":
+                continue
+
+            game_log = fetch_player_game_log(pid)
+            if not game_log:
+                continue
+
+            l5 = calculate_l5_form(game_log)
+            h2h = calculate_h2h_factor(game_log, opp_abbrev)
+
+            # Re-score with L5 + H2H
+            skater = player.pop("_skater", None)
+            if skater:
+                team = player["team"]
+                opp = player["opp"]
+                is_home = player["is_home"] == 1
+                my_s = standings.get(team, {})
+                opp_s = standings.get(opp, {})
+                enhanced = _score_player(skater, team, opp, my_s, opp_s,
+                                         is_home, goalie_form, tired_teams, ai_factors,
+                                         l5_form=l5, h2h=h2h)
+                # Update in-place
+                idx = match_players.index(player)
+                match_players[idx] = enhanced
+                enhanced_count += 1
+
+                tag = ""
+                if l5.get("hot"):
+                    tag += " 🔥HOT"
+                if l5.get("cold"):
+                    tag += " 🥶COLD"
+                if h2h.get("games", 0) >= 2:
+                    tag += f" H2H:{h2h['games']}g"
+                if tag:
+                    logger.info(f"[NHL]   📊 {enhanced['player_name']} ({team}){tag}")
+
+        # Remove internal refs
+        for p in match_players:
+            p.pop("_skater", None)
+
+        if enhanced_count:
+            logger.info(f"[NHL]   ✅ {enhanced_count} joueurs enrichis avec L5+H2H")
+
+        all_players.extend(match_players)
 
         # Win probabilities
         win_prob = calculate_win_prob(home_abbrev, away_abbrev, standings, tired_teams)

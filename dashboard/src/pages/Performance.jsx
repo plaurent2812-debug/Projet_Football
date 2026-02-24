@@ -114,20 +114,26 @@ function ChartTooltip({ active, payload, label }) {
 export default function PerformancePage() {
     const [data, setData] = useState(null)
     const [jours, setJours] = useState(30)
+    const [sport, setSport] = useState("football") // 'football' | 'nhl'
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
 
     useEffect(() => {
         setLoading(true)
         setError(null)
-        fetchPerformance(jours)
-            .then(setData)
-            .catch(err => {
-                console.error(err)
-                setError(err.message)
-            })
-            .finally(() => setLoading(false))
-    }, [jours])
+
+        // Dynamically import API functions based on selected sport to avoid full rework
+        import('@/lib/api').then(({ fetchPerformance, fetchNHLPerformance }) => {
+            const fetcher = sport === 'nhl' ? fetchNHLPerformance : fetchPerformance
+            fetcher(jours)
+                .then(setData)
+                .catch(err => {
+                    console.error(err)
+                    setError(err.message)
+                })
+                .finally(() => setLoading(false))
+        })
+    }, [jours, sport])
 
     if (loading) {
         return (
@@ -165,8 +171,8 @@ export default function PerformancePage() {
         date_short: d.date?.slice(5) || d.date
     }))
 
-    // Market accuracy data for the grid
-    const markets = [
+    // Market accuracy data for the grid based on sport
+    const markets = sport === 'football' ? [
         { label: "Résultat 1X2", accuracy: data.accuracy_1x2, icon: Swords, color: "text-indigo-400" },
         { label: "But des 2 équipes", accuracy: data.accuracy_btts, icon: Percent, color: "text-emerald-400" },
         { label: "Plus de 0.5 buts", accuracy: data.accuracy_over_05 ?? "—", icon: TrendingUp, color: "text-blue-400" },
@@ -174,6 +180,10 @@ export default function PerformancePage() {
         { label: "Plus de 2.5 buts", accuracy: data.accuracy_over_25 ?? "—", icon: TrendingUp, color: "text-amber-400" },
         { label: "Plus de 3.5 buts", accuracy: data.accuracy_over_35 ?? "—", icon: TrendingUp, color: "text-orange-400" },
         { label: "Score exact", accuracy: data.accuracy_score ?? "—", icon: Target, color: "text-purple-400" },
+    ].filter(m => m.accuracy !== "—") : [
+        { label: "Taux Buts (Top 1)", accuracy: data.accuracy_goal, icon: Target, color: "text-emerald-400" },
+        { label: "Taux Passes (Top 1)", accuracy: data.accuracy_assist, icon: Target, color: "text-blue-400" },
+        { label: "Taux Points (Top 1)", accuracy: data.accuracy_point, icon: Target, color: "text-amber-400" },
     ].filter(m => m.accuracy !== "—")
 
     return (
@@ -186,21 +196,47 @@ export default function PerformancePage() {
                         Taux de réussite sur les {jours} derniers jours
                     </p>
                 </div>
-                <div className="flex p-0.5 rounded-lg bg-secondary/50 ring-1 ring-border/50">
-                    {[7, 14, 30, 60, 90].map((d) => (
+
+                <div className="flex items-center gap-4 flex-wrap">
+                    {/* Sport Toggle */}
+                    <div className="flex p-0.5 rounded-lg bg-secondary/50 ring-1 ring-border/50">
                         <button
-                            key={d}
-                            onClick={() => setJours(d)}
+                            onClick={() => setSport("football")}
                             className={cn(
-                                "px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
-                                jours === d
-                                    ? "bg-card text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
+                                "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
+                                sport === "football" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            {d}j
+                            Football
                         </button>
-                    ))}
+                        <button
+                            onClick={() => setSport("nhl")}
+                            className={cn(
+                                "px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
+                                sport === "nhl" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            NHL
+                        </button>
+                    </div>
+
+                    {/* Date Toggle */}
+                    <div className="flex p-0.5 rounded-lg bg-secondary/50 ring-1 ring-border/50">
+                        {[7, 14, 30, 60, 90].map((d) => (
+                            <button
+                                key={d}
+                                onClick={() => setJours(d)}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200",
+                                    jours === d
+                                        ? "bg-card text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {d}j
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -212,24 +248,50 @@ export default function PerformancePage() {
                     icon={BarChart3}
                     accent="bg-indigo-500/10 text-indigo-400"
                 />
-                <StatTile
-                    value={`${data.accuracy_1x2}%`}
-                    label="Précision 1X2"
-                    icon={Target}
-                    accent="bg-emerald-500/10 text-emerald-400"
-                />
-                <StatTile
-                    value={data.avg_confidence}
-                    label="Confiance moyenne"
-                    icon={Zap}
-                    accent="bg-amber-500/10 text-amber-400"
-                />
-                <StatTile
-                    value={data.value_bets}
-                    label="Paris value"
-                    icon={Trophy}
-                    accent="bg-purple-500/10 text-purple-400"
-                />
+
+                {sport === 'football' ? (
+                    <>
+                        <StatTile
+                            value={`${data.accuracy_1x2}%`}
+                            label="Précision 1X2"
+                            icon={Target}
+                            accent="bg-emerald-500/10 text-emerald-400"
+                        />
+                        <StatTile
+                            value={data.avg_confidence}
+                            label="Confiance moyenne"
+                            icon={Zap}
+                            accent="bg-amber-500/10 text-amber-400"
+                        />
+                        <StatTile
+                            value={data.value_bets}
+                            label="Paris value"
+                            icon={Trophy}
+                            accent="bg-purple-500/10 text-purple-400"
+                        />
+                    </>
+                ) : (
+                    <>
+                        <StatTile
+                            value={`${data.accuracy_goal}%`}
+                            label="Buteurs Top 1"
+                            icon={Target}
+                            accent="bg-emerald-500/10 text-emerald-400"
+                        />
+                        <StatTile
+                            value={`${data.accuracy_point}%`}
+                            label="Points Top 1"
+                            icon={Target}
+                            accent="bg-amber-500/10 text-amber-400"
+                        />
+                        <StatTile
+                            value={data.avg_confidence}
+                            label="Confiance moy."
+                            icon={Zap}
+                            accent="bg-purple-500/10 text-purple-400"
+                        />
+                    </>
+                )}
             </div>
 
             {/* Per-market accuracy grid */}

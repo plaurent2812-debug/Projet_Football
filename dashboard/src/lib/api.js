@@ -28,6 +28,12 @@ export async function fetchPerformance(days = 30) {
     return res.json()
 }
 
+export async function fetchNHLPerformance(days = 30) {
+    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/nhl/performance?days=${days}`)
+    if (!res.ok) throw new Error(`API error: ${res.status}`)
+    return res.json()
+}
+
 export async function fetchTeamHistory(teamName, limit = 20) {
     const res = await fetch(`${API_BASE}/team/${encodeURIComponent(teamName)}/history?limit=${limit}`)
     if (!res.ok) throw new Error(`API error: ${res.status}`)

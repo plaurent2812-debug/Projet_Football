@@ -16,6 +16,13 @@ def run_pipeline(mode="data"):
     try:
         subprocess.run([PYTHON_CMD, "run_pipeline.py", mode], cwd=PROJECT_DIR, check=True)
         log(f"✅ Pipeline ({mode}) terminé.")
+        
+        # Run NHL Results evaluation right after the main pipeline
+        if mode in ["data", "full"]:
+            log("🚀 Évaluation des prédictions NHL (Top 1) terminées...")
+            subprocess.run([PYTHON_CMD, "fetchers/fetch_nhl_results.py"], cwd=PROJECT_DIR, check=False)
+            log("✅ Évaluation NHL terminée.")
+            
     except subprocess.CalledProcessError as e:
         log(f"❌ Erreur lors de l'exécution : {e}")
     except Exception as e:

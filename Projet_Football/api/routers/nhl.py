@@ -450,29 +450,89 @@ def ingest_suivi_algo(req: IngestSuiviAlgoRequest):
     }
 
 
-@router.get("/suivi_stats", dependencies=[Depends(verify_api_key)])
-def suivi_stats():
-    # Implementation simplified for now, as it was quite long in original file
-    # and depends on logic that might need specific supabase table structure.
-    # We will implement a basic version.
-    
+@router.get("/performance")
+def get_nhl_performance(days: int = 30):
     try:
+        from datetime import datetime, timedelta
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+        # Get all performance rows for the given period
         resp = supabase.table("nhl_suivi_algo_clean") \
-            .select("type,\"résultat\"") \
-            .or_("résultat.ilike.%GAGNÉ%,résultat.ilike.%PERDU%") \
+            .select("date, type, pari, résultat, proba_predite") \
+            .gte("date", cutoff) \
+            .order("date") \
             .execute()
         
         rows = resp.data or []
-        total = len(rows)
-        wins = sum(1 for r in rows if "GAGN" in (r.get("résultat") or "").upper())
         
-        return {
-            "ok": True,
-            "total": total,
-            "wins": wins,
-            "rate": round(wins/total*100, 1) if total > 0 else 0
+        metrics = {
+            "days": days,
+            "total_matches": 0,
+            "accuracy_goal": 0,
+            "accuracy_assist": 0,
+            "accuracy_point": 0,
+            "avg_confidence": 0,
+            "daily_stats": []
         }
+        
+        stats = {
+            "goal": {"total": 0, "correct": 0},
+            "assist": {"total": 0, "correct": 0},
+            "point": {"total": 0, "correct": 0},
+            "all": {"total": 0, "correct": 0, "sum_conf": 0}
+        }
+        
+        daily = {}
+
+        for r in rows:
+            res_str = (r.get("résultat") or "").upper()
+            if "GAGN" not in res_str and "PERDU" not in res_str:
+                continue
+                
+            is_win = "GAGN" in res_str
+            stat_type = None
+            pari_lower = (r.get("pari") or "").lower()
+            
+            if "but" in pari_lower or "goal" in pari_lower:
+                stat_type = "goal"
+            elif "passe" in pari_lower or "assist" in pari_lower:
+                stat_type = "assist"
+            elif "point" in pari_lower:
+                stat_type = "point"
+                
+            if stat_type:
+                stats[stat_type]["total"] += 1
+                stats["all"]["total"] += 1
+                if is_win:
+                    stats[stat_type]["correct"] += 1
+                    stats["all"]["correct"] += 1
+                    
+                prob = r.get("proba_predite") or 50
+                stats["all"]["sum_conf"] += prob
+                
+                # Daily grouping
+                day = r.get("date")[:10] if r.get("date") else "unknown"
+                if day not in daily:
+                    daily[day] = {"date": day, "total": 0, "correct": 0}
+                daily[day]["total"] += 1
+                if is_win:
+                    daily[day]["correct"] += 1
+
+        def _pct(c, t):
+            return round(c / t * 100, 1) if t > 0 else 0
+            
+        metrics["total_matches"] = stats["all"]["total"]
+        metrics["accuracy_goal"] = _pct(stats["goal"]["correct"], stats["goal"]["total"])
+        metrics["accuracy_assist"] = _pct(stats["assist"]["correct"], stats["assist"]["total"])
+        metrics["accuracy_point"] = _pct(stats["point"]["correct"], stats["point"]["total"])
+        metrics["avg_confidence"] = round(stats["all"]["sum_conf"] / stats["all"]["total"], 1) if stats["all"]["total"] > 0 else 0
+        metrics["daily_stats"] = sorted(daily.values(), key=lambda x: x["date"])
+        
+        return metrics
+
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

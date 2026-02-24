@@ -16,6 +16,7 @@ Push dans nhl_data_lake + nhl_fixtures dans Supabase.
 import os
 import sys
 import time
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -354,6 +355,62 @@ def get_ai_game_context(games: list[dict], standings: dict) -> dict:
     return {}
 
 
+def get_claude_nhl_analysis(home_team: str, away_team: str, top_players: list[dict], ai_factors: dict) -> str:
+    """Use Claude to generate a detailed, player-centric NHL match analysis."""
+    try:
+        from brain import ask_claude
+    except ImportError:
+        return f"{home_team} vs {away_team} : Analyse indisponible."
+
+    h_ai = ai_factors.get(home_team, 1.0)
+    a_ai = ai_factors.get(away_team, 1.0)
+    
+    # Préparez les données des joueurs pour le prompt
+    players_data = []
+    for p in top_players[:10]:  # Top 10 des joueurs du match
+        goal_prob = p.get("prob_goal", 0)
+        point_prob = p.get("prob_point", 0)
+        assist_prob = p.get("prob_assist", 0)
+        
+        # Stats saison (per game)
+        gpg = p.get("goals_per_game", 0)
+        apg = p.get("assists_per_game", 0)
+        ppg = p.get("points_per_game", 0)
+        
+        form_tag = "🔥" if p.get("l5_form", {}).get("hot") else "🥶" if p.get("l5_form", {}).get("cold") else ""
+        
+        players_data.append(
+            f"- {p['player_name']} ({p['team']}) {form_tag}: "
+            f"{ppg:.2f} pts/m ({gpg:.2f} G, {apg:.2f} A). "
+            f"Probas ce soir: Point {point_prob}%, But {goal_prob}%, Passe {assist_prob}%."
+        )
+
+    system_prompt = (
+        "Tu es un expert en NHL qui s'adresse à des passionnés et parieurs.\n"
+        "Ta mission est de rédiger une brève analyse (3 à 4 phrases maximum) axée sur les joueurs clés.\n\n"
+        "CONSIGNES CRUCIALES :\n"
+        "1. SOIS BREF ET DIRECT : Pas d'intro ni de conclusion générique, va à l'essentiel.\n"
+        "2. AXE L'ANALYSE SUR LES JOUEURS : Cite la forme actuelle et les complémentarités (ex: un duo dynamique).\n"
+        "3. UTILISE UN TON de passionné/parieur : Parle de 'value', 'forme', 'spot favorable', 'chances de marquer'.\n"
+        "4. ÉVITE LE JARGON TROP TECHNIQUE : Pas de 'AI factors', 'probabilités individuelles exactes' ou termes mathématiques complexes.\n"
+        "5. Rends le texte facile à lire pour le grand public."
+    )
+
+    user_prompt = (
+        f"Match : {home_team} vs {away_team}\n"
+        f"Contexte offensif estimé (1.0 = normal, >1.2 = très ouvert, <0.8 = fermé) : {home_team} ({h_ai}), {away_team} ({a_ai})\n\n"
+        "Joueurs à surveiller ce soir :\n" + "\n".join(players_data) + "\n\n"
+        "Rédige ton analyse courte et percutante."
+    )
+
+    try:
+        response = ask_claude(system_prompt, user_prompt)
+        return response if response else f"Analyse automatique pour {home_team} vs {away_team}."
+    except Exception as e:
+        logger.warning(f"[NHL] AI analysis failed: {e}")
+        return f"Échec de l'analyse IA pour {home_team} vs {away_team}."
+
+
 # ─── Player scoring ─────────────────────────────────────────────
 
 def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: dict,
@@ -410,40 +467,41 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     l5 = l5_form or {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0}
     h2h_adj = h2h or {"goal": 1.0, "point": 1.0, "shot": 1.0}
 
-    # ─── Goal probability ───
-    base_goal_prob = min(gpg * 100, 60)
-    base_goal_prob *= defense_factor * (1 + goalie_adj) * pp_boost * b2b_penalty * ai_factor
-    base_goal_prob *= l5["goal"] * h2h_adj["goal"]  # L5 + H2H
+    # ─── Expected Values (Lambda for Poisson) ───
+    exp_goals = gpg * defense_factor * (1 + goalie_adj) * pp_boost * b2b_penalty * ai_factor * l5["goal"] * h2h_adj["goal"]
+    exp_assists = apg * defense_factor * pp_boost * b2b_penalty * ai_factor * l5["assist"]
+    exp_points = ppg * defense_factor * (1 + goalie_adj * 0.5) * pp_boost * b2b_penalty * ai_factor * l5["point"] * h2h_adj["point"]
+    exp_shots = shots_per_game * b2b_penalty * ai_factor * l5["shot"] * h2h_adj["shot"]
+    
+    # ─── Home & TOI adjustments ───
     if is_home:
-        base_goal_prob *= 1.05
+        exp_goals *= 1.05
+        exp_assists *= 1.03
+        exp_points *= 1.05
+        exp_shots *= 1.03
+
     if toi_minutes > 20:
-        base_goal_prob *= 1.10
+        exp_goals *= 1.10
     elif toi_minutes > 18:
-        base_goal_prob *= 1.05
+        exp_goals *= 1.05
 
-    # ─── Assist probability ───
-    base_assist_prob = min(apg * 100, 60)
-    base_assist_prob *= defense_factor * pp_boost * b2b_penalty * ai_factor
-    base_assist_prob *= l5["assist"]  # L5 form
-    if is_home:
-        base_assist_prob *= 1.03
     if toi_minutes > 19:
-        base_assist_prob *= 1.08
+        exp_assists *= 1.08
+        exp_shots *= 1.15
 
-    # ─── Point probability ───
-    base_point_prob = min(ppg * 100, 80)
-    base_point_prob *= defense_factor * (1 + goalie_adj * 0.5) * pp_boost * b2b_penalty * ai_factor
-    base_point_prob *= l5["point"] * h2h_adj["point"]  # L5 + H2H
-    if is_home:
-        base_point_prob *= 1.05
+    # ─── Poisson Probabilities ───
+    # Prob of at least 1 event = 1 - e^(-lambda)
+    prob_goal = (1 - math.exp(-max(0, exp_goals))) * 100
+    prob_assist = (1 - math.exp(-max(0, exp_assists))) * 100
+    prob_point = (1 - math.exp(-max(0, exp_points))) * 100
 
-    # ─── Shot probability (2.5+ SOG) ───
-    base_shot_prob = min(shots_per_game / 2.5 * 50, 90)
-    base_shot_prob *= b2b_penalty * ai_factor * l5["shot"] * h2h_adj["shot"]  # L5 + H2H
-    if toi_minutes > 19:
-        base_shot_prob *= 1.15
-    if is_home:
-        base_shot_prob *= 1.03
+    # Prob of 3+ shots (Over 2.5) = 1 - P(0) - P(1) - P(2)
+    l_s = max(0, exp_shots)
+    p0 = math.exp(-l_s)
+    p1 = p0 * l_s
+    p2 = p1 * l_s / 2
+    prob_shot = (1 - (p0 + p1 + p2)) * 100
+
 
     res = {
         "player_id": player_id,
@@ -451,12 +509,12 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
         "team": team,
         "opp": opp,
         "is_home": 1 if is_home else 0,
-        "prob_goal": round(min(base_goal_prob, 65), 1),
-        "prob_assist": round(min(base_assist_prob, 65), 1),
-        "prob_point": round(min(base_point_prob, 80), 1),
-        "prob_shot": round(min(base_shot_prob, 95), 1),
-        "algo_score_goal": int(min(base_goal_prob, 100)),
-        "algo_score_shot": int(min(base_shot_prob, 100)),
+        "prob_goal": min(95.0, round(prob_goal, 1)),
+        "prob_assist": min(95.0, round(prob_assist, 1)),
+        "prob_point": min(99.0, round(prob_point, 1)),
+        "prob_shot": min(95.0, round(prob_shot, 1)),
+        "algo_score_goal": int(min(100, prob_goal)),
+        "algo_score_shot": int(min(100, prob_shot)),
         "goals_per_game": round(gpg, 3),
         "assists_per_game": round(apg, 3),
         "points_per_game": round(ppg, 3),
@@ -749,52 +807,48 @@ def run_nhl_pipeline() -> dict:
 
         all_players.extend(match_players)
 
-        # Win probabilities
-        win_prob = calculate_win_prob(home_abbrev, away_abbrev, standings, tired_teams)
+        # ─── PASS 5: Recommended Bet (Player-based: Point, Goal, Assist) ───
+        rec_bet = "Analyse en cours..."
+        conf = 3
         
-        # Recommended Bet & Confidence
+        # Sort match players to find the best bet
+        # Priorities: Point > 50%, Goal > 30%, Assist > 35%
+        best_p_points = sorted(match_players, key=lambda p: p["prob_point"], reverse=True)
+        best_p_goals = sorted(match_players, key=lambda p: p["prob_goal"], reverse=True)
+        best_p_assists = sorted(match_players, key=lambda p: p["prob_assist"], reverse=True)
+        
+        if best_p_goals and best_p_goals[0].get("prob_goal", 0) > 35:
+            p = best_p_goals[0]
+            rec_bet = f"{p['player_name']} ({p['team']}) : Buteur"
+            # Scale probability strictly out of 10. (e.g., 65% -> 6.5 -> 7/10)
+            conf = min(10, max(1, round(p["prob_goal"] / 10)))
+        elif best_p_points and best_p_points[0].get("prob_point", 0) > 55:
+            p = best_p_points[0]
+            rec_bet = f"{p['player_name']} ({p['team']}) : +0.5 Point"
+            conf = min(10, max(1, round(p["prob_point"] / 10)))
+        elif best_p_assists and best_p_assists[0].get("prob_assist", 0) > 40:
+            p = best_p_assists[0]
+            rec_bet = f"{p['player_name']} ({p['team']}) : Passeur décisif"
+            conf = min(10, max(1, round(p["prob_assist"] / 10)))
+        else:
+            # Fallback to team win if no strong player bet
+            ph = win_prob["home"]
+            pa = win_prob["away"]
+            if ph >= pa:
+                rec_bet = f"Victoire {home_name} (incl. OT)"
+                conf = min(10, max(1, round(ph / 10)))
+            else:
+                rec_bet = f"Victoire {away_name} (incl. OT)"
+                conf = min(10, max(1, round(pa / 10)))
+
+        # ─── PASS 6: AI Detailed Analysis ───
+        logger.info(f"[NHL]   🧠 Génération analyse détaillée pour {home_abbrev} vs {away_abbrev}...")
+        analysis_text = get_claude_nhl_analysis(home_name, away_name, match_players, ai_factors)
+
+        # Win probabilities for fixtures_data (saved to Supabase)
+        win_prob = calculate_win_prob(home_abbrev, away_abbrev, standings, tired_teams)
         ph = win_prob["home"]
         pa = win_prob["away"]
-        
-        if ph >= pa:
-            rec_team = home_name
-            rec_prob = ph
-            other_team = away_name
-            is_home_fav = True
-        else:
-            rec_team = away_name
-            rec_prob = pa
-            other_team = home_name
-            is_home_fav = False
-            
-        if rec_prob >= 65:
-            rec_bet = f"Victoire {rec_team} (Temps Réglementaire)"
-            conf = min(10, max(1, int((rec_prob - 60) / 4) + 6))  # 6 to 9
-        elif rec_prob >= 55:
-            rec_bet = f"Victoire {rec_team} (Prolongations incluses)"
-            conf = min(10, max(1, int((rec_prob - 50) / 3) + 4))  # 4 to 6
-        else:
-            rec_bet = f"Match nul ou +1.5 buts {rec_team}"
-            conf = 3
-            
-        # Modifiers based on AI contextual factors
-        ai_boost = h_ai if is_home_fav else a_ai
-        if ai_boost > 1.15:
-            conf = min(10, conf + 1)
-            
-        # Build Analysis Text
-        fav_factor = h_ai if is_home_fav else a_ai
-        b2b_text = ""
-        if (is_home_fav and home_abbrev in tired_teams) or (not is_home_fav and away_abbrev in tired_teams):
-            b2b_text = " Attention, l'équipe joue un match 'back-to-back', ce qui peut altérer son énergie physique."
-            conf = max(1, conf - 1)
-        
-        analysis_text = f"{rec_team} part favori avec {rec_prob}% de chances de victoire contre {other_team}."
-        if fav_factor > 1.10:
-            analysis_text += " L'intelligence artificielle a détecté un contexte très favorable pour eux (dynamique forte ou matchup d'attaque avantageux)."
-        elif fav_factor < 0.90:
-            analysis_text += " Toutefois, le contexte de la rencontre est légèrement piégeur, la prudence est de mise."
-        analysis_text += b2b_text
 
         fixtures_data.append({
             "api_fixture_id": game_id,

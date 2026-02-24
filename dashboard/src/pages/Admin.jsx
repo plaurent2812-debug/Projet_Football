@@ -43,8 +43,8 @@ function AdminDashboard() {
         setNhlLoading(true)
         setNhlMsg('')
         try {
-            const result = await triggerNHLPipeline()
-            setNhlMsg(`✅ ${result.matches || 0} matchs analysés, ${result.players_analyzed || 0} joueurs scorés`)
+            await triggerNHLPipeline()
+            setTimeout(refreshStatus, 1000)
         } catch (err) {
             setNhlMsg(`Erreur: ${err.message}`)
         } finally {

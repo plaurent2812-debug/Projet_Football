@@ -878,9 +878,13 @@ def _run_pipeline_background(mode: str):
     """Run the pipeline in a background thread and capture output."""
     global _pipeline_state
     project_dir = str(Path(__file__).resolve().parent.parent)
-    cmd = [sys.executable, "run_pipeline.py"]
-    if mode != "full":
-        cmd.append(mode)
+    
+    if mode == "nhl":
+        cmd = [sys.executable, "-c", "from fetchers.nhl_pipeline import run_nhl_pipeline; run_nhl_pipeline()"]
+    else:
+        cmd = [sys.executable, "run_pipeline.py"]
+        if mode != "full":
+            cmd.append(mode)
 
     with _pipeline_lock:
         _pipeline_state["process"] = None
@@ -928,14 +932,14 @@ def _run_pipeline_background(mode: str):
 
 @app.post("/api/admin/run-pipeline")
 def admin_run_pipeline(
-    mode: str = Query("full", description="Pipeline mode: full, data, analyze, or results"),
+    mode: str = Query("full", description="Pipeline mode: full, data, analyze, results, or nhl"),
     authorization: Optional[str] = Header(None),
 ):
     """Trigger the pipeline (admin only, requires Supabase JWT)."""
     _require_admin(authorization)
 
-    if mode not in ("full", "data", "analyze", "results"):
-        raise HTTPException(status_code=400, detail="Mode must be: full, data, analyze, or results")
+    if mode not in ("full", "data", "analyze", "results", "nhl"):
+        raise HTTPException(status_code=400, detail="Mode must be: full, data, analyze, results, or nhl")
 
     with _pipeline_lock:
         if _pipeline_state["status"] == "running":

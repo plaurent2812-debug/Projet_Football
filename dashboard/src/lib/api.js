@@ -48,19 +48,7 @@ export async function triggerPipeline(mode = 'full') {
 }
 
 export async function triggerNHLPipeline() {
-    const headers = await getAuthHeaders()
-    const res = await fetch(`${API_ROOT}/api/trigger/nhl-run-pipeline`, {
-        method: 'POST',
-        headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-        },
-    })
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail || `API error: ${res.status}`)
-    }
-    return res.json()
+    return triggerPipeline('nhl')
 }
 
 

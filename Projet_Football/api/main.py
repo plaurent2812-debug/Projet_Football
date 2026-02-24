@@ -989,7 +989,10 @@ def admin_pipeline_status(authorization: Optional[str] = Header(None)):
     _require_admin(authorization)
 
     with _pipeline_lock:
-        return dict(_pipeline_state)
+        state = dict(_pipeline_state)
+        # Remove non-serializable fields
+        state.pop("process", None)
+        return state
 
 
 @app.post("/api/admin/update-scores")

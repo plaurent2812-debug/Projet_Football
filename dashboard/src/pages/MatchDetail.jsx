@@ -315,7 +315,7 @@ export default function MatchDetailPage() {
                                     </div>
                                 </div>
                                 <Badge className="bg-primary/10 text-primary border-0 font-bold">
-                                    {s.probability ?? s.prob ?? "—"}%
+                                    {s.probability ?? s.proba ?? s.prob ?? "—"}%
                                 </Badge>
                             </div>
                         ))}

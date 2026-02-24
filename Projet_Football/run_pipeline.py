@@ -99,7 +99,9 @@ def run_analysis():
     run_brain()
 
 
-def run_results(date: str | None = None):
+from typing import Optional
+
+def run_results(date: Optional[str] = None):
     """Met à jour les scores des matchs du jour depuis l'API Football."""
     logger.info("=" * 60)
     logger.info("🔄 PHASE SCORES : Mise à jour des résultats")

@@ -80,14 +80,15 @@ def verify_trigger_auth(authorization: str = Header(None)):
             raise ValueError("Invalid JWT")
             
         user_id = user_res.user.id
-        db_user = supabase.table("users").select("role").eq("id", user_id).execute().data
+        db_user = supabase.table("profiles").select("role").eq("id", user_id).execute().data
         if not db_user or db_user[0].get("role") != "admin":
             raise HTTPException(status_code=403, detail="Forbidden: Admin only")
             
     except Exception as e:
+        logger.error(f"[Auth] ❌ token verification failed: {e}")
         if isinstance(e, HTTPException):
             raise e
-        raise HTTPException(status_code=403, detail="Invalid token or unauthorized")
+        raise HTTPException(status_code=403, detail=f"Invalid token or unauthorized: {str(e)}")
         
     return True
 

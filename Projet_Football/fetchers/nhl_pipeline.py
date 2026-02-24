@@ -56,7 +56,7 @@ def _fetch_json(endpoint: str) -> Optional[dict]:
     url = f"{NHL_API}{endpoint}"
     for attempt in range(3):
         try:
-            resp = httpx.get(url, timeout=15.0)
+            resp = httpx.get(url, timeout=15.0, follow_redirects=True)
             if resp.status_code == 200:
                 return resp.json()
             elif resp.status_code in (429, 500, 502, 503):

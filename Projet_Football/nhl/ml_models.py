@@ -23,7 +23,8 @@ class EnhancedGoalPredictor:
     Fallback sur Poisson si le modèle n'est pas disponible.
     """
 
-    def __init__(self):
+    def __init__(self, target_stat: str = "goal"):
+        self.target_stat = target_stat  # goal, assist, point, shot
         self.model = None
         self.feature_names: List[str] = []
         self.model_metadata: Dict[str, Any] = {}
@@ -203,17 +204,36 @@ class EnhancedGoalPredictor:
 
     def _predict_fallback(self, data: Dict[str, Any]) -> float:
         """Fallback Poisson quand pas de modèle ML."""
-        gpg = float(data.get('gpg', 0) or 0)
-        if gpg <= 0:
-            # Utiliser goals_avg_5 enrichi si disponible, sinon valeur neutre NHL
-            gpg = float(data.get('goals_avg_5', 0) or 0)
-        if gpg <= 0:
-            gpg = 0.25  # ~20 buts / 82 matchs, valeur neutre
+        
+        if self.target_stat == "assist":
+            rate = float(data.get('apg', 0) or data.get('assists_per_game', 0) or 0)
+            if rate <= 0: rate = 0.40
+        elif self.target_stat == "point":
+            rate = float(data.get('ppg', 0) or data.get('points_per_game', 0) or 0)
+            if rate <= 0: rate = 0.65
+        elif self.target_stat == "shot":
+            rate = float(data.get('spg', 0) or data.get('shots_per_game', 0) or 0)
+            if rate <= 0: rate = 2.0
+            lam = rate * (1.05 if bool(data.get('is_home', False)) else 0.95)
+            # Shot prob is for 2.5+ shots, which is P(X >= 3)
+            # 1 - P(0) - P(1) - P(2)
+            if lam > 0:
+                p0 = math.exp(-lam)
+                p1 = lam * p0
+                p2 = (lam**2 / 2) * p0
+                prob = 1.0 - (p0 + p1 + p2)
+            else:
+                prob = 0.0
+            return max(0.01, min(0.99, prob))
+        else: # goal
+            rate = float(data.get('gpg', 0) or data.get('goals_per_game', 0) or 0)
+            if rate <= 0:
+                rate = float(data.get('goals_avg_5', 0) or 0.25)
 
         is_home = bool(data.get('is_home', False))
         home_factor = 1.05 if is_home else 0.95
 
-        lam = gpg * home_factor
+        lam = rate * home_factor
         prob = 1.0 - math.exp(-lam) if lam > 0 else 0.0
         return max(0.01, min(0.99, prob))
 
@@ -222,10 +242,10 @@ class EnhancedGoalPredictor:
 # SINGLETONS (compatibilité avec main.py)
 # =============================================================================
 
-goal_predictor = EnhancedGoalPredictor()
-shot_predictor = EnhancedGoalPredictor()
-point_predictor = EnhancedGoalPredictor()
-assist_predictor = EnhancedGoalPredictor()
+goal_predictor = EnhancedGoalPredictor(target_stat="goal")
+shot_predictor = EnhancedGoalPredictor(target_stat="shot")
+point_predictor = EnhancedGoalPredictor(target_stat="point")
+assist_predictor = EnhancedGoalPredictor(target_stat="assist")
 
 
 def load_all_models() -> Dict[str, EnhancedGoalPredictor]:

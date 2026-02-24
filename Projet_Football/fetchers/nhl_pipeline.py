@@ -459,6 +459,7 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
         "algo_score_shot": int(min(base_shot_prob, 100)),
         "goals_per_game": round(gpg, 3),
         "assists_per_game": round(apg, 3),
+        "points_per_game": round(ppg, 3),
         "shots_per_game": round(shots_per_game, 1),
         "toi_minutes": round(toi_minutes, 1),
         "games_played": gp,
@@ -750,6 +751,50 @@ def run_nhl_pipeline() -> dict:
 
         # Win probabilities
         win_prob = calculate_win_prob(home_abbrev, away_abbrev, standings, tired_teams)
+        
+        # Recommended Bet & Confidence
+        ph = win_prob["home"]
+        pa = win_prob["away"]
+        
+        if ph >= pa:
+            rec_team = home_name
+            rec_prob = ph
+            other_team = away_name
+            is_home_fav = True
+        else:
+            rec_team = away_name
+            rec_prob = pa
+            other_team = home_name
+            is_home_fav = False
+            
+        if rec_prob >= 65:
+            rec_bet = f"Victoire {rec_team} (Temps Réglementaire)"
+            conf = min(10, max(1, int((rec_prob - 60) / 4) + 6))  # 6 to 9
+        elif rec_prob >= 55:
+            rec_bet = f"Victoire {rec_team} (Prolongations incluses)"
+            conf = min(10, max(1, int((rec_prob - 50) / 3) + 4))  # 4 to 6
+        else:
+            rec_bet = f"Match nul ou +1.5 buts {rec_team}"
+            conf = 3
+            
+        # Modifiers based on AI contextual factors
+        ai_boost = h_ai if is_home_fav else a_ai
+        if ai_boost > 1.15:
+            conf = min(10, conf + 1)
+            
+        # Build Analysis Text
+        fav_factor = h_ai if is_home_fav else a_ai
+        b2b_text = ""
+        if (is_home_fav and home_abbrev in tired_teams) or (not is_home_fav and away_abbrev in tired_teams):
+            b2b_text = " Attention, l'équipe joue un match 'back-to-back', ce qui peut altérer son énergie physique."
+            conf = max(1, conf - 1)
+        
+        analysis_text = f"{rec_team} part favori avec {rec_prob}% de chances de victoire contre {other_team}."
+        if fav_factor > 1.10:
+            analysis_text += " L'intelligence artificielle a détecté un contexte très favorable pour eux (dynamique forte ou matchup d'attaque avantageux)."
+        elif fav_factor < 0.90:
+            analysis_text += " Toutefois, le contexte de la rencontre est légèrement piégeur, la prudence est de mise."
+        analysis_text += b2b_text
 
         fixtures_data.append({
             "api_fixture_id": game_id,
@@ -757,10 +802,13 @@ def run_nhl_pipeline() -> dict:
             "status": "NS",
             "home_team": home_name,
             "away_team": away_name,
-            "proba_home": win_prob["home"],
-            "proba_away": win_prob["away"],
+            "proba_home": ph,
+            "proba_away": pa,
             "ai_home_factor": h_ai,
             "ai_away_factor": a_ai,
+            "recommended_bet": rec_bet,
+            "confidence_score": conf,
+            "analysis_text": analysis_text,
             "stats_json": {"top_players": match_players},
         })
 
@@ -820,6 +868,9 @@ def run_nhl_pipeline() -> dict:
                     "away_team": f["away_team"],
                     "predictions_json": predictions,
                     "stats_json": f.get("stats_json", {}),
+                    "recommended_bet": f["recommended_bet"],
+                    "confidence_score": f["confidence_score"],
+                    "analysis_text": f["analysis_text"],
                 }).eq("api_fixture_id", f["api_fixture_id"]).execute()
             else:
                 supabase.table("nhl_fixtures").insert({
@@ -830,6 +881,9 @@ def run_nhl_pipeline() -> dict:
                     "away_team": f["away_team"],
                     "predictions_json": predictions,
                     "stats_json": f.get("stats_json", {}),
+                    "recommended_bet": f["recommended_bet"],
+                    "confidence_score": f["confidence_score"],
+                    "analysis_text": f["analysis_text"],
                 }).execute()
         except Exception as e:
             logger.error(f"[NHL] Error upserting fixture {f['home_team']} vs {f['away_team']}: {e}")

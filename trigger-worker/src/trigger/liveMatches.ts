@@ -241,3 +241,27 @@ export const nhlUpdateLiveScores = schedules.task({
         return await res.json();
     },
 });
+
+// ─── Task 10: NHL ML Training Reminder ──────────────────────
+export const nhlMlReminder = task({
+    id: "nhl-ml-reminder",
+    run: async () => {
+        // Automatically checkpoint and wait for 14 days
+        await wait.for({ days: 14 });
+
+        const res = await fetch(`${API_URL}/api/trigger/nhl-ml-reminder`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${CRON_SECRET}`
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error(`NHL ML reminder failed: ${res.statusText}`);
+        }
+
+        return await res.json();
+    },
+});
+

@@ -676,7 +676,7 @@ def nhl_value_bets():
     fixtures = (
         supabase.table("nhl_fixtures")
         .select("id, api_fixture_id, date, home_team, away_team, "
-                "proba_home, proba_away")
+                "proba_home, proba_away, odds_json")
         .gte("date", f"{today}T00:00:00Z")
         .lt("date", f"{today}T23:59:59Z")
         .in_("status", ["NS", "TBD", ""])
@@ -737,37 +737,59 @@ def nhl_value_bets():
         top_points = top5(match_players, "python_prob")  # combined proxy
         top_shots = top5(match_players, "algo_score_shot")
 
-        # Value bet calculation using bookmaker odds
-        # For now, use implied probabilities from our model
-        # Value score = edge × odds (prefer high edge × decent odds)
-        # A 77% @ 1.70 gives value_score = (77-59)*1.70 = 30.6
-        # A 90% @ 1.20 gives value_score = (90-83)*1.20 = 8.4
-        # → 1.70 @ 77% wins!
+        # Extraction des vraies cotes depuis odds_json (API-Sports Hockey)
+        odds_json = fix.get("odds_json") or {}
+        home_odd_real = 0.0
+        away_odd_real = 0.0
+        
+        if "bookmakers" in odds_json:
+            for bm in odds_json["bookmakers"]:
+                # On cherche Bet365 (id 1) ou autre en fallback
+                for bet in bm.get("bets", []):
+                    # Marché "Money Line" ou "Home/Away" (id 1, 2)
+                    if bet.get("id") in (1, 2) or bet.get("name") in ("Home/Away", "Match Winner"):
+                        for val in bet.get("values", []):
+                            if val.get("value") == "Home":
+                                home_odd_real = float(val.get("odd", 0))
+                            elif val.get("value") == "Away":
+                                away_odd_real = float(val.get("odd", 0))
+                if home_odd_real > 0:
+                    break
+
+        # S'il n'y a pas de vraie cote, on l'estime
+        is_real_odd = home_odd_real > 0 and away_odd_real > 0
+        if not is_real_odd:
+            home_odd_real = round(100 / our_home, 2) if our_home > 0 else 0
+            away_odd_real = round(100 / our_away, 2) if our_away > 0 else 0
 
         bet_options = []
-        if our_home > 0:
-            implied_home = 100 - our_home  # naive complement
-            home_odd_estimate = round(100 / our_home, 2) if our_home > 0 else 0
-            edge_home = our_home - (100 / home_odd_estimate) if home_odd_estimate > 0 else 0
-            value_score_home = edge_home * home_odd_estimate
-            bet_options.append(("Victoire " + home, our_home, home_odd_estimate, value_score_home))
+        if our_home > 0 and home_odd_real > 0:
+            implied_home = 100 / home_odd_real
+            edge_home = our_home - implied_home
+            # Only keep True Value Bets (Edge >= 3% if real odds)
+            if not is_real_odd or edge_home >= 3.0:
+                value_score_home = edge_home * home_odd_real
+                bet_options.append(("Victoire " + home, our_home, home_odd_real, value_score_home, edge_home))
 
-        if our_away > 0:
-            away_odd_estimate = round(100 / our_away, 2) if our_away > 0 else 0
-            edge_away = our_away - (100 / away_odd_estimate) if away_odd_estimate > 0 else 0
-            value_score_away = edge_away * away_odd_estimate
-            bet_options.append(("Victoire " + away, our_away, away_odd_estimate, value_score_away))
+        if our_away > 0 and away_odd_real > 0:
+            implied_away = 100 / away_odd_real
+            edge_away = our_away - implied_away
+            if not is_real_odd or edge_away >= 3.0:
+                value_score_away = edge_away * away_odd_real
+                bet_options.append(("Victoire " + away, our_away, away_odd_real, value_score_away, edge_away))
 
-        # Pick best value bet (highest value_score)
+        # Pick best value bet
         best_bet = max(bet_options, key=lambda x: x[3]) if bet_options else None
 
         value_bets.append({
             "match": f"{home} vs {away}",
             "home_proba": our_home,
             "away_proba": our_away,
-            "recommended_bet": best_bet[0] if best_bet else "N/A",
+            "recommended_bet": best_bet[0] if best_bet else "Aucune Value",
             "recommended_odd": best_bet[2] if best_bet else 0,
             "recommended_proba": best_bet[1] if best_bet else 0,
+            "edge": round(best_bet[4], 1) if best_bet else 0,
+            "is_real_odd": is_real_odd,
             "top_buteurs": top_buteurs,
             "top_passeurs": top_passeurs,
             "top_points": top_points,
@@ -779,8 +801,13 @@ def nhl_value_bets():
 
     for vb in value_bets:
         lines.append(f"⚽ *{vb['match']}*")
-        lines.append(f"   💰 *{vb['recommended_bet']}* @ {vb['recommended_odd']}")
-        lines.append(f"   📊 Proba: {vb['recommended_proba']}%\n")
+        if vb['recommended_bet'] != "Aucune Value":
+            lines.append(f"   💰 *{vb['recommended_bet']}* @ {vb['recommended_odd']} {'(Cote Bookmaker)' if vb['is_real_odd'] else '(Estimation)'}")
+            lines.append(f"   📊 Proba: {vb['recommended_proba']}% (Edge: +{vb['edge']}%)")
+        else:
+            lines.append(f"   ❌ *Aucune value bet détectée*")
+        
+        lines.append("")
 
         # Top 5 Buteurs
         if vb["top_buteurs"]:
@@ -820,6 +847,23 @@ def nhl_update_live_scores():
 
     if not fixtures:
         return {"status": "no_fixtures", "updated": 0}
+
+@router.post("/nhl-fetch-odds")
+def nhl_fetch_odds():
+    """Fetch NHL odds from API-Sports and update nhl_fixtures"""
+    import time
+    logger.info("[NHL Odds] 🏒 Démarrage fetch_nhl_odds...")
+    start = time.time()
+    try:
+        from fetchers.fetch_nhl_odds import fetch_nhl_odds
+        result = fetch_nhl_odds()
+    except Exception as e:
+        logger.error(f"[NHL Odds] ❌ Erreur: {e}")
+        return {"status": "error", "message": str(e)}
+        
+    logger.info(f"[NHL Odds] ✅ Terminé en {round(time.time() - start)}s")
+    return result
+
 
     updated = 0
     errors = 0
@@ -890,3 +934,22 @@ def nhl_run_pipeline():
 
     logger.info(f"[NHL Pipeline] ✅ Terminé en {elapsed}s")
     return result
+
+
+@router.post("/nhl-ml-reminder")
+def nhl_ml_reminder():
+    """Send a Telegram reminder to run the NHL ML training pipeline."""
+    logger.info("[NHL ML] 🧠 Envoi du rappel d'entraînement Machine Learning...")
+    
+    msg = (
+        "🧠 *Rappel ProbaLab ML*\n\n"
+        "Cela fait 2 semaines ! Il est temps d'entraîner tes modèles prédictifs NHL avec les nouvelles données récoltées.\n\n"
+        "👉 *Commandes à lancer sur le serveur :*\n"
+        "`cd Projet_Football`\n"
+        "`python -m nhl.build_data`\n"
+        "`python -m nhl.train`\n\n"
+        "Une fois terminé, les nouveaux `.pkl` seront pris en compte automatiquement."
+    )
+    _send_telegram_message(msg)
+    
+    return {"status": "ok"}

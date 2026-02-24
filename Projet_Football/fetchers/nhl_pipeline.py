@@ -25,6 +25,13 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import supabase, logger
 
+try:
+    from nhl.ml_models import load_all_models
+    ML_MODELS = load_all_models()
+except ImportError:
+    logger.warning("[NHL] nhl.ml_models not available.")
+    ML_MODELS = {}
+
 NHL_API = "https://api-web.nhle.com/v1"
 
 TEAM_NAMES = {
@@ -438,7 +445,7 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     if is_home:
         base_shot_prob *= 1.03
 
-    return {
+    res = {
         "player_id": player_id,
         "player_name": name.strip(),
         "team": team,
@@ -461,6 +468,18 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
         "l5_form": l5,
         "h2h": h2h_adj,
     }
+
+    # ─── Machine Learning Predictions ───
+    if "GOAL" in ML_MODELS:
+        res["ml_prob_goal"] = round(ML_MODELS["GOAL"].predict_proba(res) * 100, 1)
+    if "ASSIST" in ML_MODELS:
+        res["ml_prob_assist"] = round(ML_MODELS["ASSIST"].predict_proba(res) * 100, 1)
+    if "POINT" in ML_MODELS:
+        res["ml_prob_point"] = round(ML_MODELS["POINT"].predict_proba(res) * 100, 1)
+    if "SHOT" in ML_MODELS:
+        res["ml_prob_shot"] = round(ML_MODELS["SHOT"].predict_proba(res) * 100, 1)
+
+    return res
 
 
 # ─── Win probability ────────────────────────────────────────────
@@ -742,6 +761,7 @@ def run_nhl_pipeline() -> dict:
             "proba_away": win_prob["away"],
             "ai_home_factor": h_ai,
             "ai_away_factor": a_ai,
+            "stats_json": {"top_players": match_players},
         })
 
     # 7. Save to Supabase — nhl_data_lake
@@ -799,6 +819,7 @@ def run_nhl_pipeline() -> dict:
                     "home_team": f["home_team"],
                     "away_team": f["away_team"],
                     "predictions_json": predictions,
+                    "stats_json": f.get("stats_json", {}),
                 }).eq("api_fixture_id", f["api_fixture_id"]).execute()
             else:
                 supabase.table("nhl_fixtures").insert({
@@ -808,6 +829,7 @@ def run_nhl_pipeline() -> dict:
                     "home_team": f["home_team"],
                     "away_team": f["away_team"],
                     "predictions_json": predictions,
+                    "stats_json": f.get("stats_json", {}),
                 }).execute()
         except Exception as e:
             logger.error(f"[NHL] Error upserting fixture {f['home_team']} vs {f['away_team']}: {e}")

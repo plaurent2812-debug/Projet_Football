@@ -132,6 +132,36 @@ export default function NHLMatchDetailPage() {
     const confidence = fixture?.confidence_score
     const recommendedBet = fixture?.recommended_bet
 
+    // Calculate Value Bet
+    let valueBet = null
+    if (fixture?.odds_json?.bookmakers) {
+        let homeOdd = 0; let awayOdd = 0;
+        for (const bm of fixture.odds_json.bookmakers) {
+            for (const bet of (bm.bets || [])) {
+                if ([1, 2].includes(bet.id) || ["Home/Away", "Match Winner"].includes(bet.name)) {
+                    for (const val of (bet.values || [])) {
+                        if (val.value === "Home") homeOdd = parseFloat(val.odd);
+                        if (val.value === "Away") awayOdd = parseFloat(val.odd);
+                    }
+                }
+            }
+            if (homeOdd > 0) break;
+        }
+
+        if (homeOdd > 0 && homeProb > 0) {
+            const edge = homeProb - (100 / homeOdd);
+            if (edge >= 3) {
+                valueBet = { team: fixture.home_team, type: "Victoire", odd: homeOdd, edge: edge.toFixed(1) }
+            }
+        }
+        if (awayOdd > 0 && awayProb > 0) {
+            const edge = awayProb - (100 / awayOdd);
+            if (edge >= 3 && (!valueBet || edge > parseFloat(valueBet.edge))) {
+                valueBet = { team: fixture.away_team, type: "Victoire", odd: awayOdd, edge: edge.toFixed(1) }
+            }
+        }
+    }
+
     return (
         <div className="max-w-2xl mx-auto space-y-4 animate-fade-in-up pb-12">
 
@@ -199,6 +229,33 @@ export default function NHLMatchDetailPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* True Value Bet Banner */}
+            {valueBet && (
+                <Card className="border-emerald-500/50 bg-emerald-500/10 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <CardHeader className="py-2.5 px-4 flex flex-row items-center justify-between border-b border-emerald-500/20">
+                        <CardTitle className="text-[13px] uppercase tracking-wider font-bold flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                            <Target className="w-4 h-4" />
+                            True Value Bet
+                        </CardTitle>
+                        <Badge className="border-emerald-500 text-emerald-700 bg-emerald-500/20 hover:bg-emerald-500/30">
+                            Edge: +{valueBet.edge}%
+                        </Badge>
+                    </CardHeader>
+                    <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-base font-bold text-foreground">{valueBet.type} {valueBet.team}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Avantage mathématique sur le bookmaker</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Cote Réelle</p>
+                            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                                @ {valueBet.odd.toFixed(2)}
+                            </span>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Post-Match: Predictions vs Results */}
             {(() => {

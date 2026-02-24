@@ -265,3 +265,25 @@ export const nhlMlReminder = task({
     },
 });
 
+// ─── Task 11: NHL Fetch Odds (CRON 22:00 UTC = 23h Paris) ─────
+export const nhlFetchOdds = schedules.task({
+    id: "nhl-fetch-odds",
+    cron: "0 22 * * *",
+    run: async () => {
+        const res = await fetch(`${API_URL}/api/trigger/nhl-fetch-odds`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${CRON_SECRET}`
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error(`NHL fetch odds failed: ${res.statusText}`);
+        }
+
+        return await res.json();
+    },
+});
+
+

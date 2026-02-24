@@ -239,10 +239,10 @@ def load_all_models() -> Dict[str, EnhancedGoalPredictor]:
     base_path = "Projet_Football/models"
     
     models = {
-        'GOAL': (f'{base_path}/best_goal_predictor.pkl', goal_predictor),
-        'SHOT': (f'{base_path}/best_shot_predictor.pkl', shot_predictor),
-        'POINT': (f'{base_path}/best_point_predictor.pkl', point_predictor),
-        'ASSIST': (f'{base_path}/best_assist_predictor.pkl', assist_predictor),
+        'GOAL': (f'{base_path}/nhl_best_goal_predictor.pkl', goal_predictor),
+        'SHOT': (f'{base_path}/nhl_best_shot_predictor.pkl', shot_predictor),
+        'POINT': (f'{base_path}/nhl_best_point_predictor.pkl', point_predictor),
+        'ASSIST': (f'{base_path}/nhl_best_assist_predictor.pkl', assist_predictor),
     }
 
     for name, (path, predictor) in models.items():

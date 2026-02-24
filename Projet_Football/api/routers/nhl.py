@@ -490,7 +490,7 @@ def get_nhl_match_top_players(fixture_id: str):
     try:
         fixture_data = (
             supabase.table("nhl_fixtures")
-            .select("date, home_team, away_team")
+            .select("date, home_team, away_team, stats_json")
             .eq("api_fixture_id", fixture_id)
             .limit(1)
             .execute()
@@ -500,7 +500,7 @@ def get_nhl_match_top_players(fixture_id: str):
             # Try by id
             fixture_data = (
                 supabase.table("nhl_fixtures")
-                .select("date, home_team, away_team")
+                .select("date, home_team, away_team, stats_json")
                 .eq("id", fixture_id)
                 .limit(1)
                 .execute()
@@ -517,36 +517,40 @@ def get_nhl_match_top_players(fixture_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # 2. Fetch players from nhl_data_lake for that date
+    # 2. Extract players from fixture stats_json
     try:
-        rows = (
-            supabase.table("nhl_data_lake")
-            .select("player_id, player_name, team, python_prob, algo_score_goal, algo_score_shot, is_home")
-            .eq("date", match_date)
-            .execute()
-            .data
-            or []
-        )
+        stats_json = fixture.get("stats_json") or {}
+        rows = stats_json.get("top_players") or []
     except Exception:
         rows = []
 
-    # Filter to players from these two teams only
-    teams = {home_team.lower(), away_team.lower()}
-    if teams - {""}:
-        rows = [r for r in rows if (r.get("team") or "").lower() in teams or not teams - {""}]
-
-    def _top5(rows_sorted: list) -> list:
+    def _top5(rows_sorted: list, prob_key: str) -> list:
         seen = set()
         result = []
         for r in rows_sorted:
             pid = r.get("player_id") or r.get("player_name", "")
             if pid not in seen:
                 seen.add(pid)
+                
+                # Use ML probability if available, otherwise fallback to heuristics
+                if prob_key in r:
+                    prob_val = r.get(prob_key, 0)
+                elif prob_key == 'ml_prob_goal':
+                    prob_val = r.get("prob_goal", 0)
+                elif prob_key == 'ml_prob_assist':
+                    prob_val = r.get("prob_assist", 0)
+                elif prob_key == 'ml_prob_point':
+                    prob_val = r.get("prob_point", 0)
+                elif prob_key == 'ml_prob_shot':
+                    prob_val = r.get("prob_shot", 0)
+                else:
+                    prob_val = 0
+                    
                 result.append({
                     "player_id": r.get("player_id", ""),
                     "player_name": r.get("player_name", "Inconnu"),
                     "team": r.get("team", ""),
-                    "prob": round(float(r.get("python_prob", 0)) * 100, 1),
+                    "prob": prob_val,
                     "algo_score_goal": r.get("algo_score_goal", 0),
                     "algo_score_shot": r.get("algo_score_shot", 0),
                 })
@@ -554,12 +558,11 @@ def get_nhl_match_top_players(fixture_id: str):
                 break
         return result
 
-    # Sort by different criteria for each category
-    by_goal = sorted(rows, key=lambda r: float(r.get("python_prob", 0)), reverse=True)
-    by_shot = sorted(rows, key=lambda r: int(r.get("algo_score_shot", 0)), reverse=True)
-    # For point and assist, use a combined score
-    by_point = sorted(rows, key=lambda r: float(r.get("python_prob", 0)) * 0.6 + int(r.get("algo_score_goal", 0)) * 0.4 / 100, reverse=True)
-    by_assist = sorted(rows, key=lambda r: int(r.get("algo_score_goal", 0)), reverse=True)
+    # Sort by the new ML probabilities or fallback heuristics
+    by_goal = sorted(rows, key=lambda r: r.get("ml_prob_goal", r.get("prob_goal", 0)), reverse=True)
+    by_shot = sorted(rows, key=lambda r: r.get("ml_prob_shot", r.get("prob_shot", 0)), reverse=True)
+    by_point = sorted(rows, key=lambda r: r.get("ml_prob_point", r.get("prob_point", 0)), reverse=True)
+    by_assist = sorted(rows, key=lambda r: r.get("ml_prob_assist", r.get("prob_assist", 0)), reverse=True)
 
     return {
         "fixture_id": fixture_id,
@@ -567,10 +570,10 @@ def get_nhl_match_top_players(fixture_id: str):
         "home_team": home_team,
         "away_team": away_team,
         "top_players": {
-            "goal": _top5(by_goal),
-            "assist": _top5(by_assist),
-            "point": _top5(by_point),
-            "sog": _top5(by_shot),
+            "goal": _top5(by_goal, "ml_prob_goal"),
+            "assist": _top5(by_assist, "ml_prob_assist"),
+            "point": _top5(by_point, "ml_prob_point"),
+            "sog": _top5(by_shot, "ml_prob_shot"),
         }
     }
 

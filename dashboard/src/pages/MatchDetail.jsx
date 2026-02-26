@@ -263,7 +263,7 @@ export default function MatchDetailPage() {
 
             {/* Match Events — Goals Timeline */}
             {(() => {
-                const events = fixture?.events_json || []
+                const events = (fixture?.events_json || []).filter(e => e.player)
                 if (!events.length) return null
 
                 return (

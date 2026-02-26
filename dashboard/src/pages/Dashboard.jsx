@@ -24,8 +24,8 @@ function MatchRow({ match }) {
     const isHot = pred?.confidence_score >= 7 && !isFinished
     const hasScore = isFinished || isLive
 
-    // Extract goals from events_json
-    const events = match.events_json || []
+    // Extract goals from events_json (filter out null player names)
+    const events = (match.events_json || []).filter(e => e.player)
     const homeEvents = events.filter(e => e.team === match.home_team)
     const awayEvents = events.filter(e => e.team === match.away_team)
     const hasEvents = hasScore && events.length > 0

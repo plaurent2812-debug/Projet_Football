@@ -963,6 +963,45 @@ def nhl_update_live_scores():
             if away_goals is not None:
                 update_data["away_goals"] = away_goals
 
+            # Fetch game events (goals, assists) from Hockey API
+            try:
+                events_resp = _requests.get(
+                    f"{HOCKEY_API_URL}/games/events",
+                    headers=HOCKEY_HEADERS,
+                    params={"game": api_id},
+                    timeout=15,
+                )
+                _time.sleep(0.5)  # Rate limit
+
+                if events_resp.status_code == 200:
+                    events_data = events_resp.json().get("response", [])
+                    # Build a clean goals list with scorer + assists
+                    goals_list = []
+                    for ev in events_data:
+                        if ev.get("type", "").lower() in ("goal", "score"):
+                            goal_info = {
+                                "team": ev.get("team", {}).get("name", ""),
+                                "player": ev.get("players", [{}])[0].get("player", {}).get("name", "") if ev.get("players") else "",
+                                "assists": [],
+                                "period": ev.get("period", ""),
+                                "minute": ev.get("minute", ""),
+                                "comment": ev.get("comment", ""),  # PP, SH, EN, etc.
+                            }
+                            # Extract assists from additional players
+                            for p in ev.get("players", [])[1:]:
+                                assist_name = p.get("player", {}).get("name", "")
+                                if assist_name:
+                                    goal_info["assists"].append(assist_name)
+                            goals_list.append(goal_info)
+
+                    if goals_list or events_data:
+                        update_data["stats_json"] = {
+                            "events": events_data,
+                            "goals": goals_list,
+                        }
+            except Exception as ev_err:
+                logger.warning(f"[NHL Live] Events fetch error for {api_id}: {ev_err}")
+
             supabase.table("nhl_fixtures").update(
                 update_data
             ).eq("api_fixture_id", api_id).execute()

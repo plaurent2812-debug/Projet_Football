@@ -324,6 +324,67 @@ export default function NHLMatchDetailPage() {
                 )
             })()}
 
+            {/* Match Events — Goals Timeline */}
+            {(() => {
+                const goals = fixture?.stats_json?.goals || []
+                if (!goals.length) return null
+
+                const periodMap = { "1": "1ère", "2": "2ème", "3": "3ème", "OT": "Prol.", "SO": "Tirs" }
+
+                return (
+                    <Card className="border-border/50">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                🏒 Événements du match
+                                <Badge className="ml-auto text-[10px] border-0 bg-muted text-muted-foreground">
+                                    {goals.length} but{goals.length > 1 ? 's' : ''}
+                                </Badge>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-0">
+                                {goals.map((goal, idx) => {
+                                    const isHome = goal.team?.toLowerCase().includes(fixture?.home_team?.split(' ').pop()?.toLowerCase())
+                                    const periodStr = periodMap[goal.period] || goal.period || ""
+                                    const timeStr = goal.minute ? `${goal.minute}'` : ""
+                                    const typeLabel = goal.comment && goal.comment !== "" ? ` (${goal.comment})` : ""
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={cn(
+                                                "flex items-start gap-3 py-2.5 border-b border-border/20 last:border-0",
+                                                "pl-3 border-l-2",
+                                                isHome ? "border-l-primary" : "border-l-red-500"
+                                            )}
+                                        >
+                                            <div className="w-10 shrink-0 text-center">
+                                                <span className="text-[10px] font-bold text-muted-foreground block">{periodStr}</span>
+                                                {timeStr && <span className="text-[10px] text-muted-foreground/60">{timeStr}</span>}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold truncate">
+                                                    ⚽ {goal.player || "Inconnu"}
+                                                    <span className="text-muted-foreground font-normal text-xs">{typeLabel}</span>
+                                                </p>
+                                                {goal.assists?.length > 0 && (
+                                                    <p className="text-[10px] text-muted-foreground truncate">
+                                                        🎯 {goal.assists.join(', ')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] font-medium text-muted-foreground shrink-0">
+                                                {goal.team}
+                                            </span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )
+            })()}
+
             {/* Top Players — 4 tabs */}
             <Card className="border-border/50">
                 <CardHeader className="pb-3">

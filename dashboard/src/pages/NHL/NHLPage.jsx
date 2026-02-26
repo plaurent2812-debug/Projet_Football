@@ -31,6 +31,12 @@ function NHLMatchRow({ match }) {
         "LIVE": "Live",
     }[match.status] || "Live"
 
+    const hasScore = isFinished || isLive
+    // Extract goals from stats_json
+    const goals = match.stats_json?.goals || []
+    const homeGoals = goals.filter(g => g.team?.toLowerCase().includes(match.home_team?.split(' ').pop()?.toLowerCase()))
+    const awayGoals = goals.filter(g => g.team?.toLowerCase().includes(match.away_team?.split(' ').pop()?.toLowerCase()))
+
     return (
         <div
             className="match-card group flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/40 border-b border-border/30 last:border-0 transition-colors"
@@ -50,13 +56,20 @@ function NHLMatchRow({ match }) {
             {/* Teams */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                         <div className="w-5 h-5 rounded bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
                             {match.home_team?.charAt(0)}
                         </div>
-                        <span className={cn("text-sm", homeWon ? "font-bold" : "font-medium text-foreground/80")}>
-                            {match.home_team}
-                        </span>
+                        <div className="min-w-0">
+                            <span className={cn("text-sm block", homeWon ? "font-bold" : "font-medium text-foreground/80")}>
+                                {match.home_team}
+                            </span>
+                            {hasScore && homeGoals.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground block truncate">
+                                    {homeGoals.map((g, i) => `⚽ ${g.player}${g.period ? ` (${g.period})` : ''}`).join(', ')}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <span className={cn("text-sm font-bold tabular-nums shrink-0",
                         isLive ? "text-red-500" : homeWon ? "text-foreground" : "text-muted-foreground/50"
@@ -65,13 +78,20 @@ function NHLMatchRow({ match }) {
                     </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                         <div className="w-5 h-5 rounded bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
                             {match.away_team?.charAt(0)}
                         </div>
-                        <span className={cn("text-sm", awayWon ? "font-bold" : "font-medium text-foreground/80")}>
-                            {match.away_team}
-                        </span>
+                        <div className="min-w-0">
+                            <span className={cn("text-sm block", awayWon ? "font-bold" : "font-medium text-foreground/80")}>
+                                {match.away_team}
+                            </span>
+                            {hasScore && awayGoals.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground block truncate">
+                                    {awayGoals.map((g, i) => `⚽ ${g.player}${g.period ? ` (${g.period})` : ''}`).join(', ')}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <span className={cn("text-sm font-bold tabular-nums shrink-0",
                         isLive ? "text-red-500" : awayWon ? "text-foreground" : "text-muted-foreground/50"

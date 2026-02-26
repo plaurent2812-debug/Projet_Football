@@ -250,6 +250,14 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
     is_hot = point_factor > 1.2
     is_cold = point_factor < 0.8
 
+    days_since_last_game = 999
+    if all_games and "gameDate" in all_games[0]:
+        try:
+            last_date = datetime.strptime(all_games[0]["gameDate"], "%Y-%m-%d")
+            days_since_last_game = (datetime.utcnow() - last_date).days
+        except Exception:
+            pass
+
     return {
         "goal": round(goal_factor, 3),
         "assist": round(assist_factor, 3),
@@ -260,6 +268,7 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
         "l5_pts": l5_points,
         "l5_goals": l5_goals,
         "l5_shots": l5_shots,
+        "days_since_last_game": days_since_last_game,
     }
 
 
@@ -437,14 +446,17 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     except (ValueError, IndexError):
         toi_minutes = 0
 
+    # ─── Volume smoothing (penalize low GP) ───
+    volume_factor = min(1.0, (gp + 5) / 20.0)
+
     # Per-game rates
-    gpg = goals / gp
-    apg = assists / gp
-    ppg = points / gp
+    gpg = (goals / gp) * volume_factor
+    apg = (assists / gp) * volume_factor
+    ppg = (points / gp) * volume_factor
 
     # Calculate shots per game
     shooting_pct = skater.get("shootingPctg", 0)
-    shots_per_game = (goals / max(0.01, shooting_pct)) / gp if shooting_pct > 0 else 2.0
+    shots_per_game = ((goals / max(0.01, shooting_pct)) / gp if shooting_pct > 0 else 2.0) * volume_factor
 
     # ─── Adjustment factors ───
     opp_gaa = opp_stats.get("gaa", 3.0) if opp_stats else 3.0
@@ -724,48 +736,53 @@ def run_nhl_pipeline() -> dict:
         if enhanced_count:
             logger.info(f"[NHL]   ✅ {enhanced_count} joueurs enrichis avec L5+H2H")
 
-        # ─── PASS 3: Injury detection (absent from last 3 team games) ───
+        # ─── PASS 3: Injury detection (absent from last 10 days) ───
         injured = set()
         for p in match_players:
             l5 = p.get("l5_form", {})
-            # If we fetched game logs and they show 0 games in L5,
-            # or the player hasn't been scored with game logs: check separately
             pid = p["player_id"]
             if not pid or pid == "0":
                 continue
-            # Quick check: if game log was fetched and last game was >10 days ago → injured
-            if l5 and l5.get("l5_pts") is not None:
-                continue  # Had L5 data = active
-            # For players without game logs, check if they have very few GP
-            if p.get("games_played", 0) > 0:
+            
+            # If we fetched game logs, check `days_since_last_game`
+            if l5 and "days_since_last_game" in l5:
+                if l5["days_since_last_game"] > 10:
+                    injured.add(pid)
+                    logger.info(f"[NHL]   🏥 {p['player_name']} enlevé (absent depuis {l5['days_since_last_game']}j)")
                 continue
-            injured.add(pid)
+
+            # For players without game logs, if they have very few GP overall
+            if p.get("games_played", 0) == 0:
+                injured.add(pid)
 
         # Also detect missing players by checking game logs for top scorers
-        # who weren't in the L5 pass (fetch game logs for top 5 per team to check)
+        # who weren't in the L5 pass
         teams_in_match = {home_abbrev, away_abbrev}
         for team in teams_in_match:
             team_players = [p for p in match_players if p["team"] == team]
             team_players.sort(key=lambda p: p["prob_point"], reverse=True)
-            for p in team_players[:5]:
+            for p in team_players[:10]:
                 pid = p["player_id"]
                 if pid in injured or not pid or pid == "0":
                     continue
-                if p.get("l5_form"):
-                    continue  # Already checked via game log
+                if p.get("l5_form", {}).get("days_since_last_game") is not None:
+                    continue  # Already checked
+                
                 game_log = fetch_player_game_log(pid)
                 if game_log:
-                    # Check if last game was more than 7 days ago
+                    # Check if last game was more than 10 days ago
                     try:
                         last_game_date = game_log[0].get("gameDate", "")
                         if last_game_date:
                             last_dt = datetime.strptime(last_game_date, "%Y-%m-%d")
                             days_since = (datetime.utcnow() - last_dt).days
-                            if days_since > 7:
+                            if days_since > 10:
                                 injured.add(pid)
-                                logger.info(f"[NHL]   🏥 {p['player_name']} ({team}) absent depuis {days_since}j")
+                                logger.info(f"[NHL]   🏥 {p['player_name']} ({team}) enlevé (absent depuis {days_since}j)")
                     except Exception:
                         pass
+                else:
+                    injured.add(pid)
 
         # Filter injured players
         if injured:

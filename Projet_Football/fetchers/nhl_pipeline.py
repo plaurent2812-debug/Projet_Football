@@ -253,10 +253,27 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
     days_since_last_game = 999
     if all_games and "gameDate" in all_games[0]:
         try:
+            from datetime import datetime
             last_date = datetime.strptime(all_games[0]["gameDate"], "%Y-%m-%d")
             days_since_last_game = (datetime.utcnow() - last_date).days
         except Exception:
             pass
+
+    def _parse_toi(toi_str):
+        try:
+            parts = str(toi_str).split(":")
+            if len(parts) >= 2:
+                return int(parts[0]) + int(parts[1]) / 60.0
+        except Exception:
+            pass
+        return 0.0
+
+    l5_toi = sum(_parse_toi(g.get("toi", "00:00")) for g in last5) / max(1, len(last5))
+    season_toi_sample = sum(_parse_toi(g.get("toi", "00:00")) for g in all_games[:20]) / max(1, min(20, len(all_games)))
+
+    toi_drop_factor = 1.0
+    if season_toi_sample > 12.0 and l5_toi < season_toi_sample * 0.8:
+        toi_drop_factor = l5_toi / season_toi_sample
 
     return {
         "goal": round(goal_factor, 3),
@@ -269,6 +286,7 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
         "l5_goals": l5_goals,
         "l5_shots": l5_shots,
         "days_since_last_game": days_since_last_game,
+        "toi_drop_factor": round(toi_drop_factor, 3),
     }
 
 
@@ -476,14 +494,15 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     ai_factor = ai_factors.get(team, 1.0)
 
     # L5 form + H2H adjustments
-    l5 = l5_form or {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0}
+    l5 = l5_form or {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0, "toi_drop_factor": 1.0}
     h2h_adj = h2h or {"goal": 1.0, "point": 1.0, "shot": 1.0}
+    toi_drop = l5.get("toi_drop_factor", 1.0)
 
     # ─── Expected Values (Lambda for Poisson) ───
-    exp_goals = gpg * defense_factor * (1 + goalie_adj) * pp_boost * b2b_penalty * ai_factor * l5["goal"] * h2h_adj["goal"]
-    exp_assists = apg * defense_factor * pp_boost * b2b_penalty * ai_factor * l5["assist"]
-    exp_points = ppg * defense_factor * (1 + goalie_adj * 0.5) * pp_boost * b2b_penalty * ai_factor * l5["point"] * h2h_adj["point"]
-    exp_shots = shots_per_game * b2b_penalty * ai_factor * l5["shot"] * h2h_adj["shot"]
+    exp_goals = gpg * defense_factor * (1 + goalie_adj) * pp_boost * b2b_penalty * ai_factor * l5["goal"] * h2h_adj["goal"] * toi_drop
+    exp_assists = apg * defense_factor * pp_boost * b2b_penalty * ai_factor * l5["assist"] * toi_drop
+    exp_points = ppg * defense_factor * (1 + goalie_adj * 0.5) * pp_boost * b2b_penalty * ai_factor * l5["point"] * h2h_adj["point"] * toi_drop
+    exp_shots = shots_per_game * b2b_penalty * ai_factor * l5["shot"] * h2h_adj["shot"] * toi_drop
     
     # ─── Home & TOI adjustments ───
     if is_home:
@@ -672,6 +691,8 @@ def run_nhl_pipeline() -> dict:
         # Score players — PASS 1: base scoring (no game logs)
         match_players = []
         for skater in home_roster:
+            if skater.get("gamesPlayed", 0) < 10:
+                continue
             player = _score_player(skater, home_abbrev, away_abbrev, h_stats, a_stats,
                                    True, goalie_form, tired_teams, ai_factors)
             if player["prob_goal"] > 5 or player["prob_shot"] > 15:
@@ -679,6 +700,8 @@ def run_nhl_pipeline() -> dict:
                 match_players.append(player)
 
         for skater in away_roster:
+            if skater.get("gamesPlayed", 0) < 10:
+                continue
             player = _score_player(skater, away_abbrev, home_abbrev, a_stats, h_stats,
                                    False, goalie_form, tired_teams, ai_factors)
             if player["prob_goal"] > 5 or player["prob_shot"] > 15:
@@ -746,7 +769,7 @@ def run_nhl_pipeline() -> dict:
             
             # If we fetched game logs, check `days_since_last_game`
             if l5 and "days_since_last_game" in l5:
-                if l5["days_since_last_game"] > 10:
+                if l5["days_since_last_game"] > 30:
                     injured.add(pid)
                     logger.info(f"[NHL]   🏥 {p['player_name']} enlevé (absent depuis {l5['days_since_last_game']}j)")
                 continue
@@ -776,7 +799,7 @@ def run_nhl_pipeline() -> dict:
                         if last_game_date:
                             last_dt = datetime.strptime(last_game_date, "%Y-%m-%d")
                             days_since = (datetime.utcnow() - last_dt).days
-                            if days_since > 10:
+                            if days_since > 30:
                                 injured.add(pid)
                                 logger.info(f"[NHL]   🏥 {p['player_name']} ({team}) enlevé (absent depuis {days_since}j)")
                     except Exception:

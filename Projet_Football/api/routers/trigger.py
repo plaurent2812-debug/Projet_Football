@@ -346,6 +346,7 @@ def update_live_scores():
                 "home_goals": home_goals,
                 "away_goals": away_goals,
                 "status": our_status,
+                "elapsed": lf.get("fixture", {}).get("status", {}).get("elapsed"),
             }
 
             # Fetch match events (goals, assists)

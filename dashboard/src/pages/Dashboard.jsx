@@ -39,7 +39,9 @@ function MatchRow({ match }) {
                 {/* Time / Status */}
                 <div className="w-11 shrink-0 text-center">
                     {isLive ? (
-                        <Badge variant="destructive" className="text-[10px] px-1.5 h-5 animate-pulse">LIVE</Badge>
+                        <Badge variant="destructive" className="text-[10px] px-1.5 h-5 animate-pulse">
+                            {match.elapsed ? `${match.elapsed}'` : "LIVE"}
+                        </Badge>
                     ) : isFinished ? (
                         <Badge className="text-[10px] px-1.5 h-5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0">Terminé</Badge>
                     ) : (

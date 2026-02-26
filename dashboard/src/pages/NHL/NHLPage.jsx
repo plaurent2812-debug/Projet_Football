@@ -17,8 +17,8 @@ function NHLMatchRow({ match }) {
     const time = match.date ? new Date(match.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "--:--"
     const isFinished = ["FT", "Final", "FINAL", "OFF"].includes(match.status)
     const isLive = LIVE_STATUSES.includes(match.status)
-    const homeWon = isFinished && match.home_goals > match.away_goals
-    const awayWon = isFinished && match.away_goals > match.home_goals
+    const homeWon = isFinished && match.home_score > match.away_score
+    const awayWon = isFinished && match.away_score > match.home_score
     const isHot = match.confidence_score >= 7 && !isFinished
 
     // Period label for live badge
@@ -74,7 +74,7 @@ function NHLMatchRow({ match }) {
                     <span className={cn("text-sm font-bold tabular-nums shrink-0",
                         isLive ? "text-red-500" : homeWon ? "text-foreground" : "text-muted-foreground/50"
                     )}>
-                        {match.home_goals ?? (isFinished ? "0" : "-")}
+                        {match.home_score ?? (isFinished ? "0" : "-")}
                     </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-1">
@@ -96,7 +96,7 @@ function NHLMatchRow({ match }) {
                     <span className={cn("text-sm font-bold tabular-nums shrink-0",
                         isLive ? "text-red-500" : awayWon ? "text-foreground" : "text-muted-foreground/50"
                     )}>
-                        {match.away_goals ?? (isFinished ? "0" : "-")}
+                        {match.away_score ?? (isFinished ? "0" : "-")}
                     </span>
                 </div>
             </div>

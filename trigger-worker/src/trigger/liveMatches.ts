@@ -221,10 +221,10 @@ export const nhlDetectValueBets = schedules.task({
     },
 });
 
-// ─── Task 9: NHL Live Scores (CRON every 2 min, 16h-05h UTC) ──
+// ─── Task 9: NHL Live Scores (CRON every 2 min, 16h-08h UTC) ──
 export const nhlUpdateLiveScores = schedules.task({
     id: "nhl-update-live-scores",
-    cron: "*/2 16,17,18,19,20,21,22,23,0,1,2,3,4,5 * * *",  // 17h-06h Paris
+    cron: "*/2 16,17,18,19,20,21,22,23,0,1,2,3,4,5,6,7,8 * * *",  // 17h-09h Paris
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/nhl-update-live-scores`, {
             method: "POST",

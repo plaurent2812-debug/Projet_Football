@@ -1006,10 +1006,10 @@ def nhl_update_live_scores():
 
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # Get today's NHL fixtures
+    # Get today's NHL fixtures from DB
     fixtures = (
         supabase.table("nhl_fixtures")
-        .select("id, api_fixture_id, home_team, away_team, status")
+        .select("id, api_fixture_id, home_team, away_team, status, home_score, away_score")
         .gte("date", f"{today}T00:00:00Z")
         .lt("date", f"{today}T23:59:59Z")
         .execute()
@@ -1018,6 +1018,9 @@ def nhl_update_live_scores():
 
     if not fixtures:
         return {"status": "no_fixtures", "updated": 0}
+
+    # Map our DB fixtures by API ID for quick access
+    db_fixtures_map = {str(f["api_fixture_id"]): f for f in fixtures if f.get("api_fixture_id")}
 
     # Hockey API-Sports config
     HOCKEY_API_URL = "https://v1.hockey.api-sports.io"
@@ -1045,104 +1048,111 @@ def nhl_update_live_scores():
         "WO": "FT",       # Walkover
     }
 
-    # Statuses that mean "game is in progress"
-    LIVE_STATUSES = {"Q1", "Q2", "Q3", "OT", "BT", "P"}
-
     updated = 0
     errors = 0
 
-    for fix in fixtures:
-        api_id = fix.get("api_fixture_id")
-        if not api_id:
-            continue
+    try:
+        # SINGLE REQUEST to get all games for the day
+        resp = _requests.get(
+            f"{HOCKEY_API_URL}/games",
+            headers=HOCKEY_HEADERS,
+            params={"date": today},
+            timeout=15,
+        )
+        _time.sleep(0.5)
 
-        # Skip already finished fixtures
-        if fix.get("status") in ("FT", "CANC", "POST"):
-            continue
+        if resp.status_code != 200:
+            logger.warning(f"[NHL Live] HTTP {resp.status_code} fetching global daily games")
+            return {"status": "error", "message": "API Error"}
 
-        try:
-            resp = _requests.get(
-                f"{HOCKEY_API_URL}/games",
-                headers=HOCKEY_HEADERS,
-                params={"id": api_id},
-                timeout=15,
-            )
-            _time.sleep(0.5)  # Rate limit
+        data = resp.json()
+        
+        # Check for API limit errors
+        if "errors" in data and data["errors"]:
+            logger.error(f"[NHL Live] API Error: {data['errors']}")
+            return {"status": "error", "message": str(data["errors"])}
+            
+        api_games = data.get("response", [])
 
-            if resp.status_code != 200:
-                logger.warning(f"[NHL Live] HTTP {resp.status_code} for game {api_id}")
+        for game in api_games:
+            api_id = str(game.get("id"))
+            if api_id not in db_fixtures_map:
                 continue
 
-            data = resp.json()
-            games = data.get("response", [])
-            if not games:
+            db_fix = db_fixtures_map[api_id]
+            
+            # Skip if we already marked it finished in our DB previously
+            if db_fix.get("status") in ("FT", "CANC", "POST"):
                 continue
 
-            game = games[0]
             scores = game.get("scores", {})
             home_goals = scores.get("home")
             away_goals = scores.get("away")
             api_status = game.get("status", {}).get("short", "")
             our_status = STATUS_MAP.get(api_status, api_status)
 
-            # BT (Break Time) means intermission — show as live with last period status
             if api_status == "BT":
-                # During break, keep period context (show as live, not finished)
                 our_status = "LIVE"
 
+            old_home = db_fix.get("home_score")
+            old_away = db_fix.get("away_score")
+            
             update_data = {"status": our_status}
             if home_goals is not None:
-                update_data["home_goals"] = home_goals
+                update_data["home_score"] = home_goals
             if away_goals is not None:
-                update_data["away_goals"] = away_goals
+                update_data["away_score"] = away_goals
 
-            # Fetch game events (goals, assists) from Hockey API
-            try:
-                events_resp = _requests.get(
-                    f"{HOCKEY_API_URL}/games/events",
-                    headers=HOCKEY_HEADERS,
-                    params={"game": api_id},
-                    timeout=15,
-                )
-                _time.sleep(0.5)  # Rate limit
+            # We only query events IF the score changed OR the status became FT/OT/SO today
+            # to save API calls
+            score_changed = (home_goals != old_home) or (away_goals != old_away)
+            newly_finished = (our_status == "FT") and (db_fix.get("status") != "FT")
+            
+            if score_changed or newly_finished:
+                try:
+                    events_resp = _requests.get(
+                        f"{HOCKEY_API_URL}/games/events",
+                        headers=HOCKEY_HEADERS,
+                        params={"game": api_id},
+                        timeout=15,
+                    )
+                    _time.sleep(0.5)  # Rate limit
 
-                if events_resp.status_code == 200:
-                    events_data = events_resp.json().get("response", [])
-                    # Build a clean goals list with scorer + assists
-                    goals_list = []
-                    for ev in events_data:
-                        if ev.get("type", "").lower() in ("goal", "score"):
-                            goal_info = {
-                                "team": ev.get("team", {}).get("name", ""),
-                                "player": ev.get("players", [{}])[0].get("player", {}).get("name", "") if ev.get("players") else "",
-                                "assists": [],
-                                "period": ev.get("period", ""),
-                                "minute": ev.get("minute", ""),
-                                "comment": ev.get("comment", ""),  # PP, SH, EN, etc.
+                    if events_resp.status_code == 200:
+                        events_data = events_resp.json().get("response", [])
+                        goals_list = []
+                        for ev in events_data:
+                            if ev.get("type", "").lower() in ("goal", "score"):
+                                goal_info = {
+                                    "team": ev.get("team", {}).get("name", ""),
+                                    "player": ev.get("players", [{}])[0].get("player", {}).get("name", "") if ev.get("players") else "",
+                                    "assists": [],
+                                    "period": ev.get("period", ""),
+                                    "minute": ev.get("minute", ""),
+                                    "comment": ev.get("comment", ""),
+                                }
+                                for p in ev.get("players", [])[1:]:
+                                    assist_name = p.get("player", {}).get("name", "")
+                                    if assist_name:
+                                        goal_info["assists"].append(assist_name)
+                                goals_list.append(goal_info)
+
+                        if goals_list or events_data:
+                            update_data["stats_json"] = {
+                                "events": events_data,
+                                "goals": goals_list,
                             }
-                            # Extract assists from additional players
-                            for p in ev.get("players", [])[1:]:
-                                assist_name = p.get("player", {}).get("name", "")
-                                if assist_name:
-                                    goal_info["assists"].append(assist_name)
-                            goals_list.append(goal_info)
-
-                    if goals_list or events_data:
-                        update_data["stats_json"] = {
-                            "events": events_data,
-                            "goals": goals_list,
-                        }
-            except Exception as ev_err:
-                logger.warning(f"[NHL Live] Events fetch error for {api_id}: {ev_err}")
+                except Exception as ev_err:
+                    logger.warning(f"[NHL Live] Events fetch error for {api_id}: {ev_err}")
 
             supabase.table("nhl_fixtures").update(
                 update_data
             ).eq("api_fixture_id", api_id).execute()
             updated += 1
 
-        except Exception as e:
-            logger.error(f"[NHL Live] Error updating {api_id}: {e}")
-            errors += 1
+    except Exception as e:
+        logger.error(f"[NHL Live] Global error: {e}")
+        errors += 1
 
     logger.info(f"[NHL Live Scores] ✅ {updated} scores mis à jour, {errors} erreurs")
     return {"status": "ok", "updated": updated, "errors": errors}

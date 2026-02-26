@@ -184,8 +184,8 @@ export default function NHLMatchDetailPage() {
                     <div className="flex items-center justify-between gap-4 mt-3">
                         <div className="flex-1 text-center">
                             <p className="text-xl font-black">{fixture?.home_team || "—"}</p>
-                            {fixture?.home_goals != null && (
-                                <p className="text-3xl font-black text-primary mt-1">{fixture.home_goals}</p>
+                            {fixture?.home_score != null && (
+                                <p className="text-3xl font-black text-primary mt-1">{fixture.home_score}</p>
                             )}
                             {homeProb != null && (
                                 <p className="text-sm font-bold text-primary mt-1">{homeProb}%</p>
@@ -196,8 +196,8 @@ export default function NHLMatchDetailPage() {
                         </div>
                         <div className="flex-1 text-center">
                             <p className="text-xl font-black">{fixture?.away_team || "—"}</p>
-                            {fixture?.away_goals != null && (
-                                <p className="text-3xl font-black text-primary mt-1">{fixture.away_goals}</p>
+                            {fixture?.away_score != null && (
+                                <p className="text-3xl font-black text-primary mt-1">{fixture.away_score}</p>
                             )}
                             {awayProb != null && (
                                 <p className="text-sm font-bold text-primary mt-1">{awayProb}%</p>
@@ -260,10 +260,10 @@ export default function NHLMatchDetailPage() {
             {/* Post-Match: Predictions vs Results */}
             {(() => {
                 const isFinished = ["FT", "Final", "FINAL", "OFF"].includes(fixture?.status)
-                if (!isFinished || fixture?.home_goals == null) return null
+                if (!isFinished || fixture?.home_score == null) return null
 
-                const hg = fixture.home_goals
-                const ag = fixture.away_goals
+                const hg = fixture.home_score
+                const ag = fixture.away_score
                 const predictions = fixture?.predictions_json || {}
                 const predHome = homeProb ?? predictions.proba_home
                 const predAway = awayProb ?? predictions.proba_away

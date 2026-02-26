@@ -666,7 +666,7 @@ def _rank_scorers(
     synergy_map = {}
     for s in synergies:
         if s["count"] >= 2 and s["scorer_id"] not in synergy_map:
-            synergy_map[s["scorer_id"]] = (s["count"], s["assister_name"])
+            synergy_map[s["scorer_id"]] = (s["count"], s["assister_name"], s["assister_id"])
 
     # Pré-charger l'historique vs adversaire (fixtures de l'adversaire)
     opp_name = get_team_name(opponent_team_id)
@@ -811,7 +811,14 @@ def _rank_scorers(
             syn_data = synergy_map.get(pid)
             syn_name = syn_data[1] if syn_data else None
             syn_count = syn_data[0] if syn_data else 0
-            score += min(syn_count * 0.5, 2) * W_SYNERGY
+            syn_assister_id = syn_data[2] if syn_data else None
+            
+            synergy_broken = False
+            if syn_assister_id and syn_assister_id in injured_ids:
+                synergy_broken = True
+                score *= 0.65  # Heavy penalty for missing key playmaker
+            else:
+                score += min(syn_count * 0.5, 2) * W_SYNERGY
 
             # 6. Tireur de penalty
             if rate["is_penalty_taker"]:
@@ -822,6 +829,15 @@ def _rank_scorers(
                 score += W_STARTER * 2
             elif matches_played == 0:
                 score *= 0.5
+
+            # xG Regression / Puck Luck equivalent
+            # Comparison between conversion rate and expected baseline
+            xg_regression = 1.0
+            if rate["total_shots_on"] >= 5:
+                # Cap the minimum conversion rate to avoid infinite regression
+                clamped_conversion = max(rate["conversion_rate"], 0.05)
+                # > 1.05 = Due for goals, < 0.95 = Overperforming (Sur-régime)
+                xg_regression = round(EXPECTED_CONVERSION_RATE / clamped_conversion, 2)
 
             # ── Facteurs contextuels ──
             score *= defense_factor

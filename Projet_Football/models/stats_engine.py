@@ -579,7 +579,7 @@ def calculate_form(
 # ═══════════════════════════════════════════════════════════════════
 
 
-def calculate_rest_factor(team_name: str, match_date: str) -> tuple[float, int, int]:
+def calculate_rest_factor(team_name: str, match_date: str) -> tuple[float, int, int, bool]:
     """Calculate a rest / fixture-congestion multiplier for a team.
 
     Rest bands:
@@ -596,10 +596,11 @@ def calculate_rest_factor(team_name: str, match_date: str) -> tuple[float, int, 
         match_date: ISO-8601 date string of the upcoming match.
 
     Returns:
-        Tuple of ``(rest_factor, rest_days, matches_30d)`` where
+        Tuple of ``(rest_factor, rest_days, matches_30d, is_severe_fatigue)`` where
         *rest_factor* is a float multiplier (< 1 = fatigued),
-        *rest_days* is the number of days since the last match, and
-        *matches_30d* is the match count over the past 30 days.
+        *rest_days* is the number of days since the last match,
+        *matches_30d* is the match count over the past 30 days, and
+        *is_severe_fatigue* is True if played <3 days ago with >=6 matches this month.
     """
     match_dt = datetime.fromisoformat(match_date.replace("Z", "+00:00"))
 
@@ -646,7 +647,13 @@ def calculate_rest_factor(team_name: str, match_date: str) -> tuple[float, int, 
     elif matches_30d > 6:
         rest_factor *= 0.98
 
-    return rest_factor, rest_days, matches_30d
+    is_severe_fatigue = False
+    # European Fatigue Factor: Short rest + Congested calendar
+    if rest_days < 3 and matches_30d >= 6:
+        rest_factor = 0.85
+        is_severe_fatigue = True
+
+    return rest_factor, rest_days, matches_30d, is_severe_fatigue
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1527,12 +1534,14 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     context["form_away"] = "".join(form_letters_a)
 
     # Repos
-    rest_h, rest_days_h, congestion_h = calculate_rest_factor(home_team, match_date)
-    rest_a, rest_days_a, congestion_a = calculate_rest_factor(away_team, match_date)
+    rest_h, rest_days_h, congestion_h, severe_h = calculate_rest_factor(home_team, match_date)
+    rest_a, rest_days_a, congestion_a, severe_a = calculate_rest_factor(away_team, match_date)
     context["rest_days_home"] = rest_days_h
     context["rest_days_away"] = rest_days_a
     context["congestion_home"] = congestion_h
     context["congestion_away"] = congestion_a
+    context["severe_fatigue_home"] = severe_h
+    context["severe_fatigue_away"] = severe_a
 
     # Enjeu
     stakes_h, stakes_label_h = calculate_stakes(home_id, league_id) if home_id else (1.0, "inconnu")

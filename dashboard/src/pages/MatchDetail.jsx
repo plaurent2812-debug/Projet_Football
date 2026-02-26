@@ -198,7 +198,14 @@ export default function MatchDetailPage() {
                             {fixture?.home_logo && (
                                 <img src={fixture.home_logo} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
                             )}
-                            <p className="text-xl font-black leading-tight">{fixture?.home_team}</p>
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                <p className="text-xl font-black leading-tight">{fixture?.home_team}</p>
+                                {sj?.severe_fatigue_home && (
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-red-500/30 text-red-500 whitespace-nowrap">
+                                        ⚠️ Calendrier
+                                    </Badge>
+                                )}
+                            </div>
                             {fixture?.home_goals != null && (
                                 <p className="text-3xl font-black text-primary mt-1">{fixture.home_goals}</p>
                             )}
@@ -222,7 +229,14 @@ export default function MatchDetailPage() {
                             {fixture?.away_logo && (
                                 <img src={fixture.away_logo} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
                             )}
-                            <p className="text-xl font-black leading-tight">{fixture?.away_team}</p>
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                <p className="text-xl font-black leading-tight">{fixture?.away_team}</p>
+                                {sj?.severe_fatigue_away && (
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-red-500/30 text-red-500 whitespace-nowrap">
+                                        ⚠️ Calendrier
+                                    </Badge>
+                                )}
+                            </div>
                             {fixture?.away_goals != null && (
                                 <p className="text-3xl font-black text-primary mt-1">{fixture.away_goals}</p>
                             )}
@@ -433,26 +447,48 @@ export default function MatchDetailPage() {
             <PremiumSection title="Buteurs probables" icon={Users}>
                 {scorers.length > 0 ? (
                     <div className="space-y-2">
-                        {scorers.slice(0, 2).map((s, i) => (
-                            <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
-                                <div className="flex items-center gap-3">
-                                    {s.photo ? (
-                                        <img src={s.photo} alt={s.name} className="w-8 h-8 rounded-full object-cover border border-border/50 shrink-0" />
-                                    ) : (
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0 border border-border/50">
-                                            {i + 1}
+                        {scorers.slice(0, 2).map((s, i) => {
+                            const regress = s.xg_regression || 1.0;
+                            const broken = s.synergy_broken || false;
+
+                            return (
+                                <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+                                    <div className="flex items-center gap-3">
+                                        {s.photo ? (
+                                            <img src={s.photo} alt={s.name} className="w-8 h-8 rounded-full object-cover border border-border/50 shrink-0" />
+                                        ) : (
+                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0 border border-border/50">
+                                                {i + 1}
+                                            </div>
+                                        )}
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold leading-tight truncate">{s.player_name || s.name}</p>
+                                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                                {s.team && <p className="text-[10px] text-muted-foreground mr-1 shrink-0">{s.team}</p>}
+                                                {regress > 1.05 && (
+                                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                                                        🎯 Rebond xG
+                                                    </Badge>
+                                                )}
+                                                {regress < 0.95 && (
+                                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-red-500/30 text-red-500 whitespace-nowrap">
+                                                        📉 Sur-régime
+                                                    </Badge>
+                                                )}
+                                                {broken && (
+                                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-amber-500/30 text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                                                        ⚡ Synergie Brisée
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </div>
-                                    )}
-                                    <div>
-                                        <p className="text-sm font-semibold leading-tight">{s.player_name || s.name}</p>
-                                        {s.team && <p className="text-[10px] text-muted-foreground">{s.team}</p>}
                                     </div>
+                                    <Badge className="bg-primary/10 text-primary border-0 font-bold ml-2 shrink-0">
+                                        {s.probability ?? s.proba ?? s.prob ?? "—"}%
+                                    </Badge>
                                 </div>
-                                <Badge className="bg-primary/10 text-primary border-0 font-bold">
-                                    {s.probability ?? s.proba ?? s.prob ?? "—"}%
-                                </Badge>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground text-center py-2">Données non disponibles</p>

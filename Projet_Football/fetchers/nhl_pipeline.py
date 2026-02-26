@@ -107,9 +107,11 @@ def fetch_standings() -> dict:
             "pp_pct": t.get("powerPlayPctg", 0.20),
             "pk_pct": t.get("penaltyKillPctg", 0.80),
             "l10_pts_pct": t.get("l10PtsPctg", 0.5),
+            "pk_pct": t.get("pkPctg", 80.0) / 100.0,
             "wins": t.get("wins", 0),
             "losses": t.get("losses", 0),
             "points": t.get("points", 0),
+            "shots_against_per_game": t.get("shotsAgainstPerGame", 30.0),
         }
     return team_stats
 
@@ -144,30 +146,52 @@ def fetch_goalie_form(teams: list[str]) -> dict:
             continue
 
         total_ga = 0
+        total_sa = 0
         for g in last5:
             is_home = g.get("homeTeam", {}).get("abbrev") == team
-            total_ga += g.get("awayTeam" if is_home else "homeTeam", {}).get("score", 0)
+            opp_team_key = "awayTeam" if is_home else "homeTeam"
+            my_team_key = "homeTeam" if is_home else "awayTeam"
+            
+            ga = g.get(opp_team_key, {}).get("score", 0)
+            total_ga += ga
+            
+            # Optionally attempt to extract shots if API provides it in `shots` or `sog` fields
+            sa = g.get(opp_team_key, {}).get("sog", 30) # fallback 30 shots if missing
+            total_sa += sa
 
         avg_ga = total_ga / len(last5)
+        sv_pct = 1 - (total_ga / max(1, total_sa))
+
         form = 0
-        if avg_ga < 2.0:
-            form = 0.15
-        elif avg_ga < 2.7:
-            form = 0.08
-        elif avg_ga > 4.2:
-            form = -0.15
-        elif avg_ga > 3.4:
-            form = -0.08
+        if sv_pct > 0.930:
+            form = 0.20
+        elif sv_pct > 0.915:
+            form = 0.10
+        elif sv_pct < 0.880:
+            form = -0.20
+        elif sv_pct < 0.895:
+            form = -0.10
+        else:
+            # Fallback to GA logic if SV% is purely estimated (SV% around .900)
+            if avg_ga < 2.0:
+                form = 0.15
+            elif avg_ga < 2.7:
+                form = 0.08
+            elif avg_ga > 4.2:
+                form = -0.15
+            elif avg_ga > 3.4:
+                form = -0.08
 
         reason = "Neutre"
-        if form > 0.1:
-            reason = f"🧱 Mur ({avg_ga:.1f} GA/m L5)"
+        sv_str = f"{sv_pct:.3f}"[1:] # .925 format
+        if form > 0.15:
+            reason = f"🧱 Mur ({sv_str} SV%)"
         elif form > 0:
-            reason = f"🛡️ Solide ({avg_ga:.1f} GA/m)"
-        elif form < -0.1:
-            reason = f"🚨 Passoire ({avg_ga:.1f} GA/m L5)"
+            reason = f"🛡️ Solide ({sv_str} SV%)"
+        elif form < -0.15:
+            reason = f"🚨 Passoire ({sv_str} SV%)"
         elif form < 0:
-            reason = f"⚠️ Friable ({avg_ga:.1f} GA/m)"
+            reason = f"⚠️ Friable ({sv_str} SV%)"
 
         goalie_stats[team] = {"form": form, "reason": reason}
 
@@ -275,6 +299,17 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
     if season_toi_sample > 12.0 and l5_toi < season_toi_sample * 0.8:
         toi_drop_factor = l5_toi / season_toi_sample
 
+    # Shooting % Regression
+    sh_pct_regression = 1.0
+    if season_shots >= 20 and l5_shots >= 5:
+        season_pct = season_goals / season_shots
+        l5_pct = l5_goals / l5_shots
+        diff = season_pct - l5_pct
+        if abs(diff) > 0.05:  # Trigger on significant deviation
+            impact = max(-0.25, min(0.25, diff))
+            weight = min(1.0, l5_shots / 20.0)
+            sh_pct_regression = 1.0 + (impact * weight)
+
     return {
         "goal": round(goal_factor, 3),
         "assist": round(assist_factor, 3),
@@ -287,6 +322,7 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
         "l5_shots": l5_shots,
         "days_since_last_game": days_since_last_game,
         "toi_drop_factor": round(toi_drop_factor, 3),
+        "sh_pct_regression": round(sh_pct_regression, 3),
     }
 
 
@@ -455,6 +491,8 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     goals = skater.get("goals", 0)
     assists = skater.get("assists", 0)
     points = skater.get("points", 0)
+    pp_goals = skater.get("powerPlayGoals", 0)
+    pp_points = skater.get("powerPlayPoints", 0)
     toi_per_game = skater.get("avgToi", "00:00")
 
     # Parse TOI
@@ -480,12 +518,24 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     opp_gaa = opp_stats.get("gaa", 3.0) if opp_stats else 3.0
     defense_factor = opp_gaa / 3.0  # >1 = weak defense
 
+    # Shots Allowed Adjustment (High volume defense -> more expected shots & goals)
+    opp_shots_allowed = opp_stats.get("shots_against_per_game", 30.0) if opp_stats else 30.0
+    shot_volume_factor = max(0.85, min(1.3, opp_shots_allowed / 30.0))
+
     goalie_adj = goalie_form.get(opp, {}).get("form", 0)
 
     # Power Play boost: good PP% of own team + bad PK% of opponent
     my_pp = my_stats.get("pp_pct", 0.20) if my_stats else 0.20
     opp_pk = opp_stats.get("pk_pct", 0.80) if opp_stats else 0.80
-    pp_boost = 1.0 + (my_pp - 0.20) * 0.5 + (0.80 - opp_pk) * 0.5  # Boost if strong PP vs weak PK
+    team_pp_advantage = (my_pp - 0.20) * 0.5 + (0.80 - opp_pk) * 0.5  # Raw advantage
+
+    # PP1 Reliance (Only give PP boost to players who actually score on the PP)
+    pp_reliance = pp_points / max(1, points)
+    # If a player gets 30%+ of their points on the PP, they are a specialist. Cap at 0.5 for scaling.
+    pp_weight = min(1.0, pp_reliance / 0.30)
+    
+    # Base boost is 1.0. We add the team advantage scaled by how much this player plays on the PP (min 10% exposure)
+    pp_boost = 1.0 + (team_pp_advantage * max(0.1, pp_weight) * 2.0)  # Double impact for true PP1 guys
 
     # Back-to-back fatigue penalty
     b2b_penalty = 0.92 if team in tired_teams else 1.0
@@ -494,15 +544,23 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
     ai_factor = ai_factors.get(team, 1.0)
 
     # L5 form + H2H adjustments
-    l5 = l5_form or {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0, "toi_drop_factor": 1.0}
+    l5 = l5_form or {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0, "toi_drop_factor": 1.0, "sh_pct_regression": 1.0}
     h2h_adj = h2h or {"goal": 1.0, "point": 1.0, "shot": 1.0}
     toi_drop = l5.get("toi_drop_factor", 1.0)
+    sh_regress = l5.get("sh_pct_regression", 1.0)
+
+    # Apply shot volume to expected shots 
+    exp_shots_base = shots_per_game * b2b_penalty * ai_factor * l5["shot"] * h2h_adj["shot"] * toi_drop
+    exp_shots = exp_shots_base * shot_volume_factor
+
+    # Apply shot volume marginally to goals (more shots = more goal chances)
+    goal_volume_boost = 1.0 + ((shot_volume_factor - 1.0) * 0.5)
 
     # ─── Expected Values (Lambda for Poisson) ───
-    exp_goals = gpg * defense_factor * (1 + goalie_adj) * pp_boost * b2b_penalty * ai_factor * l5["goal"] * h2h_adj["goal"] * toi_drop
-    exp_assists = apg * defense_factor * pp_boost * b2b_penalty * ai_factor * l5["assist"] * toi_drop
-    exp_points = ppg * defense_factor * (1 + goalie_adj * 0.5) * pp_boost * b2b_penalty * ai_factor * l5["point"] * h2h_adj["point"] * toi_drop
-    exp_shots = shots_per_game * b2b_penalty * ai_factor * l5["shot"] * h2h_adj["shot"] * toi_drop
+    exp_goals = gpg * defense_factor * goal_volume_boost * (1 + goalie_adj) * pp_boost * b2b_penalty * ai_factor * l5["goal"] * h2h_adj["goal"] * toi_drop * sh_regress
+    exp_assists = apg * defense_factor * goal_volume_boost * pp_boost * b2b_penalty * ai_factor * l5["assist"] * toi_drop
+    exp_points = ppg * defense_factor * goal_volume_boost * (1 + goalie_adj * 0.5) * pp_boost * b2b_penalty * ai_factor * l5["point"] * h2h_adj["point"] * toi_drop * sh_regress
+
     
     # ─── Home & TOI adjustments ───
     if is_home:

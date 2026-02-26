@@ -313,12 +313,11 @@ def update_live_scores():
     logger.info("[Live Scores] Fetching live fixtures...")
 
     resp = api_get("fixtures", {"live": "all"})
-    if not resp or not resp.get("response"):
-        return {"status": "no_live_matches", "updated": 0}
+    live_fixtures = resp.get("response", []) if resp else []
 
-    live_fixtures = resp["response"]
     updated = 0
     errors = 0
+    live_api_ids = set()
 
     for lf in live_fixtures:
         api_fixture_id = lf.get("fixture", {}).get("id")
@@ -329,6 +328,8 @@ def update_live_scores():
 
         if not api_fixture_id:
             continue
+
+        live_api_ids.add(api_fixture_id)
 
         try:
             # Map API status to our status codes
@@ -383,8 +384,84 @@ def update_live_scores():
             logger.error(f"[Live Scores] Error updating fixture {api_fixture_id}: {e}")
             errors += 1
 
-    logger.info(f"[Live Scores] ✅ {updated} scores mis à jour, {errors} erreurs")
-    return {"status": "ok", "updated": updated, "errors": errors, "total_live": len(live_fixtures)}
+    # ── 2nd pass: detect recently finished matches ──
+    # Fixtures in our DB marked as live/NS but no longer in the API live response
+    today = datetime.now().strftime("%Y-%m-%d")
+    stale_statuses = ["1H", "2H", "HT", "ET", "LIVE", "BT", "NS"]
+    try:
+        stale_fixtures = (
+            supabase.table("fixtures")
+            .select("id, api_fixture_id, status")
+            .gte("date", f"{today}T00:00:00Z")
+            .lt("date", f"{today}T23:59:59Z")
+            .in_("status", stale_statuses)
+            .execute()
+            .data or []
+        )
+    except Exception:
+        stale_fixtures = []
+
+    finished_count = 0
+    for sf in stale_fixtures:
+        sf_api_id = sf.get("api_fixture_id")
+        if not sf_api_id or sf_api_id in live_api_ids:
+            continue  # Still live or no API ID
+
+        # This match is marked live in DB but not in API — it just finished
+        try:
+            import time as _time
+            fix_resp = api_get("fixtures", {"id": sf_api_id})
+            _time.sleep(0.3)
+            if not fix_resp or not fix_resp.get("response"):
+                continue
+
+            fix_data = fix_resp["response"][0]
+            api_status = fix_data.get("fixture", {}).get("status", {}).get("short", "")
+            goals = fix_data.get("goals", {})
+
+            status_map = {
+                "FT": "FT", "AET": "FT", "PEN": "FT",
+                "NS": "NS", "PST": "POST", "CANC": "CANC",
+                "1H": "1H", "2H": "2H", "HT": "HT",
+            }
+            final_status = status_map.get(api_status, api_status)
+
+            update_data = {
+                "status": final_status,
+                "home_goals": goals.get("home"),
+                "away_goals": goals.get("away"),
+            }
+
+            # Also fetch events for the finished match
+            try:
+                events_resp = api_get("fixtures/events", {"fixture": sf_api_id})
+                _time.sleep(0.3)
+                if events_resp and events_resp.get("response"):
+                    raw_events = events_resp["response"]
+                    goals_list = []
+                    for ev in raw_events:
+                        if ev.get("type") == "Goal":
+                            goals_list.append({
+                                "team": ev.get("team", {}).get("name", ""),
+                                "player": ev.get("player", {}).get("name", ""),
+                                "assist": ev.get("assist", {}).get("name", "") if ev.get("assist") else "",
+                                "time": ev.get("time", {}).get("elapsed", ""),
+                                "extra_time": ev.get("time", {}).get("extra"),
+                                "detail": ev.get("detail", ""),
+                                "half": "1H" if (ev.get("time", {}).get("elapsed", 0) or 0) <= 45 else "2H",
+                            })
+                    update_data["events_json"] = goals_list
+            except Exception:
+                pass
+
+            supabase.table("fixtures").update(update_data).eq("api_fixture_id", sf_api_id).execute()
+            finished_count += 1
+            logger.info(f"[Live Scores] 🏁 Match {sf_api_id} terminé → {final_status} ({goals.get('home')}-{goals.get('away')})")
+        except Exception as e:
+            logger.error(f"[Live Scores] Error finishing {sf_api_id}: {e}")
+
+    logger.info(f"[Live Scores] ✅ {updated} live mis à jour, {finished_count} terminés, {errors} erreurs")
+    return {"status": "ok", "updated": updated, "finished": finished_count, "errors": errors, "total_live": len(live_fixtures)}
 
 
 # ─── Generic Telegram sender ────────────────────────────────────

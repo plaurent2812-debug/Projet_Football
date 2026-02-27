@@ -153,7 +153,7 @@ function MatchRow({ match }) {
                                 </div>
                             )}
                             {!isFinished && pred?.recommended_bet && (
-                                <span className="text-[9px] sm:text-[10px] font-semibold text-primary bg-primary/10 px-1 sm:px-1.5 py-0.5 rounded truncate max-w-full">
+                                <span className="text-[9px] sm:text-[10px] font-semibold text-primary bg-primary/10 px-1 sm:px-1.5 py-0.5 rounded text-center leading-tight">
                                     {pred.recommended_bet}
                                 </span>
                             )}

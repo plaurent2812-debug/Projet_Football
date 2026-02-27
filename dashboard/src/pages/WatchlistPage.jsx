@@ -14,9 +14,19 @@ function MiniMatchCard({ match, isStarred, onToggleStar, sport = "football" }) {
     const isFinished = ["FT", "AET", "PEN", "Final", "FINAL", "OFF"].includes(match.status)
     const isLive = ["1H", "2H", "HT", "ET", "P", "LIVE", "1P", "2P", "3P", "OT", "SO"].includes(match.status)
     const pred = match.prediction
-    const time = match.date ? new Date(match.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "--:--"
+    const matchDate = match.date ? new Date(match.date) : null
+    const time = matchDate ? matchDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "--:--"
     const homeGoals = sport === "nhl" ? match.home_score : match.home_goals
     const awayGoals = sport === "nhl" ? match.away_score : match.away_goals
+
+    // Day label
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    const matchDayStr = matchDate?.toISOString().slice(0, 10)
+    const dayLabel = matchDayStr === todayStr ? "Aujourd'hui"
+        : matchDayStr === tomorrowStr ? "Demain"
+            : matchDate ? matchDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+                : null
 
     return (
         <div
@@ -27,13 +37,16 @@ function MiniMatchCard({ match, isStarred, onToggleStar, sport = "football" }) {
             )}
         >
             {/* Status */}
-            <div className="w-12 shrink-0 text-center">
+            <div className="w-14 shrink-0 text-center">
                 {isLive ? (
                     <Badge variant="destructive" className="text-[10px] px-1.5 h-5 animate-pulse">LIVE</Badge>
                 ) : isFinished ? (
                     <Badge className="text-[10px] px-1.5 h-5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0">FT</Badge>
                 ) : (
                     <span className="text-xs font-bold tabular-nums text-foreground/80">{time}</span>
+                )}
+                {dayLabel && !isFinished && !isLive && (
+                    <p className="text-[9px] text-muted-foreground leading-tight mt-0.5 truncate">{dayLabel}</p>
                 )}
             </div>
 
@@ -130,23 +143,33 @@ export default function WatchlistPage() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        const today = new Date().toISOString().slice(0, 10)
         setLoading(true)
 
-        // Fetch football + NHL in parallel
-        Promise.all([
-            fetchPredictions(today).then(r => r.matches || []).catch(() => []),
-            (() => {
-                const start = new Date(today); start.setHours(0, 0, 0, 0)
-                const end = new Date(today); end.setHours(23, 59, 59, 999)
-                return supabase.from('nhl_fixtures').select('*')
-                    .gte('date', start.toISOString())
-                    .lte('date', end.toISOString())
-                    .order('date', { ascending: true })
-                    .then(({ data }) => data || [])
-                    .catch(() => [])
-            })()
-        ]).then(([foot, nhl]) => {
+        // Build array of next 7 days
+        const days = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date()
+            d.setDate(d.getDate() + i)
+            return d.toISOString().slice(0, 10)
+        })
+
+        // Football: one fetch per day (parallel)
+        const footPromise = Promise.all(
+            days.map(day => fetchPredictions(day).then(r => r.matches || []).catch(() => []))
+        ).then(results => results.flat())
+
+        // NHL: single range query
+        const start = new Date(); start.setHours(0, 0, 0, 0)
+        const end = new Date(); end.setDate(end.getDate() + 7); end.setHours(23, 59, 59, 999)
+        const nhlPromise = supabase.from('nhl_fixtures').select('*')
+            .gte('date', start.toISOString())
+            .lte('date', end.toISOString())
+            .order('date', { ascending: true })
+            .then(({ data }) => data || [])
+            .catch(() => [])
+
+        Promise.all([footPromise, nhlPromise]).then(([foot, nhl]) => {
+            // Sort both by date ascending
+            foot.sort((a, b) => new Date(a.date) - new Date(b.date))
             setFootMatches(foot)
             setNhlMatches(nhl)
         }).finally(() => setLoading(false))

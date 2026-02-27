@@ -11,6 +11,34 @@ import { Badge } from "@/components/ui/badge"
 
 const LIVE_STATUSES = ["1P", "2P", "3P", "OT", "SO", "LIVE"]
 
+const getMatchLabel = (match) => {
+    if (match.status === "FT" || ["Final", "FINAL", "OFF"].includes(match.status)) return null
+
+    const conf = match.confidence_score
+    const recBet = match.recommended_bet?.toLowerCase() || ""
+    const pred = match.predictions_json || {}
+    const aiHome = pred.ai_home_factor || 1.0
+    const aiAway = pred.ai_away_factor || 1.0
+
+    // 1. Top Confidence
+    if (conf >= 8) return { text: "Top Confiance", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" }
+
+    // 2. Avoid (Low confidence)
+    if (conf != null && conf < 5) return { text: "À éviter", color: "bg-red-500/10 text-red-600 dark:text-red-400" }
+
+    // 3. Offensive / Open Game
+    if (aiHome > 1.2 || aiAway > 1.2 || recBet.includes("over") || recBet.includes("+")) {
+        return { text: "Match Offensif", color: "bg-orange-500/10 text-orange-600 dark:text-orange-400" }
+    }
+
+    // 4. Defensive / Under
+    if (aiHome < 0.8 || aiAway < 0.8 || recBet.includes("under") || recBet.includes("-")) {
+        return { text: "Match Défensif", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" }
+    }
+
+    return null
+}
+
 /* ── NHL Match Row ─────────────────────────────────────────── */
 function NHLMatchRow({ match }) {
     const navigate = useNavigate()
@@ -19,7 +47,7 @@ function NHLMatchRow({ match }) {
     const isLive = LIVE_STATUSES.includes(match.status)
     const homeWon = isFinished && match.home_score > match.away_score
     const awayWon = isFinished && match.away_score > match.home_score
-    const isHot = match.confidence_score >= 7 && !isFinished
+    const label = getMatchLabel(match)
 
     // Period label for live badge
     const periodLabel = {
@@ -101,10 +129,12 @@ function NHLMatchRow({ match }) {
                 </div>
             </div>
 
-            {/* Hot badge */}
-            {isHot && (
-                <div className="flex items-center gap-1 shrink-0">
-                    <Flame className="w-3.5 h-3.5 text-orange-500 flame-badge" />
+            {/* Analytical Label */}
+            {label && (
+                <div className="hidden sm:flex shrink-0">
+                    <Badge variant="outline" className={cn("text-[10px] px-2 py-0 h-5 border-0 font-bold", label.color)}>
+                        {label.text}
+                    </Badge>
                 </div>
             )}
 

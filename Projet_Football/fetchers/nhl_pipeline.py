@@ -675,34 +675,70 @@ def _score_player(skater: dict, team: str, opp: str, my_stats: dict, opp_stats: 
 # ─── Win probability ────────────────────────────────────────────
 
 def calculate_win_prob(home: str, away: str, standings: dict, fatigue_dict: dict) -> dict:
-    """Calculate win probability based on standings, PP/PK, and fatigue."""
+    """Calculate win probability and Over 5.5 using a team-level Poisson model."""
     h = standings.get(home, {})
     a = standings.get(away, {})
 
-    h_pts = h.get("l10_pts_pct", 0.5)
-    a_pts = a.get("l10_pts_pct", 0.5)
+    # Estimation des buts par match
+    h_gf = float(h.get("goalsFor", 250)) / max(1, h.get("gamesPlayed", 82))
+    h_ga = float(h.get("goalsAgainst", 250)) / max(1, h.get("gamesPlayed", 82))
+    a_gf = float(a.get("goalsFor", 250)) / max(1, a.get("gamesPlayed", 82))
+    a_ga = float(a.get("goalsAgainst", 250)) / max(1, a.get("gamesPlayed", 82))
 
-    # Power index: L10 form + offensive/defensive balance
-    h_power = h_pts * 1.05  # Home ice advantage
-    h_power += (h.get("pp_pct", 0.20) - 0.20) * 0.15  # PP bonus
-    h_power += (h.get("pk_pct", 0.80) - 0.80) * 0.10  # PK bonus
+    league_gf = 3.1  # Moyenne historique NHL
 
-    a_power = a_pts
-    a_power += (a.get("pp_pct", 0.20) - 0.20) * 0.15
-    a_power += (a.get("pk_pct", 0.80) - 0.80) * 0.10
+    h_atk = max(0.5, h_gf / league_gf)
+    h_def = max(0.5, h_ga / league_gf)
+    a_atk = max(0.5, a_gf / league_gf)
+    a_def = max(0.5, a_ga / league_gf)
 
-    # Advanced fatigue
-    h_power *= fatigue_dict.get(home, 1.0)
-    a_power *= fatigue_dict.get(away, 1.0)
+    # Base xG avec léger avantage domicile
+    h_xg = h_atk * a_def * league_gf * 1.05
+    a_xg = a_atk * h_def * league_gf * 0.95
 
-    total = h_power + a_power
-    if total == 0:
-        return {"home": 50, "away": 50}
+    # Ajustement spécial équipes spéciales (PP/PK) et forme (L10)
+    h_form = h.get("l10_pts_pct", 0.5)
+    a_form = a.get("l10_pts_pct", 0.5)
+    
+    h_xg *= (0.9 + 0.2 * h_form)
+    a_xg *= (0.9 + 0.2 * a_form)
 
-    home_pct = round(h_power / total * 100)
-    away_pct = 100 - home_pct
+    # Fatigue
+    h_xg *= fatigue_dict.get(home, 1.0)
+    a_xg *= fatigue_dict.get(away, 1.0)
 
-    return {"home": home_pct, "away": away_pct}
+    # Grille Poisson pour prédire le vainqueur et l'Over
+    import numpy as np
+    from scipy.stats import poisson
+    
+    max_goals = 15
+    goals = np.arange(max_goals)
+    pmf_home = poisson.pmf(goals, h_xg)
+    pmf_away = poisson.pmf(goals, a_xg)
+    grid = np.outer(pmf_home, pmf_away)
+    
+    home_win_reg = float(np.tril(grid, k=-1).sum())
+    away_win_reg = float(np.triu(grid, k=1).sum())
+    draw_reg = float(np.trace(grid))
+    
+    # Répartition du nul (Prolongation / Tirs au but)
+    # On distribue au prorata des forces en présence
+    ot_home_share = home_win_reg / (home_win_reg + away_win_reg) if (home_win_reg + away_win_reg) > 0 else 0.5
+    home_win_total = home_win_reg + draw_reg * ot_home_share
+    away_win_total = away_win_reg + draw_reg * (1.0 - ot_home_share)
+    
+    home_pct = round(home_win_total * 100)
+    away_pct = round(away_win_total * 100)
+    
+    # Prédiction Over 5.5
+    total_goals_grid = goals[:, None] + goals[None, :]
+    over_55 = float(grid[total_goals_grid > 5].sum())
+    
+    return {
+        "home": home_pct,
+        "away": away_pct,
+        "over_55": round(over_55 * 100)
+    }
 
 
 # ─── Main Pipeline ──────────────────────────────────────────────
@@ -1014,6 +1050,7 @@ def run_nhl_pipeline() -> dict:
         win_prob = calculate_win_prob(home_abbrev, away_abbrev, standings, fatigue_dict)
         ph = win_prob["home"]
         pa = win_prob["away"]
+        po55 = win_prob.get("over_55", 50)
 
         fixtures_data.append({
             "api_fixture_id": game_id,
@@ -1023,6 +1060,7 @@ def run_nhl_pipeline() -> dict:
             "away_team": away_name,
             "proba_home": ph,
             "proba_away": pa,
+            "proba_over_55": po55,
             "ai_home_factor": h_ai,
             "ai_away_factor": a_ai,
             "recommended_bet": rec_bet,
@@ -1076,6 +1114,7 @@ def run_nhl_pipeline() -> dict:
             predictions = {
                 "proba_home": f["proba_home"],
                 "proba_away": f["proba_away"],
+                "proba_over_55": f.get("proba_over_55", 50),
                 "ai_home_factor": f.get("ai_home_factor", 1.0),
                 "ai_away_factor": f.get("ai_away_factor", 1.0),
             }

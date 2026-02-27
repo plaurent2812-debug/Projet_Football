@@ -483,9 +483,9 @@ export default function MatchDetailPage() {
                         </CardHeader>
                         <CardContent className="space-y-0">
                             <StatBar label="Possession" home={h.possession} away={a.possession} />
+                            {(h.xg || a.xg) && <StatBar label="xG (Expected Goals)" home={h.xg} away={a.xg} />}
                             <StatBar label="Tirs (total)" home={h.shots_total} away={a.shots_total} />
                             <StatBar label="Tirs cadrés" home={h.shots_on} away={a.shots_on} />
-                            {(h.xg || a.xg) && <StatBar label="xG" home={h.xg} away={a.xg} />}
                             <StatBar label="Corners" home={h.corners} away={a.corners} />
                             <StatBar label="Fautes" home={h.fouls} away={a.fouls} />
                             <StatBar label="Hors-jeu" home={h.offsides} away={a.offsides} />

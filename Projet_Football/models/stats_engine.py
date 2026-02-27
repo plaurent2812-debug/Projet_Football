@@ -536,12 +536,14 @@ def calculate_form(
     n: int = 6,
     decay: float = 0.82,
     home_only: bool | None = None,
+    name_to_elo: dict[str, float] | None = None,
 ) -> tuple[float, list[str]]:
     """Calculate the recent form of a team using exponential weighting.
 
     Each of the last *n* results is weighted by ``decay ** i`` (most
-    recent first), producing a score between 0.0 (catastrophic) and
-    1.0 (perfect).
+    recent first). If ``name_to_elo`` is provided, a Strength of Schedule
+    multiplier (opponent_elo / 1500) is applied so that results against
+    stronger teams count for more.
 
     Args:
         team_name: Canonical team name as stored in the fixtures table.
@@ -549,6 +551,7 @@ def calculate_form(
         decay: Exponential decay factor applied per match index.
         home_only: ``True`` to consider home matches only, ``False`` for
             away matches only, ``None`` for all matches.
+        name_to_elo: Optional mapping of team names to their ELO ratings.
 
     Returns:
         Tuple of ``(form_score, form_letters)`` where *form_score* is a
@@ -580,6 +583,14 @@ def calculate_form(
     for i, r in enumerate(results):
         weight = decay**i
         is_home = r["home_team"] == team_name
+        opponent_name = r["away_team"] if is_home else r["home_team"]
+
+        # Strength of schedule multiplier
+        sos_multiplier = 1.0
+        if name_to_elo:
+            opp_elo = name_to_elo.get(opponent_name, 1500)
+            sos_multiplier = opp_elo / 1500.0
+
         gf = r["home_goals"] if is_home else r["away_goals"]
         ga = r["away_goals"] if is_home else r["home_goals"]
 
@@ -587,17 +598,18 @@ def calculate_form(
             continue
 
         if gf > ga:
-            form_score += 3 * weight
+            form_score += 3 * sos_multiplier * weight
             form_letters.append("W")
         elif gf == ga:
-            form_score += 1 * weight
+            form_score += 1 * sos_multiplier * weight
             form_letters.append("D")
         else:
             form_letters.append("L")
 
-        total_weight += 3 * weight
+        total_weight += 3 * sos_multiplier * weight
 
     return (form_score / total_weight if total_weight > 0 else 0.5), form_letters
+
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1550,10 +1562,15 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     league_data = calculate_team_strengths(league_id)
     xg_home, xg_away = calculate_xg(home_id or 0, away_id or 0, league_data)
 
+    # ── ELO Préalable (requis pour le calcul de forme SOS) ───────
+    elos = supabase.table("team_elo").select("team_api_id, elo_rating").execute().data
+    elo_map = {e["team_api_id"]: e["elo_rating"] for e in elos}
+    name_to_elo = {t["name"]: elo_map.get(t["api_id"], 1500) for t in teams}
+
     # ── 2. Ajustements ───────────────────────────────────────────
-    # Forme
-    form_home, form_letters_h = calculate_form(home_team, home_only=True)
-    form_away, form_letters_a = calculate_form(away_team, home_only=False)
+    # Forme (récente pondérée avec Strength of Schedule)
+    form_home, form_letters_h = calculate_form(home_team, home_only=True, name_to_elo=name_to_elo)
+    form_away, form_letters_a = calculate_form(away_team, home_only=False, name_to_elo=name_to_elo)
     form_factor_h = 0.85 + form_home * 0.30  # Range: 0.85 - 1.15
     form_factor_a = 0.85 + form_away * 0.30
     context["form_home"] = "".join(form_letters_h)
@@ -1630,8 +1647,7 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     poisson_probs = poisson_grid(xg_home_adj, xg_away_adj)
 
     # ── 5. ELO ───────────────────────────────────────────────────
-    elos = supabase.table("team_elo").select("team_api_id, elo_rating").execute().data
-    elo_map = {e["team_api_id"]: e["elo_rating"] for e in elos}
+
     home_elo_raw = elo_map.get(home_id, 1500)
     away_elo_raw = elo_map.get(away_id, 1500)
 

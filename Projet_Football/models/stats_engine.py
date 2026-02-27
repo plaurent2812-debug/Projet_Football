@@ -441,23 +441,38 @@ def get_elo_probs(
         as rounded integer percentages.
     """
     adj_home = home_elo + HOME_ELO_ADVANTAGE
-    p_home = elo_expected(adj_home, away_elo)
-    p_away = elo_expected(away_elo, adj_home)
+    # Estimer la probabilité de base du nul pour cette ligue (ex: 0.26)
+    draw_base = DRAW_FACTOR_BY_LEAGUE.get(league_id, DRAW_FACTOR) if league_id else DRAW_FACTOR
+    
+    # Modèle de Rue & Salvesen : on introduit une largeur de nul δ (delta)
+    # P(nul à ELO égal) = draw_base
+    # 2 / (1 + 10^(δ/400)) = 1 - draw_base
+    # δ = 400 * log10( 2 / (1 - draw_base) - 1 )
+    draw_base = max(0.01, min(0.99, draw_base)) # Sécurité
+    delta = 400 * math.log10((2.0 / (1.0 - draw_base)) - 1.0)
 
-    # Estimer le nul — modèle calibré par ligue + écart ELO
-    # Plus les ELO sont proches, plus le nul est probable
-    draw_factor = DRAW_FACTOR_BY_LEAGUE.get(league_id, DRAW_FACTOR) if league_id else DRAW_FACTOR
-    elo_gap = abs(home_elo - away_elo)
-    # draw_base décroît exponentiellement avec l'écart ELO
-    draw_base = draw_factor * math.exp(-ELO_DRAW_DECAY_RATE * elo_gap)
-    p_draw = max(0.05, draw_base)  # Plancher à 5%
-    p_home_adj = p_home * (1 - p_draw)
-    p_away_adj = p_away * (1 - p_draw)
+    diff = (home_elo + HOME_ELO_ADVANTAGE) - away_elo
+
+    # P(Home) = P(Perf_Home - Perf_Away > δ)
+    p_home = 1.0 / (1.0 + 10 ** (-(diff - delta) / 400))
+    
+    # P(Away) = P(Perf_Home - Perf_Away < -δ)
+    p_away = 1.0 - (1.0 / (1.0 + 10 ** (-(diff + delta) / 400)))
+    
+    # P(Draw) = Ce qui reste entre -δ et +δ
+    p_draw = 1.0 - p_home - p_away
+
+    # Plancher de sécurité à 1% au cas où les écarts sont extrêmes
+    p_draw = max(0.01, p_draw)
+    total = p_home + p_draw + p_away
+    p_home /= total
+    p_draw /= total
+    p_away /= total
 
     return {
-        "elo_home": round(p_home_adj * 100),
+        "elo_home": round(p_home * 100),
         "elo_draw": round(p_draw * 100),
-        "elo_away": round(p_away_adj * 100),
+        "elo_away": round(p_away * 100),
     }
 
 

@@ -256,6 +256,9 @@ def calculate_team_strengths(league_id: int) -> dict | None:
     league_avg_home_conceded = total_home_against / total_home_played
     league_avg_away_conceded = total_away_against / total_away_played
 
+    # Extraire le home advantage global (fallback/prior)
+    from constants import HOME_XG_BONUS
+
     strengths = {}
     for s in standings:
         tid = s["team_api_id"]
@@ -268,6 +271,18 @@ def calculate_team_strengths(league_id: int) -> dict | None:
         raw_away_atk = (s["away_goals_for"] / ap) / max(league_avg_away_goals, 0.5)
         raw_away_def = (s["away_goals_against"] / ap) / max(league_avg_away_conceded, 0.5)
 
+        # Calcul de l'avantage domicile propre à l'équipe
+        # Ratio: performance à domicile vs extérieur
+        # On utilise une régression bayésienne très forte (poids=15) car l'avantage
+        # domicile d'une équipe met plusieurs saisons à se dessiner clairement,
+        # on veut éviter de sur-réagir à 10 matchs.
+        home_perf_ratio = raw_home_atk * raw_away_def
+        away_perf_ratio = raw_away_atk * raw_home_def
+        raw_home_adv = home_perf_ratio / max(away_perf_ratio, 0.5)
+        # L'avantage "neutre" sans biais est de 1.0 (les équipes jouent de la même façon)
+        # Mais on regresse vers le bonus moyen de la ligue (ex: 1.12)
+        team_home_adv = regress_to_mean(raw_home_adv, hp + ap, HOME_XG_BONUS, weight=15)
+
         # Régression vers la moyenne pour les petits échantillons
         # Les équipes avec peu de matchs sont tirées vers 1.0 (force moyenne)
         strengths[tid] = {
@@ -275,6 +290,7 @@ def calculate_team_strengths(league_id: int) -> dict | None:
             "home_defense": regress_to_mean(raw_home_def, hp, 1.0),
             "away_attack": regress_to_mean(raw_away_atk, ap, 1.0),
             "away_defense": regress_to_mean(raw_away_def, ap, 1.0),
+            "home_advantage": round(max(1.0, min(team_home_adv, 1.30)), 3), # Plafonné entre 1.00 et 1.30
         }
 
     return {
@@ -307,6 +323,7 @@ def calculate_xg(
         ``XG_CEIL``.
     """
     if not league_data:
+        from constants import XG_FALLBACK_HOME, XG_FALLBACK_AWAY
         return XG_FALLBACK_HOME, XG_FALLBACK_AWAY  # Fallback
 
     strengths = league_data["strengths"]
@@ -314,9 +331,12 @@ def calculate_xg(
     away_s = strengths.get(away_team_id)
 
     if not home_s or not away_s:
+        from constants import XG_FALLBACK_HOME, XG_FALLBACK_AWAY
         return XG_FALLBACK_HOME, XG_FALLBACK_AWAY
 
-    home_bonus = HOME_XG_BONUS  # Avantage domicile moyen en Europe
+    from constants import HOME_XG_BONUS
+    # Avantage domicile spécifique à l'équipe, ou la moyenne de la ligue si manquant
+    home_bonus = home_s.get("home_advantage", HOME_XG_BONUS)
 
     xg_home = (
         home_s["home_attack"] * away_s["away_defense"] * league_data["league_avg_home"] * home_bonus

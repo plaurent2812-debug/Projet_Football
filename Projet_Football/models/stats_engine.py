@@ -1862,6 +1862,8 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         ("Victoire Domicile",               final_home),
         ("Victoire Extérieur",              final_away),
         ("Match Nul",                       final_draw),
+        ("Double Chance 1X",               poisson_probs.get("proba_dc_1x", 0)),
+        ("Double Chance X2",               poisson_probs.get("proba_dc_x2", 0)),
         ("1X + Plus de 1.5 buts",          poisson_probs.get("proba_dc1x_over15", 0)),
         ("X2 + Plus de 1.5 buts",          poisson_probs.get("proba_dcx2_over15", 0)),
     ]

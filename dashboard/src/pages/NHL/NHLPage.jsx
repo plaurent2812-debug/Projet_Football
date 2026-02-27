@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { format, addDays } from "date-fns"
 import { fr } from "date-fns/locale"
-import { ChevronLeft, ChevronRight, Calendar, Flame, Clock } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar, Flame, Clock, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/auth"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useWatchlist } from "@/lib/useWatchlist"
 
 const LIVE_STATUSES = ["1P", "2P", "3P", "OT", "SO", "LIVE"]
 
@@ -40,7 +41,7 @@ const getMatchLabel = (match) => {
 }
 
 /* ── NHL Match Row ─────────────────────────────────────────── */
-function NHLMatchRow({ match }) {
+function NHLMatchRow({ match, isStarred, onToggleStar }) {
     const navigate = useNavigate()
     const time = match.date ? new Date(match.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "--:--"
     const isFinished = ["FT", "Final", "FINAL", "OFF"].includes(match.status)
@@ -138,6 +139,16 @@ function NHLMatchRow({ match }) {
                 </div>
             )}
 
+            <button
+                className="shrink-0 p-1 rounded-full hover:bg-amber-500/10 transition-colors"
+                onClick={(e) => { e.stopPropagation(); onToggleStar(match.id) }}
+                title={isStarred ? "Retirer des favoris" : "Ajouter aux favoris"}
+            >
+                <Star className={cn(
+                    "w-4 h-4 transition-colors",
+                    isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400"
+                )} />
+            </button>
             <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 transition-colors" />
         </div>
     )
@@ -149,6 +160,7 @@ function NHLMatchRow({ match }) {
 export default function NHLPage({ date, setDate }) {
     const [matches, setMatches] = useState([])
     const [loading, setLoading] = useState(true)
+    const { isStarred, toggleMatch } = useWatchlist()
 
     const fetchMatches = useCallback((showLoading = true) => {
         if (showLoading) setLoading(true)
@@ -217,7 +229,7 @@ export default function NHLPage({ date, setDate }) {
                         <p className="text-xs text-muted-foreground animate-pulse">Chargement des matchs NHL...</p>
                     </div>
                 ) : matches.length > 0 ? (
-                    matches.map(m => <NHLMatchRow key={m.id} match={m} />)
+                    matches.map(m => <NHLMatchRow key={m.id} match={m} isStarred={isStarred(m.id)} onToggleStar={toggleMatch} />)
                 ) : (
                     <div className="flex flex-col items-center justify-center py-24 text-center">
                         <Calendar className="w-10 h-10 text-muted-foreground/30 mb-4" />

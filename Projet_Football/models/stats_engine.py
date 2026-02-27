@@ -1855,37 +1855,49 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
 
     # B3: Pari recommandé — Priorité à la probabilité la plus élevée (seuil min 55%)
     # Marchés inclus (Over 0.5 exclu car cote quasi nulle)
-    candidate_bets: list[tuple[str, float]] = [
-        ("Plus de 1.5 buts",               poisson_probs["proba_over_15"]),
-        ("Plus de 2.5 buts",               poisson_probs["proba_over_25"]),
-        ("BTTS Oui",                        poisson_probs["proba_btts"]),
-        ("Victoire Domicile",               final_home),
-        ("Victoire Extérieur",              final_away),
-        ("Match Nul",                       final_draw),
-        ("Double Chance 1X",               poisson_probs.get("proba_dc_1x", 0)),
-        ("Double Chance X2",               poisson_probs.get("proba_dc_x2", 0)),
-        ("1X + Plus de 1.5 buts",          poisson_probs.get("proba_dc1x_over15", 0)),
-        ("X2 + Plus de 1.5 buts",          poisson_probs.get("proba_dcx2_over15", 0)),
-    ]
 
-    # Filter by minimum threshold (55%) and sort by probability descending
-    MIN_PROBA = 55
-    eligible = [(name, prob) for name, prob in candidate_bets if prob >= MIN_PROBA]
+    dc_1x = poisson_probs.get("proba_dc_1x", 0)
+    dc_x2 = poisson_probs.get("proba_dc_x2", 0)
+    over_15 = poisson_probs["proba_over_15"]
+    COMBO_THRESHOLD = 65  # Both legs must clear this to recommend combined bet
 
-    if eligible:
-        # Pick highest probability
-        best_name, best_prob = max(eligible, key=lambda x: x[1])
-        result["recommended_bet"] = best_name
-        result["kelly_edge"] = round((best_prob - 50) / 100, 3)  # Simple edge vs 50%
+    # Priority rule: if both DC and Over 1.5 are individually strong → recommend combined
+    if dc_1x >= COMBO_THRESHOLD and over_15 >= COMBO_THRESHOLD:
+        result["recommended_bet"] = "1X + Plus de 1.5 buts"
+        result["kelly_edge"] = round((poisson_probs.get("proba_dc1x_over15", dc_1x) - 50) / 100, 3)
         result["kelly_fraction"] = 0
-        result["value_bet"] = best_prob >= 65
+        result["value_bet"] = True
+    elif dc_x2 >= COMBO_THRESHOLD and over_15 >= COMBO_THRESHOLD:
+        result["recommended_bet"] = "X2 + Plus de 1.5 buts"
+        result["kelly_edge"] = round((poisson_probs.get("proba_dcx2_over15", dc_x2) - 50) / 100, 3)
+        result["kelly_fraction"] = 0
+        result["value_bet"] = True
     else:
-        # No market clears 55% — fallback to highest proba regardless
-        best_name, best_prob = max(candidate_bets, key=lambda x: x[1])
+        candidate_bets: list[tuple[str, float]] = [
+            ("Plus de 1.5 buts",               over_15),
+            ("Plus de 2.5 buts",               poisson_probs["proba_over_25"]),
+            ("BTTS Oui",                        poisson_probs["proba_btts"]),
+            ("Victoire Domicile",               final_home),
+            ("Victoire Extérieur",              final_away),
+            ("Match Nul",                       final_draw),
+            ("Double Chance 1X",               dc_1x),
+            ("Double Chance X2",               dc_x2),
+            ("1X + Plus de 1.5 buts",          poisson_probs.get("proba_dc1x_over15", 0)),
+            ("X2 + Plus de 1.5 buts",          poisson_probs.get("proba_dcx2_over15", 0)),
+        ]
+
+        MIN_PROBA = 55
+        eligible = [(name, prob) for name, prob in candidate_bets if prob >= MIN_PROBA]
+
+        if eligible:
+            best_name, best_prob = max(eligible, key=lambda x: x[1])
+        else:
+            best_name, best_prob = max(candidate_bets, key=lambda x: x[1])
+
         result["recommended_bet"] = best_name
         result["kelly_edge"] = round((best_prob - 50) / 100, 3)
         result["kelly_fraction"] = 0
-        result["value_bet"] = False
+        result["value_bet"] = best_prob >= 65
 
     # Score de confiance redesigné (1–10)
     # Combine : (a) accord inter-modèles, (b) qualité données, (c) spread 1X2

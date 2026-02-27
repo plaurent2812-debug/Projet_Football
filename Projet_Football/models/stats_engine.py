@@ -1643,6 +1643,37 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         xg_home_adj *= 1.03
         xg_away_adj *= 1.03
 
+    # ── 3.b Fusion xG Live (In-Play) ─────────────────────────────
+    status = fixture.get("status", "NS")
+    if status in ["1H", "2H", "HT", "LIVE", "ET", "P"]:
+        elapsed = int(fixture.get("elapsed") or 0)
+        live_stats = fixture.get("live_stats_json")
+        if elapsed > 0 and isinstance(live_stats, dict) and "home" in live_stats and "away" in live_stats:
+            try:
+                # API-Football renvoie parfois None ou ""
+                val_h = live_stats["home"].get("xg")
+                val_a = live_stats["away"].get("xg")
+                obs_xg_home = float(val_h) if val_h else 0.0
+                obs_xg_away = float(val_a) if val_a else 0.0
+                
+                if obs_xg_home > 0 or obs_xg_away > 0:
+                    elapsed_fraction = min(elapsed / 90.0, 1.0)
+                    # Le expected goals à la fin du match est ce qu'ils ont déjà généré
+                    # + ce qu'ils sont censés générer dans le temps restant
+                    rem_fraction = 1.0 - elapsed_fraction
+                    xg_home_adj = obs_xg_home + (xg_home_adj * rem_fraction)
+                    xg_away_adj = obs_xg_away + (xg_away_adj * rem_fraction)
+                    
+                    context["live_xg_fusion"] = {
+                        "elapsed": elapsed,
+                        "obs_xg_home": obs_xg_home,
+                        "obs_xg_away": obs_xg_away,
+                        "blended_xg_home": round(xg_home_adj, 2),
+                        "blended_xg_away": round(xg_away_adj, 2)
+                    }
+            except (ValueError, TypeError):
+                pass
+
     # ── 4. Grille Poisson ────────────────────────────────────────
     poisson_probs = poisson_grid(xg_home_adj, xg_away_adj)
 

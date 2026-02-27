@@ -242,7 +242,28 @@ export const nhlUpdateLiveScores = schedules.task({
     },
 });
 
-// ─── Task 10: NHL ML Training Reminder ──────────────────────
+// ─── Task 10: NHL Performance Evaluation (CRON daily at 08h UTC / 10h Paris) ──
+export const nhlEvaluatePerformance = schedules.task({
+    id: "nhl-evaluate-performance",
+    cron: "0 8 * * *",
+    run: async () => {
+        const res = await fetch(`${API_URL}/api/trigger/nhl-evaluate-performance`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${CRON_SECRET}`
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error(`NHL performance evaluation failed: ${res.statusText}`);
+        }
+
+        return await res.json();
+    },
+});
+
+// ─── Task 11: NHL ML Training Reminder ──────────────────────
 export const nhlMlReminder = task({
     id: "nhl-ml-reminder",
     run: async () => {

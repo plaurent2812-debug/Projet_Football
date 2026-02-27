@@ -1001,14 +1001,10 @@ def nhl_update_live_scores():
     """Fetch live NHL scores from official NHLE API and update nhl_fixtures table."""
     import requests as _requests
     import time as _time
+    from datetime import datetime, timedelta
 
     logger.info("[NHL Live Scores] 🏒 Fetching live NHL scores from NHLE API...")
 
-    # Hockey API-Sports headers (keep if needed for other things, but here we use NHLE which is public)
-    # NHLE API is public, no specific headers required for now.
-
-    # Map NHLE states to our dashboard statuses
-    # NHLE states: PRE, LIVE, CRIT, FINAL, OFF
     STATUS_MAP = {
         "PRE": "NS",
         "LIVE": "LIVE",
@@ -1018,16 +1014,35 @@ def nhl_update_live_scores():
     }
 
     try:
-        # 1. Fetch all scores for "now"
-        resp = _requests.get("https://api-web.nhle.com/v1/score/now", timeout=15)
-        if resp.status_code != 200:
-            logger.error(f"[NHL Live] NHLE Score API returned {resp.status_code}")
-            return {"status": "error", "message": "NHLE API Error"}
+        # We fetch "now", "yesterday" and "2 days ago" to ensure games that just finished are flipped to FT
+        # especially given the UTC/US date shift.
+        t_now = datetime.now()
+        yesterday = (t_now - timedelta(days=1)).strftime("%Y-%m-%d")
+        two_days_ago = (t_now - timedelta(days=2)).strftime("%Y-%m-%d")
+        
+        urls = [
+            "https://api-web.nhle.com/v1/score/now",
+            f"https://api-web.nhle.com/v1/score/{yesterday}",
+            f"https://api-web.nhle.com/v1/score/{two_days_ago}"
+        ]
 
-        data = resp.json()
-        api_games = data.get("games", [])
-        if not api_games:
+        all_games = []
+        for url in urls:
+            resp = _requests.get(url, timeout=15)
+            if resp.status_code == 200:
+                all_games.extend(resp.json().get("games", []))
+            _time.sleep(0.5)
+
+        if not all_games:
             return {"status": "no_games", "updated": 0}
+
+        # Deduplicate by ID
+        seen_ids = set()
+        api_games = []
+        for g in all_games:
+            if g.get("id") not in seen_ids:
+                seen_ids.add(g.get("id"))
+                api_games.append(g)
 
         updated = 0
         for game in api_games:
@@ -1035,19 +1050,19 @@ def nhl_update_live_scores():
             if not api_id:
                 continue
 
-            # Find matching DB fixture by api_fixture_id
-            db_fix = (
+            # Find matching DB fixture
+            db_fix_resp = (
                 supabase.table("nhl_fixtures")
                 .select("id, status, home_score, away_score, stats_json, home_team, away_team")
                 .eq("api_fixture_id", api_id)
                 .execute()
-                .data
             )
+            db_fix_data = db_fix_resp.data
             
-            if not db_fix:
+            if not db_fix_data:
                 continue
             
-            db_fix = db_fix[0]
+            db_fix = db_fix_data[0]
             db_home_name = db_fix.get("home_team", "")
             db_away_name = db_fix.get("away_team", "")
             
@@ -1055,7 +1070,7 @@ def nhl_update_live_scores():
             if db_fix.get("status") in ("FT", "CANC", "POST"):
                 continue
 
-            # Extract data from NHLE response
+            # Extract data
             home_team = game.get("homeTeam", {})
             away_team = game.get("awayTeam", {})
             home_abbrev = home_team.get("abbrev")
@@ -1066,8 +1081,7 @@ def nhl_update_live_scores():
             curr_away_score = away_team.get("score")
             our_status = STATUS_MAP.get(nhle_state, nhle_state)
 
-            # Special case for "LIVE" period labels
-            # NHLE gives period in game.get("period")
+            # Period labels
             period = game.get("period")
             if our_status == "LIVE" and period:
                 if period == 1: our_status = "1P"
@@ -1079,12 +1093,12 @@ def nhl_update_live_scores():
             if curr_home_score is not None: update_data["home_score"] = curr_home_score
             if curr_away_score is not None: update_data["away_score"] = curr_away_score
 
-            # Check if we need to fetch events (score changed or newly finished)
+            # Check if we need to fetch events
             score_changed = (curr_home_score != db_fix.get("home_score")) or (curr_away_score != db_fix.get("away_score"))
             newly_finished = (our_status == "FT" and db_fix.get("status") != "FT")
             
             if score_changed or newly_finished:
-                logger.info(f"[NHL Live] Score changed for {api_id} ({curr_home_score}-{curr_away_score}). Fetching events...")
+                logger.info(f"[NHL Live] Updating events for {api_id} ({our_status})")
                 try:
                     landing_resp = _requests.get(f"https://api-web.nhle.com/v1/gamecenter/{api_id}/landing", timeout=10)
                     if landing_resp.status_code == 200:
@@ -1100,7 +1114,6 @@ def nhl_update_live_scores():
                             
                             for goal in period_data.get("goals", []):
                                 g_abbrev = goal.get("teamAbbrev", {}).get("default", "")
-                                # Map abbrev to full name for frontend compatibility
                                 team_name = db_home_name if g_abbrev == home_abbrev else db_away_name if g_abbrev == away_abbrev else g_abbrev
                                 
                                 goals_list.append({
@@ -1112,22 +1125,33 @@ def nhl_update_live_scores():
                                     "comment": goal.get("goalModifier", ""),
                                 })
                         
-                        # Preserve existing top_players but update goals/events
                         existing_stats = db_fix.get("stats_json") or {}
                         existing_stats["goals"] = goals_list
                         update_data["stats_json"] = existing_stats
                 except Exception as e:
-                    logger.warning(f"[NHL Live] Failed to fetch events for {api_id}: {e}")
+                    logger.warning(f"[NHL Live] Events error for {api_id}: {e}")
 
-            # Update DB
             supabase.table("nhl_fixtures").update(update_data).eq("id", db_fix["id"]).execute()
             updated += 1
-            _time.sleep(0.2) # Gentle rate limit
+            _time.sleep(0.1)
 
         return {"status": "ok", "updated": updated}
 
     except Exception as e:
         logger.error(f"[NHL Live] Critical error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@router.post("/nhl-evaluate-performance")
+def nhl_evaluate_performance():
+    """Trigger the NHL performance evaluation script."""
+    logger.info("[NHL Performance] 📈 Démarrage de l'évaluation des performances...")
+    try:
+        from fetchers.fetch_nhl_results import evaluate_nhl_predictions
+        evaluate_nhl_predictions(days_back=7)
+        return {"status": "ok", "message": "Performance evaluation completed"}
+    except Exception as e:
+        logger.error(f"[NHL Performance] ❌ Erreur: {e}")
         return {"status": "error", "message": str(e)}
 
 @router.post("/nhl-run-pipeline")

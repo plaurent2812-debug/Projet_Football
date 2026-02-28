@@ -918,14 +918,25 @@ def get_team_roster(team_name: str):
                 .data
             )
             if stats_data:
-                stats_map = {s["player_api_id"]: s for s in stats_data}
+                stats_map = {}
+                for s in stats_data:
+                    p_id = s["player_api_id"]
+                    if p_id not in stats_map:
+                        stats_map[p_id] = {
+                            "appearances": 0, "goals": 0, "assists": 0, "goals_conceded": 0
+                        }
+                    stats_map[p_id]["appearances"] += s.get("appearances") or 0
+                    stats_map[p_id]["goals"] += s.get("goals") or 0
+                    stats_map[p_id]["assists"] += s.get("assists") or 0
+                    stats_map[p_id]["goals_conceded"] += s.get("goals_conceded") or 0
+
                 for player in roster_data:
                     p_id = player.get("id")
                     if p_id in stats_map:
-                        player["appearances"] = stats_map[p_id].get("appearances", 0)
-                        player["goals"] = stats_map[p_id].get("goals", 0)
-                        player["assists"] = stats_map[p_id].get("assists", 0)
-                        player["goals_conceded"] = stats_map[p_id].get("goals_conceded", 0)
+                        player["appearances"] = stats_map[p_id]["appearances"]
+                        player["goals"] = stats_map[p_id]["goals"]
+                        player["assists"] = stats_map[p_id]["assists"]
+                        player["goals_conceded"] = stats_map[p_id]["goals_conceded"]
         except Exception as e:
             print(f"Error fetching roster stats: {e}")
             pass

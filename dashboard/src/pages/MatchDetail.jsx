@@ -237,7 +237,15 @@ export default function MatchDetailPage() {
                                 <img src={fixture.home_logo} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
                             )}
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                <p className="text-xl font-black leading-tight">{fixture?.home_team}</p>
+                                <p
+                                    className="text-xl font-black leading-tight cursor-pointer hover:underline hover:text-primary transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (fixture?.home_team) navigate(`/equipe/${encodeURIComponent(fixture.home_team)}`)
+                                    }}
+                                >
+                                    {fixture?.home_team}
+                                </p>
                                 {sj?.severe_fatigue_home && (
                                     <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-red-500/30 text-red-500 whitespace-nowrap">
                                         ⚠️ Calendrier
@@ -268,7 +276,15 @@ export default function MatchDetailPage() {
                                 <img src={fixture.away_logo} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
                             )}
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                <p className="text-xl font-black leading-tight">{fixture?.away_team}</p>
+                                <p
+                                    className="text-xl font-black leading-tight cursor-pointer hover:underline hover:text-primary transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (fixture?.away_team) navigate(`/equipe/${encodeURIComponent(fixture.away_team)}`)
+                                    }}
+                                >
+                                    {fixture?.away_team}
+                                </p>
                                 {sj?.severe_fatigue_away && (
                                     <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-red-500/30 text-red-500 whitespace-nowrap">
                                         ⚠️ Calendrier
@@ -369,12 +385,30 @@ export default function MatchDetailPage() {
                                                 <span className="text-xs font-bold text-muted-foreground">{timeStr}</span>
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold truncate">
+                                                <p
+                                                    className={cn(
+                                                        "text-sm font-bold truncate",
+                                                        goal.player_id && "cursor-pointer hover:underline hover:text-primary transition-colors"
+                                                    )}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        if (goal.player_id) navigate(`/football/player/${goal.player_id}`)
+                                                    }}
+                                                >
                                                     ⚽ {goal.player || "Inconnu"}
                                                     <span className="text-muted-foreground font-normal text-xs">{typeLabel}</span>
                                                 </p>
                                                 {goal.assist && (
-                                                    <p className="text-[10px] text-muted-foreground truncate">
+                                                    <p
+                                                        className={cn(
+                                                            "text-[10px] text-muted-foreground truncate",
+                                                            goal.assist_id && "cursor-pointer hover:underline hover:text-primary transition-colors"
+                                                        )}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            if (goal.assist_id) navigate(`/football/player/${goal.assist_id}`)
+                                                        }}
+                                                    >
                                                         🎯 {goal.assist}
                                                     </p>
                                                 )}
@@ -427,7 +461,18 @@ export default function MatchDetailPage() {
                                                     <span className="text-[10px] w-5 text-right text-muted-foreground font-mono shrink-0">
                                                         {p.number}
                                                     </span>
-                                                    <span className="text-xs truncate">{p.name}</span>
+                                                    <span
+                                                        className={cn(
+                                                            "text-xs truncate",
+                                                            p.player_id && "cursor-pointer hover:underline hover:text-primary transition-colors"
+                                                        )}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            if (p.player_id) navigate(`/football/player/${p.player_id}`)
+                                                        }}
+                                                    >
+                                                        {p.name}
+                                                    </span>
                                                     {p.pos && (
                                                         <span className="text-[9px] text-muted-foreground shrink-0 ml-auto">
                                                             {p.pos}

@@ -361,7 +361,9 @@ def update_live_scores():
                             goal_info = {
                                 "team": ev.get("team", {}).get("name", ""),
                                 "player": ev.get("player", {}).get("name", ""),
+                                "player_id": ev.get("player", {}).get("id"),
                                 "assist": ev.get("assist", {}).get("name", "") if ev.get("assist") else "",
+                                "assist_id": ev.get("assist", {}).get("id") if ev.get("assist") else None,
                                 "time": ev.get("time", {}).get("elapsed", ""),
                                 "extra_time": ev.get("time", {}).get("extra"),
                                 "detail": ev.get("detail", ""),
@@ -471,7 +473,9 @@ def update_live_scores():
                             goals_list.append({
                                 "team": ev.get("team", {}).get("name", ""),
                                 "player": ev.get("player", {}).get("name", ""),
+                                "player_id": ev.get("player", {}).get("id"),
                                 "assist": ev.get("assist", {}).get("name", "") if ev.get("assist") else "",
+                                "assist_id": ev.get("assist", {}).get("id") if ev.get("assist") else None,
                                 "time": ev.get("time", {}).get("elapsed", ""),
                                 "extra_time": ev.get("time", {}).get("extra"),
                                 "detail": ev.get("detail", ""),
@@ -562,6 +566,7 @@ def fetch_lineups():
                 coach = team_data.get("coach", {}).get("name", "")
                 starters = [
                     {"name": p.get("player", {}).get("name", ""), 
+                     "player_id": p.get("player", {}).get("id"),
                      "number": p.get("player", {}).get("number", ""),
                      "pos": p.get("player", {}).get("pos", ""),
                      "grid": p.get("player", {}).get("grid", "")}
@@ -569,6 +574,7 @@ def fetch_lineups():
                 ]
                 substitutes = [
                     {"name": p.get("player", {}).get("name", ""),
+                     "player_id": p.get("player", {}).get("id"),
                      "number": p.get("player", {}).get("number", ""),
                      "pos": p.get("player", {}).get("pos", "")}
                     for p in team_data.get("substitutes", [])

@@ -288,7 +288,7 @@ export default function TeamProfile() {
                                                     <span className="flex items-center gap-1">🏃‍♂️ {player.appearances || 0} matchs</span>
                                                     {(player.position === "Goalkeeper" || player.position === "Gardien") ? (
                                                         <>
-                                                            <span className="flex items-center gap-1">🧤 {player.clean_sheets || 0} cleansheets</span>
+                                                            <span className="flex items-center gap-1">🥅 {player.goals_conceded || 0} encaissés</span>
                                                             <span className="flex items-center gap-1">🎯 {player.assists || 0} passes</span>
                                                         </>
                                                     ) : (

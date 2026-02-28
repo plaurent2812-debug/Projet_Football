@@ -89,3 +89,9 @@ export async function fetchNHLMatchTopPlayers(fixtureId) {
     if (!res.ok) return null
     return res.json()
 }
+
+export async function fetchPlayerProfile(playerId) {
+    const res = await fetch(`${API_BASE}/players/${playerId}`)
+    if (!res.ok) throw new Error(`API error: ${res.status}`)
+    return res.json()
+}

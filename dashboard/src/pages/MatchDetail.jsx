@@ -537,7 +537,14 @@ export default function MatchDetailPage() {
                             const broken = s.synergy_broken || false;
 
                             return (
-                                <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+                                <div
+                                    key={i}
+                                    className={cn(
+                                        "flex items-center justify-between py-2 border-b border-border/30 last:border-0",
+                                        s.player_id && "cursor-pointer hover:bg-accent/30 transition-colors px-2 rounded-md -mx-2"
+                                    )}
+                                    onClick={() => s.player_id && navigate(`/football/player/${s.player_id}`)}
+                                >
                                     <div className="flex items-center gap-3">
                                         {s.photo ? (
                                             <img src={s.photo} alt={s.name} className="w-8 h-8 rounded-full object-cover border border-border/50 shrink-0" />

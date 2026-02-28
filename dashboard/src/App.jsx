@@ -20,6 +20,7 @@ const PremiumPage = lazy(() => import("@/pages/Premium"))
 const TeamProfile = lazy(() => import("@/pages/TeamProfile"))
 const ProfilePage = lazy(() => import("@/pages/Profile"))
 const WatchlistPage = lazy(() => import("@/pages/WatchlistPage"))
+const PlayerProfile = lazy(() => import("@/pages/PlayerProfile"))
 import GoalNotifications from "@/components/GoalNotifications"
 
 
@@ -297,6 +298,7 @@ function AppContent() {
                 />
               } />
               <Route path="/football/match/:id" element={<MatchDetail />} />
+              <Route path="/football/player/:id" element={<PlayerProfile />} />
               {/* Legacy route */}
               <Route path="/match/:id" element={<MatchDetail />} />
               <Route path="/nhl" element={<NHLPage date={date} setDate={setDate} />} />

@@ -850,6 +850,7 @@ def _rank_scorers(
                 {
                     "player_id": pid,
                     "name": p["name"],
+                    "photo": p.get("photo"),
                     "team": team_name,
                     "position": p["position"],
                     "raw_score": round(score, 4),
@@ -980,7 +981,9 @@ def predict_scorers(
     for s in candidates[:top_n]:
         top_scorers.append(
             {
+                "player_id": s["player_id"],
                 "name": s["name"],
+                "photo": s.get("photo"),
                 "team": s["team"],
                 "proba": s["proba"],
                 "position": s["position"],

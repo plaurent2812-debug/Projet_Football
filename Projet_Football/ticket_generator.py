@@ -309,5 +309,8 @@ if __name__ == "__main__":
         print(message)
         
         # Test the send module
-        if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHANNEL_ID"):
+        from telegram_bot import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_IDS
+        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS:
             send_telegram_message(message)
+        else:
+            print("Configuration Telegram manquante.")

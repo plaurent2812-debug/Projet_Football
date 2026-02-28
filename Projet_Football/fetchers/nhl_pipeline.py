@@ -1168,7 +1168,7 @@ def run_nhl_pipeline() -> dict:
         "status": "ok",
         "matches": len(fixtures_data),
         "players_analyzed": len(all_players),
-        "tired_teams": list(tired_teams),
+        "tired_teams": list(fatigue_dict.keys()),
         "ai_factors": ai_factors,
         "fixtures": [
             {

@@ -386,28 +386,14 @@ export default function MatchDetailPage() {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p
-                                                    className={cn(
-                                                        "text-sm font-bold truncate",
-                                                        goal.player_id && "cursor-pointer hover:underline hover:text-primary transition-colors"
-                                                    )}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        if (goal.player_id) navigate(`/football/player/${goal.player_id}`)
-                                                    }}
+                                                    className="text-sm font-bold truncate"
                                                 >
                                                     ⚽ {goal.player || "Inconnu"}
                                                     <span className="text-muted-foreground font-normal text-xs">{typeLabel}</span>
                                                 </p>
                                                 {goal.assist && (
                                                     <p
-                                                        className={cn(
-                                                            "text-[10px] text-muted-foreground truncate",
-                                                            goal.assist_id && "cursor-pointer hover:underline hover:text-primary transition-colors"
-                                                        )}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            if (goal.assist_id) navigate(`/football/player/${goal.assist_id}`)
-                                                        }}
+                                                        className="text-[10px] text-muted-foreground truncate"
                                                     >
                                                         🎯 {goal.assist}
                                                     </p>
@@ -462,14 +448,7 @@ export default function MatchDetailPage() {
                                                         {p.number}
                                                     </span>
                                                     <span
-                                                        className={cn(
-                                                            "text-xs truncate",
-                                                            p.player_id && "cursor-pointer hover:underline hover:text-primary transition-colors"
-                                                        )}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            if (p.player_id) navigate(`/football/player/${p.player_id}`)
-                                                        }}
+                                                        className="text-xs truncate"
                                                     >
                                                         {p.name}
                                                     </span>
@@ -584,11 +563,7 @@ export default function MatchDetailPage() {
                             return (
                                 <div
                                     key={i}
-                                    className={cn(
-                                        "flex items-center justify-between py-2 border-b border-border/30 last:border-0",
-                                        s.player_id && "cursor-pointer hover:bg-accent/30 transition-colors px-2 rounded-md -mx-2"
-                                    )}
-                                    onClick={() => s.player_id && navigate(`/football/player/${s.player_id}`)}
+                                    className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
                                 >
                                     <div className="flex items-center gap-3">
                                         {s.photo ? (

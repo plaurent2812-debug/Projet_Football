@@ -281,8 +281,7 @@ export default function TeamProfile() {
                                     {roster.map((player) => (
                                         <div
                                             key={player.id}
-                                            onClick={() => navigate(`/football/player/${player.id}`)}
-                                            className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-card hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5 cursor-pointer transition-all"
+                                            className="flex items-center gap-3 p-3 rounded-lg border border-border/40 bg-card transition-all"
                                         >
                                             {player.photo ? (
                                                 <img src={player.photo} alt={player.name} className="w-10 h-10 rounded-full object-cover border border-border bg-muted shrink-0" />
@@ -297,6 +296,11 @@ export default function TeamProfile() {
                                                     <span className="font-medium text-foreground">{player.position || "Joueur"}</span>
                                                     {player.age && <span>• {player.age} ans</span>}
                                                     {player.number && <span>• N°{player.number}</span>}
+                                                </div>
+                                                <div className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-3 font-medium">
+                                                    <span className="flex items-center gap-1">🏃‍♂️ {player.appearances || 0} matchs</span>
+                                                    <span className="flex items-center gap-1">⚽ {player.goals || 0} buts</span>
+                                                    <span className="flex items-center gap-1">🎯 {player.assists || 0} passes</span>
                                                 </div>
                                             </div>
                                         </div>

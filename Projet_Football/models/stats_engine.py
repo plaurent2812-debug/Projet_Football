@@ -215,6 +215,8 @@ def poisson_grid(
         "proba_dcx2_over15": round(dcx2_over15 * 100),
         "xg_home": round(xg_home, 2),
         "xg_away": round(xg_away, 2),
+        "correct_score": correct_score,
+        "proba_correct_score": round(correct_score_prob * 100, 1),
         # Handicaps asiatiques
         "ah_home_minus_05": round(ah_home_minus_05 * 100),
         "ah_home_minus_10": round(ah_home_minus_10_effective * 100),

@@ -899,13 +899,36 @@ def get_team_roster(team_name: str):
         team_api_id = team_data[0]["api_id"]
 
     try:
-        from config import api_get
+        from config import api_get, SEASON
         # The players/squads endpoint returns the current squad of a team
         resp = api_get("players/squads", {"team": team_api_id})
         if not resp or not resp.get("response"):
             return {"team_name": team_name, "roster": []}
             
         roster_data = resp["response"][0].get("players", [])
+        
+        # --- Fetch season stats ---
+        try:
+            stats_data = (
+                supabase.table("player_season_stats")
+                .select("player_api_id, appearances, goals, assists")
+                .eq("team_api_id", team_api_id)
+                .eq("season", SEASON)
+                .execute()
+                .data
+            )
+            if stats_data:
+                stats_map = {s["player_api_id"]: s for s in stats_data}
+                for player in roster_data:
+                    p_id = player.get("id")
+                    if p_id in stats_map:
+                        player["appearances"] = stats_map[p_id].get("appearances", 0)
+                        player["goals"] = stats_map[p_id].get("goals", 0)
+                        player["assists"] = stats_map[p_id].get("assists", 0)
+        except Exception as e:
+            print(f"Error fetching roster stats: {e}")
+            pass
+
         return {"team_name": team_name, "roster": roster_data}
     except Exception as e:
         logger.error(f"Error fetching roster for {team_name}: {e}")

@@ -299,8 +299,17 @@ export default function TeamProfile() {
                                                 </div>
                                                 <div className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-3 font-medium">
                                                     <span className="flex items-center gap-1">🏃‍♂️ {player.appearances || 0} matchs</span>
-                                                    <span className="flex items-center gap-1">⚽ {player.goals || 0} buts</span>
-                                                    <span className="flex items-center gap-1">🎯 {player.assists || 0} passes</span>
+                                                    {(player.position === "Goalkeeper" || player.position === "Gardien") ? (
+                                                        <>
+                                                            <span className="flex items-center gap-1">🧤 {player.clean_sheets || 0} cleansheets</span>
+                                                            <span className="flex items-center gap-1">🎯 {player.assists || 0} passes</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className="flex items-center gap-1">⚽ {player.goals || 0} buts</span>
+                                                            <span className="flex items-center gap-1">🎯 {player.assists || 0} passes</span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

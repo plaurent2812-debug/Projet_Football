@@ -911,7 +911,7 @@ def get_team_roster(team_name: str):
         try:
             stats_data = (
                 supabase.table("player_season_stats")
-                .select("player_api_id, appearances, goals, assists")
+                .select("player_api_id, appearances, goals, assists, clean_sheets")
                 .eq("team_api_id", team_api_id)
                 .eq("season", SEASON)
                 .execute()
@@ -925,6 +925,7 @@ def get_team_roster(team_name: str):
                         player["appearances"] = stats_map[p_id].get("appearances", 0)
                         player["goals"] = stats_map[p_id].get("goals", 0)
                         player["assists"] = stats_map[p_id].get("assists", 0)
+                        player["clean_sheets"] = stats_map[p_id].get("clean_sheets", 0)
         except Exception as e:
             print(f"Error fetching roster stats: {e}")
             pass

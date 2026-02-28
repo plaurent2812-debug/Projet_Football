@@ -1,7 +1,8 @@
 import sys, os
-sys.path.insert(0, os.path.abspath("Projet_Football"))
-from config import supabase
+from supabase import create_client
 
-data = supabase.table("nhl_fixtures").select("home_team, status, home_score").gte("date", "2026-02-26").execute().data
-for row in data:
-    print(row)
+sys.path.insert(0, os.path.abspath("Projet_Football"))
+from Projet_Football.config import supabase
+
+res = supabase.table("player_season_stats").select("*").limit(1).execute()
+print(res.data[0].keys())

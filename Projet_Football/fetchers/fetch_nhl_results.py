@@ -42,14 +42,17 @@ def extract_actual_stats(boxscore: dict) -> dict:
             skaters = team_stats.get('forwards', []) + team_stats.get('defense', [])
             
             for player in skaters:
+                player_id = str(player.get('playerId', ''))
                 name = player.get('name', {}).get('default', '')
-                if not name: continue
-                # API sometimes gives short names or reverses them, but 'default' is usually "First Last"
-                stats[name.lower()] = {
+                # fallback if playerId is mysteriously missing
+                key = player_id if player_id else name.lower()
+                if not key: continue
+
+                stats[key] = {
                     "goals": player.get('goals', 0),
                     "assists": player.get('assists', 0),
                     "points": player.get('points', 0),
-                    "shots": player.get('shots', 0)
+                    "shots": player.get('sog', 0)  # Boxscore property is 'sog' not 'shots'
                 }
     except Exception as e:
         logger.error(f"[NHL] Erreur parsing boxscore: {e}")
@@ -122,9 +125,14 @@ def evaluate_nhl_predictions(days_back=3):
             if not player_dict: return
             
             p_name = player_dict.get("player_name", "")
+            p_id = str(player_dict.get("player_id", ""))
             if not p_name: return
             
-            p_stat = actual_stats.get(p_name.lower(), {})
+            if p_id in actual_stats:
+                p_stat = actual_stats[p_id]
+            else:
+                p_stat = actual_stats.get(p_name.lower(), {})
+                
             actual_val = p_stat.get(achieved_key, 0)
             
             is_winner = actual_val >= expected_val

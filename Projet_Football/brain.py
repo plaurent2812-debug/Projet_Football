@@ -455,7 +455,9 @@ def run_brain() -> None:
     leagues = supabase.table("leagues").select("api_id, name").execute().data
     league_names = {l["api_id"]: l["name"] for l in leagues}
 
-    for i, fix in enumerate(matches):
+    def process_match(args):
+        i, fix = args
+
         league_name = league_names.get(fix["league_id"], f"Ligue {fix['league_id']}")
         logger.info(
             f"[{i + 1}/{len(matches)}] {fix['home_team']} vs {fix['away_team']} ({league_name})"
@@ -541,7 +543,7 @@ def run_brain() -> None:
         
         except Exception as e:
             logger.error("⚠️ Erreur blending : %s", e)
-            continue
+            return
 
         # ── E. Sauvegarde ────────────────────────────────────────
         try:
@@ -610,7 +612,17 @@ def run_brain() -> None:
         except Exception as e:
             logger.error("   ❌ Erreur sauvegarde : %s", e)
 
-        time.sleep(1.5)
+
+
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    logger.info("⚡ Exécution asynchrone (ThreadPool, 5 workers)")
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(process_match, (i, fix)): fix for i, fix in enumerate(matches)}
+        for future in as_completed(futures):
+            future.result()  # Catch exceptions safely
+            
 
     logger.info("=" * 60)
     logger.info("  ✅ Pipeline terminé : %s matchs analysés", len(matches))

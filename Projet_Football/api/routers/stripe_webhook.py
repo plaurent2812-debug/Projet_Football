@@ -29,7 +29,24 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     event_type = event["type"]
+    event_id = event.get("id", "")
     data_object = event["data"]["object"]
+
+    if event_id:
+        try:
+            # Idempotency check
+            res = supabase.table("processed_events").insert({
+                "id": event_id,
+                "source": "stripe"
+            }).execute()
+            if hasattr(res, 'error') and res.error:
+                logger.info(f"Stripe event {event_id} already processed.")
+                return {"status": "already_processed"}
+        except Exception as e:
+            if "duplicate key value violates unique constraint" in str(e):
+                logger.info(f"Stripe event {event_id} already processed.")
+                return {"status": "already_processed"}
+            logger.warning(f"Error checking idempotency for {event_id}, continuing: {e}")
 
     if event_type == "checkout.session.completed":
         _handle_checkout_session(data_object)

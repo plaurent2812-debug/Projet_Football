@@ -3,10 +3,21 @@ import { task, wait, schedules } from "@trigger.dev/sdk/v3";
 const CRON_SECRET = process.env.CRON_SECRET || "super_secret_probalab_2026";
 const API_URL = process.env.API_URL || "https://web-production-ff663.up.railway.app";
 
+const standardRetry = {
+    maxAttempts: 3,
+    factor: 1.5,
+    minTimeoutInMs: 2000,
+    maxTimeoutInMs: 30000,
+    randomize: true,
+};
+
+
 // ─── Task 1: Monitor Halftime (48 min) ─────────────────────────
 export const monitorHalftime = task({
     id: "monitor-halftime",
-    run: async (payload: { fixture_id: string; start_date: string }) => {
+    
+    retry: standardRetry,
+run: async (payload: { fixture_id: string; start_date: string }) => {
         const startTime = new Date(payload.start_date);
 
         // Wait until 48 minutes after kickoff (halftime buffer)
@@ -36,7 +47,9 @@ export const monitorHalftime = task({
 // ─── Task 2: Monitor 70th Minute ────────────────────────────────
 export const monitor70thMinute = task({
     id: "monitor-70th-minute",
-    run: async (payload: { fixture_id: string; start_date: string }) => {
+    
+    retry: standardRetry,
+run: async (payload: { fixture_id: string; start_date: string }) => {
         const startTime = new Date(payload.start_date);
         const seventyMinTime = new Date(startTime.getTime() + 70 * 60 * 1000);
 
@@ -62,7 +75,9 @@ export const monitor70thMinute = task({
 // ─── Task 3: Schedule Daily Matches (CRON 08:00) ──────────────
 export const scheduleDailyMatches = schedules.task({
     id: "schedule-daily-matches",
-    cron: "0 8 * * *",
+    
+    retry: standardRetry,
+cron: "0 8 * * *",
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/daily-matches`, {
             headers: { "Authorization": `Bearer ${CRON_SECRET}` }
@@ -94,7 +109,9 @@ export const scheduleDailyMatches = schedules.task({
 // ─── Task 4: Update Live Scores (CRON every 5 min, 12h-23h) ───
 export const updateLiveScores = schedules.task({
     id: "update-live-scores",
-    cron: "* 11-23 * * *",  // Every 1 min, 12h-00h Paris (11h-23h UTC)
+    
+    retry: standardRetry,
+cron: "* 11-23 * * *",  // Every 1 min, 12h-00h Paris (11h-23h UTC)
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/update-live-scores`, {
             method: "POST",
@@ -115,7 +132,9 @@ export const updateLiveScores = schedules.task({
 // ─── Task 4b: Fetch H-1 Lineups (CRON every 15 min, 10h-22h UTC) ──
 export const fetchLineups = schedules.task({
     id: "fetch-lineups",
-    cron: "*/15 10-22 * * *",  // Every 15 min to catch H-1 for any kickoff
+    
+    retry: standardRetry,
+cron: "*/15 10-22 * * *",  // Every 15 min to catch H-1 for any kickoff
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/fetch-lineups`, {
             method: "POST",
@@ -136,7 +155,9 @@ export const fetchLineups = schedules.task({
 // ─── Task 5: Run Daily Pipeline (CRON 06:00) ──────────────────
 export const runDailyPipeline = schedules.task({
     id: "run-daily-pipeline",
-    cron: "0 6 * * *",  // Every day at 06:00 UTC
+    
+    retry: standardRetry,
+cron: "0 6 * * *",  // Every day at 06:00 UTC
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/run-daily-pipeline`, {
             method: "POST",
@@ -157,7 +178,9 @@ export const runDailyPipeline = schedules.task({
 // ─── Task 6: Detect Value Bets (CRON 10:00) ───────────────────
 export const detectValueBets = schedules.task({
     id: "detect-value-bets",
-    cron: "0 10 * * *",  // Every day at 10:00 UTC (after pipeline)
+    
+    retry: standardRetry,
+cron: "0 10 * * *",  // Every day at 10:00 UTC (after pipeline)
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/detect-value-bets`, {
             method: "POST",
@@ -178,7 +201,9 @@ export const detectValueBets = schedules.task({
 // ─── Task 7: Daily Recap (CRON 23:30) ─────────────────────────
 export const dailyRecap = schedules.task({
     id: "daily-recap",
-    cron: "30 23 * * *",  // Every day at 23:30 UTC
+    
+    retry: standardRetry,
+cron: "30 23 * * *",  // Every day at 23:30 UTC
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/daily-recap`, {
             method: "POST",
@@ -203,7 +228,9 @@ export const dailyRecap = schedules.task({
 // ─── Task 8: NHL Pipeline (CRON 09:00 UTC = 10h Paris) ────────
 export const nhlRunPipeline = schedules.task({
     id: "nhl-run-pipeline",
-    cron: "0 9 * * *",  // 09:00 UTC = 10h Paris
+    
+    retry: standardRetry,
+cron: "0 9 * * *",  // 09:00 UTC = 10h Paris
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/nhl-run-pipeline`, {
             method: "POST",
@@ -224,7 +251,9 @@ export const nhlRunPipeline = schedules.task({
 // ─── Task 9: NHL Value Bets (CRON 15:00 UTC = 16h Paris) ──────
 export const nhlDetectValueBets = schedules.task({
     id: "nhl-detect-value-bets",
-    cron: "0 15 * * *",  // 15:00 UTC = 16h Paris
+    
+    retry: standardRetry,
+cron: "0 15 * * *",  // 15:00 UTC = 16h Paris
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/nhl-value-bets`, {
             method: "POST",
@@ -245,7 +274,9 @@ export const nhlDetectValueBets = schedules.task({
 // ─── Task 9: NHL Live Scores (CRON every 2 min, 16h-08h UTC) ──
 export const nhlUpdateLiveScores = schedules.task({
     id: "nhl-update-live-scores",
-    cron: "* 16,17,18,19,20,21,22,23,0,1,2,3,4,5,6,7,8 * * *",  // 17h-09h Paris
+    
+    retry: standardRetry,
+cron: "* 16,17,18,19,20,21,22,23,0,1,2,3,4,5,6,7,8 * * *",  // 17h-09h Paris
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/nhl-update-live-scores`, {
             method: "POST",
@@ -266,7 +297,9 @@ export const nhlUpdateLiveScores = schedules.task({
 // ─── Task 10: NHL Performance Evaluation (CRON daily at 08h UTC / 10h Paris) ──
 export const nhlEvaluatePerformance = schedules.task({
     id: "nhl-evaluate-performance",
-    cron: "0 8 * * *",
+    
+    retry: standardRetry,
+cron: "0 8 * * *",
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/nhl-evaluate-performance`, {
             method: "POST",
@@ -287,7 +320,9 @@ export const nhlEvaluatePerformance = schedules.task({
 // ─── Task 11: NHL ML Training Reminder ──────────────────────
 export const nhlMlReminder = task({
     id: "nhl-ml-reminder",
-    run: async () => {
+    
+    retry: standardRetry,
+run: async () => {
         // Automatically checkpoint and wait for 14 days
         await wait.for({ days: 14 });
 
@@ -310,7 +345,9 @@ export const nhlMlReminder = task({
 // ─── Task 11: NHL Fetch Odds (CRON 22:00 UTC = 23h Paris) ─────
 export const nhlFetchOdds = schedules.task({
     id: "nhl-fetch-odds",
-    cron: "0 22 * * *",
+    
+    retry: standardRetry,
+cron: "0 22 * * *",
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/nhl-fetch-odds`, {
             method: "POST",
@@ -331,7 +368,9 @@ export const nhlFetchOdds = schedules.task({
 // ─── Task 12: Football Live Momentum Tracker (CRON Every 5 Mins)
 export const footballMomentumTracker = schedules.task({
     id: "football-momentum-tracker",
-    cron: "*/5 * * * *",
+    
+    retry: standardRetry,
+cron: "*/5 * * * *",
     run: async () => {
         const res = await fetch(`${API_URL}/api/trigger/football-momentum`, {
             method: "POST",

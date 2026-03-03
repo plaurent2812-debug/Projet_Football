@@ -1330,3 +1330,17 @@ def nhl_ml_reminder():
     _send_telegram_message(msg)
     
     return {"status": "ok"}
+
+
+@router.post("/run-reflection")
+def run_reflection():
+    """Trigger the AI Reflection Engine (daily self-correction loop)."""
+    logger.info("[Reflection] 🧠 Démarrage du moteur d'auto-analyse IA...")
+    try:
+        from reflection_engine import process_daily_reflection
+        process_daily_reflection("football")
+        process_daily_reflection("nhl")
+        return {"status": "ok", "message": "Reflection engine completed successfully"}
+    except Exception as e:
+        logger.error(f"[Reflection] ❌ Erreur critique: {e}")
+        return {"status": "error", "message": str(e)}

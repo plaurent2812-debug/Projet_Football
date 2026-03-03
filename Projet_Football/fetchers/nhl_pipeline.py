@@ -472,7 +472,7 @@ def get_ai_game_context(games: list[dict], standings: dict) -> dict:
 def get_gemini_nhl_analysis(home_team: str, away_team: str, top_players: list[dict], ai_factors: dict) -> str:
     """Use Gemini to generate a detailed, player-centric NHL match analysis."""
     try:
-        from brain import ask_gemini
+        from brain import ask_gemini, get_active_learnings
     except ImportError:
         return f"{home_team} vs {away_team} : Analyse indisponible."
 
@@ -499,9 +499,17 @@ def get_gemini_nhl_analysis(home_team: str, away_team: str, top_players: list[di
             f"Probas ce soir: Point {point_prob}%, But {goal_prob}%, Passe {assist_prob}%."
         )
 
+    learnings = get_active_learnings("nhl") if "get_active_learnings" in locals() else []
+    learnings_block = ""
+    if learnings:
+        learnings_block = "\n\n--- LEÇONS D'AUTO-CORRECTION ---\nPrends en compte ces enseignements :\n"
+        for i, l in enumerate(learnings, 1):
+            learnings_block += f"{i}. {l}\n"
+
     system_prompt = (
         "Tu es un expert en NHL qui s'adresse à des passionnés et parieurs.\n"
-        "Ta mission est de rédiger une brève analyse (3 à 4 phrases maximum) axée sur les joueurs clés.\n\n"
+        "Ta mission est de rédiger une brève analyse (3 à 4 phrases maximum) axée sur les joueurs clés.\n"
+        f"{learnings_block}\n"
         "CONSIGNES CRUCIALES :\n"
         "1. SOIS BREF ET DIRECT : Pas d'intro ni de conclusion générique, va à l'essentiel.\n"
         "2. AXE L'ANALYSE SUR LES JOUEURS : Cite la forme actuelle et les complémentarités (ex: un duo dynamique).\n"

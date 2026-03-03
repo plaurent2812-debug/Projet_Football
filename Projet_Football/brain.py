@@ -107,6 +107,24 @@ def _format_injuries(side: str, details: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def get_active_learnings(sport: str, limit: int = 5) -> list[str]:
+    """Fetch recent active learnings from the AI memory."""
+    try:
+        response = (
+            supabase.table("ai_learnings")
+            .select("learning_text")
+            .eq("sport", sport)
+            .eq("is_active", True)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return [r["learning_text"] for r in response.data] if response.data else []
+    except Exception as e:
+        logger.warning(f"[Brain] Cannot fetch learnings: {e}")
+        return []
+
+
 def build_prompt(fixture: dict, stats: dict, scorers: dict | None) -> tuple[str, str]:
     """Build the system and user prompts enriched with statistical data.
 
@@ -203,9 +221,16 @@ Marché →  Dom: {market.get("market_home", "?")}%  |  Nul: {market.get("market
                     pen = " ⚽ Tireur de pen." if s.get("penalty_taker") else ""
                     data_block += f"\n  - {s['name']} ({s['position']}) : {s['goals_90']} buts/90, {s['total_goals']} buts saison{pen}{syn}"
 
-    system_prompt = """Tu es un expert en paris sportifs renommé.
+    learnings = get_active_learnings("football")
+    learnings_block = ""
+    if learnings:
+        learnings_block = "\n\n--- LEÇONS D'AUTO-CORRECTION (MÉMOIRE DU MODÈLE) ---\nPrends particulièrement en compte ces enseignements tirés de tes erreurs passées :\n"
+        for i, l in enumerate(learnings, 1):
+            learnings_block += f"{i}. {l}\n"
+
+    system_prompt = f"""Tu es un expert en paris sportifs renommé.
 Tu reçois des données statistiques avancées issues de nos modèles.
-Ta mission : rédiger une analyse brève, percutante et orientée parieur.
+Ta mission : rédiger une analyse brève, percutante et orientée parieur.{learnings_block}
 
 CONSIGNES DE RÉDACTION :
 - Ton audience est constituée de parieurs, pas de data scientists.

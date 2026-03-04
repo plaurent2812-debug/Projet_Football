@@ -416,6 +416,75 @@
   white-space: nowrap;
 }
 
+/* ── Mobile cleanup (< 640px) ─────────────────────────────── */
+@media (max-width: 639px) {
+
+  /* Hide all prediction chips on mobile */
+  .fs-pred-chip {
+    display: none !important;
+  }
+
+  /* Hide flame icons on mobile */
+  .flame-badge {
+    display: none !important;
+  }
+
+  /* Hide team logos on mobile — frees space for names */
+  .fs-match-teams img,
+  .fs-match-teams .team-logo-placeholder {
+    display: none !important;
+  }
+
+  /* Smaller time column */
+  .fs-match-time {
+    width: 36px;
+    font-size: 0.65rem;
+  }
+
+  /* Tighter match row padding */
+  .fs-match-row {
+    padding: 5px 8px;
+    gap: 4px;
+  }
+
+  /* Slightly smaller team name to fit better */
+  .fs-team-name {
+    font-size: 0.75rem;
+  }
+
+  /* Narrower score box */
+  .fs-score-box {
+    width: 46px;
+    gap: 2px;
+  }
+
+  .fs-score-box .score-val {
+    width: 18px;
+    height: 20px;
+    font-size: 0.7rem;
+  }
+
+  /* Compact league headers */
+  .fs-league-header {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .fs-league-name {
+    font-size: 0.75rem;
+  }
+
+  /* Compact summary bar */
+  .fs-summary-bar {
+    padding: 6px 8px;
+  }
+
+  /* Hide star button on mobile */
+  .fs-star-btn {
+    display: none !important;
+  }
+}
+
 /* ── Bottom Navigation Bar (mobile) ────────────────────────── */
 .fs-bottom-nav {
   position: fixed;

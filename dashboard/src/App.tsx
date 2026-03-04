@@ -1,11 +1,45 @@
 import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom"
-import { lazy, Suspense, useState, useEffect } from "react"
+import { lazy, Suspense, useState, useEffect, Component } from "react"
 import { Zap, Trophy, Shield, User, Star, Radio, LayoutGrid } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ModeToggle } from "@/components/mode-toggle"
 import "./App.css"
+
+// ── Error Boundary ────────────────────────────────────────────
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error, info) {
+    console.error("ErrorBoundary caught:", error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, color: '#fff', background: '#0B1120', minHeight: '100vh' }}>
+          <h1 style={{ color: '#3B82F6', marginBottom: 16 }}>ProbaLab – Erreur</h1>
+          <p style={{ marginBottom: 8 }}>Une erreur est survenue :</p>
+          <pre style={{ background: '#1a1a2e', padding: 16, borderRadius: 8, fontSize: 12, overflow: 'auto' }}>
+            {this.state.error?.toString()}
+          </pre>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ marginTop: 16, padding: '8px 16px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+          >
+            Recharger
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // ── Lazy pages ────────────────────────────────────────────────
 const HomePage = lazy(() => import("@/pages/HomePage"))
@@ -143,6 +177,10 @@ function Header() {
 }
 
 // ── Bottom Navigation (mobile only) ───────────────────────────
+function NHLIcon() {
+  return <span className="text-base leading-none">🏒</span>
+}
+
 function BottomNav() {
   const location = useLocation()
 
@@ -150,7 +188,7 @@ function BottomNav() {
     { to: "/", label: "Tous", icon: LayoutGrid, exact: true },
     { to: "/football", label: "Direct", icon: Radio },
     { to: "/watchlist", label: "Favoris", icon: Star },
-    { to: "/nhl", label: "NHL", icon: () => <span className="text-base leading-none">🏒</span> },
+    { to: "/nhl", label: "NHL", icon: NHLIcon },
     { to: "/premium", label: "Premium", icon: Trophy },
   ]
 
@@ -160,13 +198,14 @@ function BottomNav() {
         const isActive = tab.exact
           ? location.pathname === tab.to
           : location.pathname.startsWith(tab.to)
+        const Icon = tab.icon
         return (
           <NavLink
             key={tab.to}
             to={tab.to}
             className={cn("fs-bottom-nav-item", isActive && "active")}
           >
-            <tab.icon />
+            <Icon />
             <span>{tab.label}</span>
           </NavLink>
         )
@@ -272,13 +311,15 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </ThemeProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </ThemeProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 

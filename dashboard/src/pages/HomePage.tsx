@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-    Flame, Clock, TrendingUp, BellRing, ShieldAlert,
+    Flame, BellRing, ShieldAlert,
     ChevronRight, Activity, Star, Trophy
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { fetchPredictions, fetchPerformance, fetchNews } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth, supabase } from "@/lib/auth"
 
 /* ── Live Alert Banner ────────────────────────────────────────── */

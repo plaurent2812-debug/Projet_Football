@@ -1,20 +1,20 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-    Flame, BellRing, ShieldAlert, ChevronDown, ChevronUp,
-    ChevronRight, Activity, Star, Trophy, Radio
+    Flame, BellRing, ShieldAlert,
+    ChevronRight, Activity, Star, Trophy, Radio,
+    ArrowRight, Newspaper, TrendingUp
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { fetchPredictions, fetchPerformance, fetchNews } from "@/lib/api"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth, supabase } from "@/lib/auth"
-import { useWatchlist } from "@/lib/useWatchlist"
 
 /* ── Live Alert Banner ────────────────────────────────────────── */
 function LiveAlertBanner({ alert }) {
     if (!alert) return null
     return (
-        <div className="mx-3 mt-2 rounded border border-red-500/30 bg-red-500/5 p-3">
+        <div className="mx-3 mt-4 mb-2 rounded border border-red-500/30 bg-red-500/5 p-3 animate-fade-in-up">
             <div className="flex items-start gap-2">
                 <BellRing className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                 <div className="min-w-0">
@@ -34,10 +34,9 @@ function LiveAlertBanner({ alert }) {
     )
 }
 
-/* ── Match Row (compact, reusable) ─────────────────────────────── */
+/* ── Match Row (compact, for VIP spots) ───────────────────────── */
 function MatchRow({ match, sport = "football" }) {
     const navigate = useNavigate()
-    const { isStarred, toggleMatch } = useWatchlist()
     const pred = match.prediction
     const isFinished = ["FT", "AET", "PEN", "Final", "FINAL", "OFF"].includes(match.status)
     const isLive = ["1H", "2H", "HT", "ET", "P", "LIVE", "1P", "2P", "3P", "OT", "SO"].includes(match.status)
@@ -103,11 +102,6 @@ function MatchRow({ match, sport = "football" }) {
             {(!isFinished && pred) && (
                 <div className="shrink-0 flex items-center gap-1 pl-1">
                     {isHot && <Flame className="w-3 h-3 text-orange-500 flame-badge" />}
-                    {pred.recommended_bet && (
-                        <span className="fs-pred-chip bg-primary/10 text-primary hidden sm:inline-flex truncate max-w-[80px]">
-                            {pred.recommended_bet}
-                        </span>
-                    )}
                     {pred.confidence_score != null && (
                         <span className={cn(
                             "fs-pred-chip",
@@ -120,47 +114,6 @@ function MatchRow({ match, sport = "football" }) {
                     )}
                 </div>
             )}
-
-            <button
-                className="fs-star-btn"
-                onClick={(e) => { e.stopPropagation(); toggleMatch(match.id) }}
-            >
-                <Star className={cn(
-                    "w-3.5 h-3.5 transition-colors",
-                    isStarred(match.id) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400"
-                )} />
-            </button>
-        </div>
-    )
-}
-
-/* ── League Section (collapsible) ──────────────────────────────── */
-function LeagueSection({ leagueName, countryName, matches, sport }) {
-    const [collapsed, setCollapsed] = useState(false)
-    if (!matches?.length) return null
-
-    const liveCount = matches.filter(m => ["1H", "2H", "HT", "ET", "P", "LIVE", "1P", "2P", "3P", "OT", "SO"].includes(m.status)).length
-
-    return (
-        <div>
-            <div className="fs-league-header" onClick={() => setCollapsed(c => !c)}>
-                <div className="w-5 h-4 rounded-sm bg-muted/60 flex items-center justify-center shrink-0">
-                    <Trophy className="w-2.5 h-2.5 text-muted-foreground" />
-                </div>
-                <div className="min-w-0">
-                    {countryName && <div className="fs-league-country">{countryName}</div>}
-                    <div className="fs-league-name">{leagueName}</div>
-                </div>
-                {liveCount > 0 && (
-                    <span className="fs-summary-badge bg-red-500/15 text-red-500 text-[10px]">{liveCount}</span>
-                )}
-                <span className={cn("fs-league-count", liveCount > 0 && "has-live")}>{matches.length}</span>
-                {collapsed
-                    ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                    : <ChevronUp className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                }
-            </div>
-            {!collapsed && matches.map(m => <MatchRow key={m.id} match={m} sport={sport} />)}
         </div>
     )
 }
@@ -172,26 +125,28 @@ function NewsRow({ item }) {
             href={item.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 py-2 border-b border-border/20 last:border-0 hover:bg-accent/30 transition-colors group"
+            className="flex items-center gap-2 px-3 py-2.5 border-b border-border/20 last:border-0 hover:bg-accent/30 transition-colors group"
         >
             <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0">
                 {item.source}
             </span>
-            <span className="text-xs font-medium text-foreground/80 truncate group-hover:text-primary transition-colors">
+            <span className="text-xs font-medium text-foreground/80 group-hover:text-primary transition-colors line-clamp-2">
                 {item.title}
             </span>
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0 ml-auto group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
         </a>
     )
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Home Page (FlashScore-style — RICH content)
+   Home Page (Landing / Dashboard Hybrid)
    ═══════════════════════════════════════════════════════════ */
 export default function HomePage() {
     const navigate = useNavigate()
     const { isAdmin } = useAuth()
-    const [todayFBMatches, setTodayFBMatches] = useState([])
-    const [todayNHLMatches, setTodayNHLMatches] = useState([])
+    const [fbCount, setFbCount] = useState(0)
+    const [fbLiveCount, setFbLiveCount] = useState(0)
+    const [nhlCount, setNhlCount] = useState(0)
     const [vipSpots, setVipSpots] = useState([])
     const [perf, setPerf] = useState(null)
     const [news, setNews] = useState([])
@@ -203,12 +158,14 @@ export default function HomePage() {
         const today = new Date().toISOString().slice(0, 10)
         const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
 
-        // Fetch football matches (today + tomorrow for VIP spots)
+        // Fetch football matches
         const fetchFB = Promise.all([fetchPredictions(today), fetchPredictions(tomorrow)])
             .then(([r1, r2]) => {
                 const todayMatches = (r1.matches || []).map(m => ({ ...m, sport: 'football' }))
                 const tomorrowMatches = (r2.matches || []).map(m => ({ ...m, sport: 'football' }))
-                setTodayFBMatches(todayMatches)
+
+                setFbCount(todayMatches.length)
+                setFbLiveCount(todayMatches.filter(m => ["1H", "2H", "HT", "LIVE"].includes(m.status)).length)
 
                 // VIP = from today+tomorrow, high confidence or edge
                 const all = [...todayMatches, ...tomorrowMatches]
@@ -223,17 +180,16 @@ export default function HomePage() {
             })
             .catch(console.error)
 
-        // Fetch NHL matches (today)
+        // Fetch NHL matches
         const start = new Date(today); start.setHours(0, 0, 0, 0)
         const end = new Date(today); end.setHours(23, 59, 59, 999)
         const fetchNHL = supabase
             .from('nhl_fixtures')
-            .select('*')
+            .select('id, status')
             .gte('date', start.toISOString())
             .lte('date', end.toISOString())
-            .order('date', { ascending: true })
             .then(({ data }) => {
-                setTodayNHLMatches((data || []).map(m => ({ ...m, sport: 'nhl' })))
+                setNhlCount(data?.length || 0)
             })
             .catch(console.error)
 
@@ -254,216 +210,199 @@ export default function HomePage() {
             .catch(console.error)
     }, [])
 
-    // Build league groups for today's football
-    const byLeague = {}
-    todayFBMatches.forEach(m => {
-        const key = m.league_id || "other"
-        if (!byLeague[key]) byLeague[key] = { name: m.league_name || "Autres", id: key, countryName: m.country_name, matches: [] }
-        byLeague[key].matches.push(m)
-    })
-    const leagues = Object.values(byLeague).sort((a, b) => {
-        // Live leagues first, then alphabetical
-        const aLive = a.matches.some(m => ["1H", "2H", "HT", "LIVE"].includes(m.status))
-        const bLive = b.matches.some(m => ["1H", "2H", "HT", "LIVE"].includes(m.status))
-        if (aLive && !bLive) return -1
-        if (!aLive && bLive) return 1
-        return a.name.localeCompare(b.name)
-    })
-
-    const liveMatches = [...todayFBMatches, ...todayNHLMatches].filter(m =>
-        ["1H", "2H", "HT", "ET", "P", "LIVE", "1P", "2P", "3P", "OT", "SO"].includes(m.status)
-    )
-    const totalMatches = todayFBMatches.length + todayNHLMatches.length
-
     return (
-        <div className="animate-fade-in-up pb-4">
+        <div className="animate-fade-in-up pb-8 max-w-3xl mx-auto">
+
+            {/* ── Hero / Intro Section ──────────────────────────────── */}
+            <div className="px-4 py-8 text-center bg-gradient-to-b from-primary/10 to-transparent border-b border-border/30">
+                <div className="inline-flex items-center justify-center space-x-2 bg-primary/20 text-primary px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
+                    <Activity className="w-3 h-3" />
+                    <span>Mode FlashScore activé</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-black text-foreground mb-2 tracking-tight">
+                    Proba<span className="text-primary">Lab</span>
+                </h1>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                    L'intelligence artificielle au service de vos analyses sportives. Prédictions, Live Tracking et Value Bets en un coup d'œil.
+                </p>
+            </div>
+
             {/* Live Alert */}
             {liveAlert && <LiveAlertBanner alert={liveAlert} />}
 
-            {/* Performance Stats (compact bar) */}
-            <div className="fs-summary-bar flex-wrap">
-                <Activity className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-bold">Performance 30j</span>
-                <div className="flex items-center gap-3 ml-auto">
-                    <div className="text-center">
-                        <span className="text-xs font-black text-emerald-500 tabular-nums">{perf ? `${perf.accuracy_1x2}%` : "—"}</span>
-                        <span className="text-[9px] text-muted-foreground ml-1">1X2</span>
+            {/* ── Performance Stats (Trust building) ──────────────── */}
+            <div className="mx-3 mt-4 mb-4 rounded border border-border/50 bg-card overflow-hidden">
+                <div className="fs-summary-bar border-b border-border/50 bg-muted/20">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Performance Globale</span>
+                    <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">30 Derniers Jours</span>
+                </div>
+                <div className="grid grid-cols-3 divide-x divide-border/30">
+                    <div className="p-3 text-center bg-card hover:bg-accent/10 transition-colors">
+                        <div className="text-xs text-muted-foreground font-semibold mb-1">1X2</div>
+                        <div className="text-lg font-black text-emerald-500 tabular-nums">
+                            {perf ? `${perf.accuracy_1x2}%` : "—"}
+                        </div>
                     </div>
-                    <div className="text-center">
-                        <span className="text-xs font-black text-blue-500 tabular-nums">{perf ? `${perf.accuracy_btts}%` : "—"}</span>
-                        <span className="text-[9px] text-muted-foreground ml-1">BTTS</span>
+                    <div className="p-3 text-center bg-card hover:bg-accent/10 transition-colors">
+                        <div className="text-xs text-muted-foreground font-semibold mb-1">BTTS</div>
+                        <div className="text-lg font-black text-blue-500 tabular-nums">
+                            {perf ? `${perf.accuracy_btts}%` : "—"}
+                        </div>
                     </div>
-                    <div className="text-center">
-                        <span className="text-xs font-black text-purple-500 tabular-nums">{perf ? `${perf.accuracy_over_25}%` : "—"}</span>
-                        <span className="text-[9px] text-muted-foreground ml-1">O2.5</span>
+                    <div className="p-3 text-center bg-card hover:bg-accent/10 transition-colors">
+                        <div className="text-xs text-muted-foreground font-semibold mb-1">Over 2.5</div>
+                        <div className="text-lg font-black text-purple-500 tabular-nums">
+                            {perf ? `${perf.accuracy_over_25}%` : "—"}
+                        </div>
                     </div>
-                    <span className="fs-summary-badge bg-muted text-muted-foreground">{totalMatches}</span>
                 </div>
             </div>
 
-            {/* ── LIVE Section (if live matches) ─────────────────── */}
-            {liveMatches.length > 0 && (
-                <div className="bg-card border-x border-b border-border/50">
-                    <div className="fs-league-header bg-red-500/5 border-l-2 border-l-red-500">
-                        <Radio className="w-4 h-4 text-red-500 animate-pulse shrink-0" />
-                        <div className="fs-league-name text-red-500">EN DIRECT</div>
-                        <span className="fs-summary-badge bg-red-500/15 text-red-500">{liveMatches.length}</span>
+            {/* ── Main Shortcuts (Navigation) ─────────────────────── */}
+            <div className="px-3 mb-6 grid grid-cols-2 gap-3">
+                {/* Football Card */}
+                <div
+                    onClick={() => navigate("/football")}
+                    className="relative overflow-hidden rounded-xl border border-border/50 bg-card p-4 cursor-pointer hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all group"
+                >
+                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all">
+                        <span className="text-6xl">⚽</span>
                     </div>
-                    {liveMatches.map(m => <MatchRow key={m.id} match={m} sport={m.sport} />)}
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-black text-foreground uppercase tracking-wide">Football</span>
+                            {fbLiveCount > 0 && (
+                                <span className="flex h-2 w-2 relative">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                </span>
+                            )}
+                        </div>
+                        <div className="text-2xl font-black text-primary tabular-nums mb-1">
+                            {loading ? <Skeleton className="w-8 h-8" /> : fbCount}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-3">
+                            Matchs Aujourd'hui
+                        </div>
+                        <div className="text-[10px] font-bold text-primary group-hover:translate-x-1 transition-transform flex items-center">
+                            VOIR LES MATCHS <ArrowRight className="w-3 h-3 ml-1" />
+                        </div>
+                    </div>
                 </div>
-            )}
 
-            {/* ── VIP Spots ──────────────────────────────────────── */}
-            <div className="bg-card border-x border-b border-border/50">
-                <div className="fs-league-header">
+                {/* NHL Card */}
+                <div
+                    onClick={() => navigate("/nhl")}
+                    className="relative overflow-hidden rounded-xl border border-border/50 bg-card p-4 cursor-pointer hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5 transition-all group"
+                >
+                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 group-hover:scale-110 transition-all">
+                        <span className="text-6xl">🏒</span>
+                    </div>
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-black text-foreground uppercase tracking-wide">NHL</span>
+                        </div>
+                        <div className="text-2xl font-black text-blue-500 tabular-nums mb-1">
+                            {loading ? <Skeleton className="w-8 h-8" /> : nhlCount}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-3">
+                            Matchs Aujourd'hui
+                        </div>
+                        <div className="text-[10px] font-bold text-blue-500 group-hover:translate-x-1 transition-transform flex items-center">
+                            VOIR LES MATCHS <ArrowRight className="w-3 h-3 ml-1" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick Links Row */}
+            <div className="px-3 mb-6 grid grid-cols-2 gap-2">
+                <button
+                    onClick={() => navigate("/watchlist")}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border/50 bg-card text-foreground text-xs font-bold hover:bg-accent/50 hover:border-amber-500/50 transition-colors"
+                >
+                    <Star className="w-3.5 h-3.5 text-amber-500" /> Vos Favoris
+                </button>
+                <button
+                    onClick={() => navigate("/premium")}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border/50 bg-card text-foreground text-xs font-bold hover:bg-accent/50 hover:border-emerald-500/50 transition-colors"
+                >
+                    <Trophy className="w-3.5 h-3.5 text-emerald-500" /> Stats Premium
+                </button>
+            </div>
+
+            {/* ── VIP Spots (Quick preview) ────────────────────────── */}
+            <div className="mx-3 mb-6 bg-card border border-border/50 rounded-lg overflow-hidden shadow-sm">
+                <div className="fs-league-header bg-amber-500/5 border-b border-border/50">
                     <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
                     <div>
-                        <div className="fs-league-name">🔥 Spots Premium</div>
-                        <div className="fs-league-country">Confiance 8+ ou Edge fort</div>
+                        <div className="fs-league-name font-black">🔥 Spots Premium du Jour</div>
+                        <div className="fs-league-country">Haute confiance & Edge identifié</div>
                     </div>
-                    <span className="fs-league-count">{vipSpots.length}</span>
+                    <span className="fs-league-count bg-amber-500/20 text-amber-600">{vipSpots.length}</span>
                 </div>
 
                 {loading ? (
                     <div>
                         {[1, 2, 3].map(i => (
                             <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/20">
-                                <Skeleton className="h-4 w-10" />
+                                <Skeleton className="h-4 w-10 shrink-0" />
                                 <Skeleton className="h-4 flex-1" />
                                 <Skeleton className="h-5 w-12" />
-                                <Skeleton className="h-4 flex-1" />
                             </div>
                         ))}
                     </div>
                 ) : vipSpots.length > 0 ? (
-                    vipSpots.slice(0, 5).map(m => <MatchRow key={m.id} match={m} sport={m.sport} />)
+                    <>
+                        {vipSpots.slice(0, 5).map(m => <MatchRow key={m.id} match={m} sport={m.sport} />)}
+                        {vipSpots.length > 5 && (
+                            <button
+                                onClick={() => navigate("/premium")}
+                                className="w-full py-2.5 text-xs font-bold text-amber-600 bg-amber-500/5 hover:bg-amber-500/10 transition-colors border-t border-border/30 flex items-center justify-center"
+                            >
+                                Voir les {vipSpots.length} Spots VIP <ArrowRight className="w-3 h-3 ml-1" />
+                            </button>
+                        )}
+                    </>
                 ) : (
-                    <div className="text-center py-6 text-xs text-muted-foreground">
-                        Aucun Spot VIP détecté pour le moment.
+                    <div className="text-center py-6 text-xs text-muted-foreground flex flex-col items-center">
+                        <Activity className="w-6 h-6 text-muted-foreground/30 mb-2" />
+                        Aucun Spot VIP détecté pour l'instant.
                     </div>
                 )}
             </div>
-
-            {/* Quick Navigation */}
-            <div className="flex items-center gap-2 px-3 py-3 bg-card border-x border-b border-border/50">
-                <button
-                    onClick={() => navigate("/football")}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
-                >
-                    ⚽ Football <ChevronRight className="w-3 h-3" />
-                </button>
-                <button
-                    onClick={() => navigate("/nhl")}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
-                >
-                    🏒 NHL <ChevronRight className="w-3 h-3" />
-                </button>
-                <button
-                    onClick={() => navigate("/watchlist")}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-amber-500/10 text-amber-500 text-xs font-bold hover:bg-amber-500/20 transition-colors"
-                >
-                    <Star className="w-3 h-3" /> Favoris
-                </button>
-            </div>
-
-            {/* ── Today's Football (FULL, grouped by league) ────── */}
-            <div className="bg-card border-x border-border/50 mt-2">
-                <div className="fs-summary-bar border-b border-border/50">
-                    <span className="text-sm">⚽</span>
-                    <span className="text-xs font-bold">Football aujourd'hui</span>
-                    <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">{todayFBMatches.length}</span>
-                </div>
-
-                {loading ? (
-                    <div>
-                        {[1, 2, 3, 4, 5, 6].map(i => (
-                            <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/20">
-                                <Skeleton className="h-4 w-10 shrink-0" />
-                                <Skeleton className="h-4 flex-1" />
-                                <Skeleton className="h-5 w-12" />
-                                <Skeleton className="h-4 flex-1" />
-                            </div>
-                        ))}
-                    </div>
-                ) : leagues.length > 0 ? (
-                    leagues.map(league => (
-                        <LeagueSection
-                            key={league.id}
-                            leagueName={league.name}
-                            countryName={league.countryName}
-                            matches={league.matches}
-                            sport="football"
-                        />
-                    ))
-                ) : (
-                    <div className="text-center py-8 text-xs text-muted-foreground">
-                        Aucun match de football aujourd'hui.
-                    </div>
-                )}
-
-                {todayFBMatches.length > 0 && (
-                    <button
-                        onClick={() => navigate("/football")}
-                        className="w-full py-2.5 text-xs font-bold text-primary hover:bg-primary/5 transition-colors border-t border-border/30"
-                    >
-                        Voir tous les matchs Football →
-                    </button>
-                )}
-            </div>
-
-            {/* ── Today's NHL ────────────────────────────────────── */}
-            {(loading || todayNHLMatches.length > 0) && (
-                <div className="bg-card border-x border-b border-border/50">
-                    <div className="fs-summary-bar border-b border-border/50">
-                        <span className="text-sm">🏒</span>
-                        <span className="text-xs font-bold">NHL aujourd'hui</span>
-                        <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">{todayNHLMatches.length}</span>
-                    </div>
-
-                    {loading ? (
-                        <div>
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/20">
-                                    <Skeleton className="h-4 w-10 shrink-0" />
-                                    <Skeleton className="h-4 flex-1" />
-                                    <Skeleton className="h-5 w-12" />
-                                    <Skeleton className="h-4 flex-1" />
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        todayNHLMatches.map(m => <MatchRow key={m.id} match={m} sport="nhl" />)
-                    )}
-
-                    {todayNHLMatches.length > 0 && (
-                        <button
-                            onClick={() => navigate("/nhl")}
-                            className="w-full py-2.5 text-xs font-bold text-primary hover:bg-primary/5 transition-colors border-t border-border/30"
-                        >
-                            Voir tous les matchs NHL →
-                        </button>
-                    )}
-                </div>
-            )}
 
             {/* ── News Section ───────────────────────────────────── */}
-            <div className="bg-card border-x border-b border-border/50 rounded-b mt-2">
-                <div className="fs-league-header">
-                    <span className="text-sm">📰</span>
-                    <div className="fs-league-name">Actualités</div>
+            <div className="mx-3 bg-card border border-border/50 rounded-lg overflow-hidden shadow-sm">
+                <div className="fs-league-header bg-accent/30 border-b border-border/50">
+                    <Newspaper className="w-4 h-4 text-primary shrink-0" />
+                    <div className="fs-league-name font-black">Actualités Sportives</div>
                     <span className="fs-league-count">{news.length}</span>
                 </div>
+
                 {newsLoading ? (
-                    <div className="p-3 space-y-2">
+                    <div className="p-3 space-y-3">
                         {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-5 w-full" />)}
                     </div>
                 ) : news.length > 0 ? (
-                    news.slice(0, 10).map((item, i) => <NewsRow key={i} item={item} />)
+                    <div className="divide-y divide-border/20">
+                        {news.slice(0, 10).map((item, i) => <NewsRow key={i} item={item} />)}
+                    </div>
                 ) : (
                     <div className="text-center py-6 text-xs text-muted-foreground">
-                        Actualités indisponibles
+                        Actualités indisponibles actuellement.
                     </div>
                 )}
+
+                <button
+                    onClick={() => {
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    className="w-full py-2.5 text-[10px] font-bold text-muted-foreground hover:bg-accent/50 uppercase tracking-widest transition-colors flex items-center justify-center bg-muted/10"
+                >
+                    Haut de page
+                </button>
             </div>
         </div>
     )

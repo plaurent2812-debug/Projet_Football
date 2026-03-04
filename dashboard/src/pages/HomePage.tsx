@@ -215,10 +215,6 @@ export default function HomePage() {
 
             {/* ── Hero / Intro Section ──────────────────────────────── */}
             <div className="px-4 py-8 text-center bg-gradient-to-b from-primary/10 to-transparent border-b border-border/30">
-                <div className="inline-flex items-center justify-center space-x-2 bg-primary/20 text-primary px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
-                    <Activity className="w-3 h-3" />
-                    <span>Mode FlashScore activé</span>
-                </div>
                 <h1 className="text-2xl sm:text-3xl font-black text-foreground mb-2 tracking-tight">
                     Proba<span className="text-primary">Lab</span>
                 </h1>

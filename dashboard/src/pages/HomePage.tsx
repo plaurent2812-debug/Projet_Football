@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-    Flame, BellRing, ShieldAlert,
-    ChevronRight, Activity, Star, Trophy
+    Flame, BellRing, ShieldAlert, ChevronDown, ChevronUp,
+    ChevronRight, Activity, Star, Trophy, Radio
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { fetchPredictions, fetchPerformance, fetchNews } from "@/lib/api"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth, supabase } from "@/lib/auth"
+import { useWatchlist } from "@/lib/useWatchlist"
 
 /* ── Live Alert Banner ────────────────────────────────────────── */
 function LiveAlertBanner({ alert }) {
@@ -34,66 +34,138 @@ function LiveAlertBanner({ alert }) {
     )
 }
 
-/* ── VIP Match Row (compact) ──────────────────────────────────── */
-function VIPMatchRow({ match }) {
+/* ── Match Row (compact, reusable) ─────────────────────────────── */
+function MatchRow({ match, sport = "football" }) {
     const navigate = useNavigate()
+    const { isStarred, toggleMatch } = useWatchlist()
     const pred = match.prediction
-    const time = match.date?.slice(11, 16) || "—"
-    const isHot = pred?.confidence_score >= 7
-    const link = match.sport === 'nhl' ? `/nhl/match/${match.id}` : `/football/match/${match.id}`
-    const sj = pred?.stats_json || {}
-    const edge = pred?.kelly_edge || sj.kelly_edge
-    const sportEmoji = match.sport === 'nhl' ? '🏒' : '⚽'
+    const isFinished = ["FT", "AET", "PEN", "Final", "FINAL", "OFF"].includes(match.status)
+    const isLive = ["1H", "2H", "HT", "ET", "P", "LIVE", "1P", "2P", "3P", "OT", "SO"].includes(match.status)
+    const homeGoals = sport === "nhl" ? match.home_score : match.home_goals
+    const awayGoals = sport === "nhl" ? match.away_score : match.away_goals
+    const homeWon = isFinished && homeGoals > awayGoals
+    const awayWon = isFinished && awayGoals > homeGoals
+    const hasScore = isFinished || isLive
+    const time = match.date ? new Date(match.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "--:--"
+    const isHot = pred?.confidence_score >= 7 && !isFinished
+    const link = sport === "nhl" ? `/nhl/match/${match.api_fixture_id || match.id}` : `/football/match/${match.id}`
 
     return (
-        <div
-            onClick={() => navigate(link)}
-            className="fs-match-row group"
-        >
-            <div className="fs-match-time flex flex-col items-center">
-                <span className="text-[9px] text-muted-foreground">{sportEmoji}</span>
-                <span>{time}</span>
+        <div className="fs-match-row" onClick={() => navigate(link)}>
+            <div className="fs-match-time">
+                {isLive ? (
+                    <span className="fs-live-badge">{match.elapsed ? `${match.elapsed}'` : "LIVE"}</span>
+                ) : isFinished ? (
+                    <span className="text-[10px] font-semibold text-emerald-500">FT</span>
+                ) : (
+                    <span>{time}</span>
+                )}
             </div>
 
             <div className="fs-match-teams">
-                <span className="fs-team-name text-right">{match.home_team}</span>
-                <div className="fs-score-box">
-                    <span className="score-val text-muted-foreground/40">-</span>
-                    <span className="score-val text-muted-foreground/40">-</span>
+                <div className="flex-1 flex items-center gap-1.5 min-w-0 justify-end">
+                    <span className={cn("fs-team-name text-right", homeWon && "winner")}>{match.home_team}</span>
+                    {match.home_logo ? (
+                        <img src={match.home_logo} alt="" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
+                    ) : (
+                        <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
+                            {match.home_team?.charAt(0)}
+                        </div>
+                    )}
                 </div>
-                <span className="fs-team-name">{match.away_team}</span>
+
+                <div className={cn("fs-score-box", isLive && "live")}>
+                    {hasScore ? (
+                        <>
+                            <span className={cn("score-val", homeWon && "winner")}>{homeGoals ?? 0}</span>
+                            <span className={cn("score-val", awayWon && "winner")}>{awayGoals ?? 0}</span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="score-val text-muted-foreground/40">-</span>
+                            <span className="score-val text-muted-foreground/40">-</span>
+                        </>
+                    )}
+                </div>
+
+                <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                    {match.away_logo ? (
+                        <img src={match.away_logo} alt="" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
+                    ) : (
+                        <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
+                            {match.away_team?.charAt(0)}
+                        </div>
+                    )}
+                    <span className={cn("fs-team-name", awayWon && "winner")}>{match.away_team}</span>
+                </div>
             </div>
 
-            <div className="shrink-0 flex items-center gap-1 pl-1">
-                {isHot && <Flame className="w-3 h-3 text-orange-500 flame-badge" />}
-                {pred?.recommended_bet && (
-                    <span className="fs-pred-chip bg-primary/10 text-primary hidden sm:inline-flex truncate max-w-[80px]">
-                        {pred.recommended_bet}
-                    </span>
-                )}
-                {edge >= 4 && (
-                    <span className="fs-pred-chip bg-emerald-500/10 text-emerald-500">
-                        +{edge}%
-                    </span>
-                )}
-                {pred?.confidence_score != null && (
-                    <span className={cn(
-                        "fs-pred-chip",
-                        pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-500" :
-                            pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-500" :
-                                "bg-muted text-muted-foreground"
-                    )}>
-                        {pred.confidence_score}/10
-                    </span>
-                )}
-            </div>
+            {(!isFinished && pred) && (
+                <div className="shrink-0 flex items-center gap-1 pl-1">
+                    {isHot && <Flame className="w-3 h-3 text-orange-500 flame-badge" />}
+                    {pred.recommended_bet && (
+                        <span className="fs-pred-chip bg-primary/10 text-primary hidden sm:inline-flex truncate max-w-[80px]">
+                            {pred.recommended_bet}
+                        </span>
+                    )}
+                    {pred.confidence_score != null && (
+                        <span className={cn(
+                            "fs-pred-chip",
+                            pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-500" :
+                                pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-500" :
+                                    "bg-muted text-muted-foreground"
+                        )}>
+                            {pred.confidence_score}/10
+                        </span>
+                    )}
+                </div>
+            )}
 
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/20 group-hover:text-muted-foreground/50 shrink-0" />
+            <button
+                className="fs-star-btn"
+                onClick={(e) => { e.stopPropagation(); toggleMatch(match.id) }}
+            >
+                <Star className={cn(
+                    "w-3.5 h-3.5 transition-colors",
+                    isStarred(match.id) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400"
+                )} />
+            </button>
         </div>
     )
 }
 
-/* ── News Row (compact, one-line) ──────────────────────────────── */
+/* ── League Section (collapsible) ──────────────────────────────── */
+function LeagueSection({ leagueName, countryName, matches, sport }) {
+    const [collapsed, setCollapsed] = useState(false)
+    if (!matches?.length) return null
+
+    const liveCount = matches.filter(m => ["1H", "2H", "HT", "ET", "P", "LIVE", "1P", "2P", "3P", "OT", "SO"].includes(m.status)).length
+
+    return (
+        <div>
+            <div className="fs-league-header" onClick={() => setCollapsed(c => !c)}>
+                <div className="w-5 h-4 rounded-sm bg-muted/60 flex items-center justify-center shrink-0">
+                    <Trophy className="w-2.5 h-2.5 text-muted-foreground" />
+                </div>
+                <div className="min-w-0">
+                    {countryName && <div className="fs-league-country">{countryName}</div>}
+                    <div className="fs-league-name">{leagueName}</div>
+                </div>
+                {liveCount > 0 && (
+                    <span className="fs-summary-badge bg-red-500/15 text-red-500 text-[10px]">{liveCount}</span>
+                )}
+                <span className={cn("fs-league-count", liveCount > 0 && "has-live")}>{matches.length}</span>
+                {collapsed
+                    ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                    : <ChevronUp className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                }
+            </div>
+            {!collapsed && matches.map(m => <MatchRow key={m.id} match={m} sport={sport} />)}
+        </div>
+    )
+}
+
+/* ── News Row ──────────────────────────────────────────────────── */
 function NewsRow({ item }) {
     return (
         <a
@@ -113,13 +185,14 @@ function NewsRow({ item }) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Home Page (FlashScore-style)
+   Home Page (FlashScore-style — RICH content)
    ═══════════════════════════════════════════════════════════ */
 export default function HomePage() {
     const navigate = useNavigate()
     const { isAdmin } = useAuth()
-    const [topMatches, setTopMatches] = useState([])
-    const [totalCount, setTotalCount] = useState(0)
+    const [todayFBMatches, setTodayFBMatches] = useState([])
+    const [todayNHLMatches, setTodayNHLMatches] = useState([])
+    const [vipSpots, setVipSpots] = useState([])
     const [perf, setPerf] = useState(null)
     const [news, setNews] = useState([])
     const [loading, setLoading] = useState(true)
@@ -130,42 +203,46 @@ export default function HomePage() {
         const today = new Date().toISOString().slice(0, 10)
         const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
 
+        // Fetch football matches (today + tomorrow for VIP spots)
         const fetchFB = Promise.all([fetchPredictions(today), fetchPredictions(tomorrow)])
             .then(([r1, r2]) => {
-                const arr = [...(r1.matches || []), ...(r2.matches || [])]
-                return arr.map(m => ({ ...m, sport: 'football' }))
-            })
+                const todayMatches = (r1.matches || []).map(m => ({ ...m, sport: 'football' }))
+                const tomorrowMatches = (r2.matches || []).map(m => ({ ...m, sport: 'football' }))
+                setTodayFBMatches(todayMatches)
 
-        const start = new Date(today); start.setHours(0, 0, 0, 0)
-        const end = new Date(tomorrow); end.setHours(23, 59, 59, 999)
-        const fetchNHL = supabase
-            .from('nhl_fixtures')
-            .select('*')
-            .gte('date', start.toISOString())
-            .lte('date', end.toISOString())
-            .then(({ data }) => (data || []).map(m => ({ ...m, sport: 'nhl' })))
-
-        Promise.all([fetchFB, fetchNHL])
-            .then(([fbMatches, nhlMatches]) => {
-                const all = [...fbMatches, ...nhlMatches]
-                setTotalCount(all.length)
-
-                const vipSpots = all.filter(m => {
-                    if (m.status === "FT" || !m.prediction) return false
+                // VIP = from today+tomorrow, high confidence or edge
+                const all = [...todayMatches, ...tomorrowMatches]
+                const vip = all.filter(m => {
+                    if (["FT", "AET", "PEN"].includes(m.status) || !m.prediction) return false
                     const c = m.prediction.confidence_score || 0
                     const sj = m.prediction.stats_json || {}
                     const edge = m.prediction.kelly_edge || sj.kelly_edge || 0
                     return c >= 8 || edge >= 4
                 }).sort((a, b) => (b.prediction?.confidence_score || 0) - (a.prediction?.confidence_score || 0))
-
-                setTopMatches(vipSpots)
+                setVipSpots(vip)
             })
             .catch(console.error)
-            .finally(() => setLoading(false))
+
+        // Fetch NHL matches (today)
+        const start = new Date(today); start.setHours(0, 0, 0, 0)
+        const end = new Date(today); end.setHours(23, 59, 59, 999)
+        const fetchNHL = supabase
+            .from('nhl_fixtures')
+            .select('*')
+            .gte('date', start.toISOString())
+            .lte('date', end.toISOString())
+            .order('date', { ascending: true })
+            .then(({ data }) => {
+                setTodayNHLMatches((data || []).map(m => ({ ...m, sport: 'nhl' })))
+            })
+            .catch(console.error)
+
+        Promise.all([fetchFB, fetchNHL]).finally(() => setLoading(false))
 
         fetchPerformance(30).then(setPerf).catch(() => { })
         fetchNews().then(r => setNews(r.news || [])).catch(() => { }).finally(() => setNewsLoading(false))
 
+        // Live alert
         const thirtyMinsAgo = new Date(Date.now() - 30 * 60000).toISOString()
         supabase
             .from("live_alerts")
@@ -176,6 +253,27 @@ export default function HomePage() {
             .then(({ data }) => { if (data?.length > 0) setLiveAlert(data[0]) })
             .catch(console.error)
     }, [])
+
+    // Build league groups for today's football
+    const byLeague = {}
+    todayFBMatches.forEach(m => {
+        const key = m.league_id || "other"
+        if (!byLeague[key]) byLeague[key] = { name: m.league_name || "Autres", id: key, countryName: m.country_name, matches: [] }
+        byLeague[key].matches.push(m)
+    })
+    const leagues = Object.values(byLeague).sort((a, b) => {
+        // Live leagues first, then alphabetical
+        const aLive = a.matches.some(m => ["1H", "2H", "HT", "LIVE"].includes(m.status))
+        const bLive = b.matches.some(m => ["1H", "2H", "HT", "LIVE"].includes(m.status))
+        if (aLive && !bLive) return -1
+        if (!aLive && bLive) return 1
+        return a.name.localeCompare(b.name)
+    })
+
+    const liveMatches = [...todayFBMatches, ...todayNHLMatches].filter(m =>
+        ["1H", "2H", "HT", "ET", "P", "LIVE", "1P", "2P", "3P", "OT", "SO"].includes(m.status)
+    )
+    const totalMatches = todayFBMatches.length + todayNHLMatches.length
 
     return (
         <div className="animate-fade-in-up pb-4">
@@ -199,19 +297,31 @@ export default function HomePage() {
                         <span className="text-xs font-black text-purple-500 tabular-nums">{perf ? `${perf.accuracy_over_25}%` : "—"}</span>
                         <span className="text-[9px] text-muted-foreground ml-1">O2.5</span>
                     </div>
-                    <span className="fs-summary-badge bg-muted text-muted-foreground">{totalCount}</span>
+                    <span className="fs-summary-badge bg-muted text-muted-foreground">{totalMatches}</span>
                 </div>
             </div>
 
-            {/* VIP Spots Section */}
-            <div className="bg-card border-x border-border/50">
+            {/* ── LIVE Section (if live matches) ─────────────────── */}
+            {liveMatches.length > 0 && (
+                <div className="bg-card border-x border-b border-border/50">
+                    <div className="fs-league-header bg-red-500/5 border-l-2 border-l-red-500">
+                        <Radio className="w-4 h-4 text-red-500 animate-pulse shrink-0" />
+                        <div className="fs-league-name text-red-500">EN DIRECT</div>
+                        <span className="fs-summary-badge bg-red-500/15 text-red-500">{liveMatches.length}</span>
+                    </div>
+                    {liveMatches.map(m => <MatchRow key={m.id} match={m} sport={m.sport} />)}
+                </div>
+            )}
+
+            {/* ── VIP Spots ──────────────────────────────────────── */}
+            <div className="bg-card border-x border-b border-border/50">
                 <div className="fs-league-header">
                     <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
                     <div>
-                        <div className="fs-league-name">Spots Premium du jour</div>
+                        <div className="fs-league-name">🔥 Spots Premium</div>
                         <div className="fs-league-country">Confiance 8+ ou Edge fort</div>
                     </div>
-                    <span className="fs-league-count">{topMatches.length}</span>
+                    <span className="fs-league-count">{vipSpots.length}</span>
                 </div>
 
                 {loading ? (
@@ -225,10 +335,10 @@ export default function HomePage() {
                             </div>
                         ))}
                     </div>
-                ) : topMatches.length > 0 ? (
-                    topMatches.map((m, i) => <VIPMatchRow key={i} match={m} />)
+                ) : vipSpots.length > 0 ? (
+                    vipSpots.slice(0, 5).map(m => <MatchRow key={m.id} match={m} sport={m.sport} />)
                 ) : (
-                    <div className="text-center py-10 text-xs text-muted-foreground">
+                    <div className="text-center py-6 text-xs text-muted-foreground">
                         Aucun Spot VIP détecté pour le moment.
                     </div>
                 )}
@@ -240,26 +350,103 @@ export default function HomePage() {
                     onClick={() => navigate("/football")}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
                 >
-                    ⚽ Football
-                    <ChevronRight className="w-3 h-3" />
+                    ⚽ Football <ChevronRight className="w-3 h-3" />
                 </button>
                 <button
                     onClick={() => navigate("/nhl")}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
                 >
-                    🏒 NHL
-                    <ChevronRight className="w-3 h-3" />
+                    🏒 NHL <ChevronRight className="w-3 h-3" />
                 </button>
                 <button
                     onClick={() => navigate("/watchlist")}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded bg-amber-500/10 text-amber-500 text-xs font-bold hover:bg-amber-500/20 transition-colors"
                 >
-                    <Star className="w-3 h-3" />
-                    Favoris
+                    <Star className="w-3 h-3" /> Favoris
                 </button>
             </div>
 
-            {/* News Section */}
+            {/* ── Today's Football (FULL, grouped by league) ────── */}
+            <div className="bg-card border-x border-border/50 mt-2">
+                <div className="fs-summary-bar border-b border-border/50">
+                    <span className="text-sm">⚽</span>
+                    <span className="text-xs font-bold">Football aujourd'hui</span>
+                    <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">{todayFBMatches.length}</span>
+                </div>
+
+                {loading ? (
+                    <div>
+                        {[1, 2, 3, 4, 5, 6].map(i => (
+                            <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/20">
+                                <Skeleton className="h-4 w-10 shrink-0" />
+                                <Skeleton className="h-4 flex-1" />
+                                <Skeleton className="h-5 w-12" />
+                                <Skeleton className="h-4 flex-1" />
+                            </div>
+                        ))}
+                    </div>
+                ) : leagues.length > 0 ? (
+                    leagues.map(league => (
+                        <LeagueSection
+                            key={league.id}
+                            leagueName={league.name}
+                            countryName={league.countryName}
+                            matches={league.matches}
+                            sport="football"
+                        />
+                    ))
+                ) : (
+                    <div className="text-center py-8 text-xs text-muted-foreground">
+                        Aucun match de football aujourd'hui.
+                    </div>
+                )}
+
+                {todayFBMatches.length > 0 && (
+                    <button
+                        onClick={() => navigate("/football")}
+                        className="w-full py-2.5 text-xs font-bold text-primary hover:bg-primary/5 transition-colors border-t border-border/30"
+                    >
+                        Voir tous les matchs Football →
+                    </button>
+                )}
+            </div>
+
+            {/* ── Today's NHL ────────────────────────────────────── */}
+            {(loading || todayNHLMatches.length > 0) && (
+                <div className="bg-card border-x border-b border-border/50">
+                    <div className="fs-summary-bar border-b border-border/50">
+                        <span className="text-sm">🏒</span>
+                        <span className="text-xs font-bold">NHL aujourd'hui</span>
+                        <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">{todayNHLMatches.length}</span>
+                    </div>
+
+                    {loading ? (
+                        <div>
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/20">
+                                    <Skeleton className="h-4 w-10 shrink-0" />
+                                    <Skeleton className="h-4 flex-1" />
+                                    <Skeleton className="h-5 w-12" />
+                                    <Skeleton className="h-4 flex-1" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        todayNHLMatches.map(m => <MatchRow key={m.id} match={m} sport="nhl" />)
+                    )}
+
+                    {todayNHLMatches.length > 0 && (
+                        <button
+                            onClick={() => navigate("/nhl")}
+                            className="w-full py-2.5 text-xs font-bold text-primary hover:bg-primary/5 transition-colors border-t border-border/30"
+                        >
+                            Voir tous les matchs NHL →
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* ── News Section ───────────────────────────────────── */}
             <div className="bg-card border-x border-b border-border/50 rounded-b mt-2">
                 <div className="fs-league-header">
                     <span className="text-sm">📰</span>
@@ -271,7 +458,7 @@ export default function HomePage() {
                         {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-5 w-full" />)}
                     </div>
                 ) : news.length > 0 ? (
-                    news.slice(0, 8).map((item, i) => <NewsRow key={i} item={item} />)
+                    news.slice(0, 10).map((item, i) => <NewsRow key={i} item={item} />)
                 ) : (
                     <div className="text-center py-6 text-xs text-muted-foreground">
                         Actualités indisponibles

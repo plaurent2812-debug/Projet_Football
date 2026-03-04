@@ -4,13 +4,14 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ═══════════════════════════════════════════════════
-   ProbaLab v2 — Blue/White Design System
+   ProbaLab v3 — FlashScore-inspired Design System
+   Bleu ProbaLab + Dense / Dark-first
    ═══════════════════════════════════════════════════ */
 
 :root {
-  /* Light Theme (Default) */
-  --background: 214 100% 98%;       /* #F0F7FF — bleu très clair */
-  --foreground: 222 47% 11%;        /* #1A2744 — bleu nuit texte */
+  /* Light Theme */
+  --background: 214 100% 98%;
+  --foreground: 222 47% 11%;
 
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
@@ -18,10 +19,10 @@
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
 
-  --primary: 221 83% 40%;           /* #1E40AF — bleu roi */
+  --primary: 221 83% 40%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 214 100% 95%;        /* #E0EFFF */
+  --secondary: 214 100% 95%;
   --secondary-foreground: 221 83% 30%;
 
   --muted: 214 60% 94%;
@@ -37,26 +38,34 @@
   --input: 214 40% 88%;
   --ring: 221 83% 40%;
 
-  --radius: 0.625rem;
+  --radius: 0.375rem;
 
   /* Brand */
   --brand-blue: #1E40AF;
   --brand-blue-light: #3B82F6;
   --brand-blue-pale: #EFF6FF;
+
+  /* FlashScore specific tokens */
+  --fs-league-bg: 214 60% 96%;
+  --fs-row-hover: 214 50% 93%;
+  --fs-date-active: 221 83% 40%;
+  --fs-separator: 214 30% 90%;
+  --fs-live: 0 84% 55%;
+  --fs-score-bg: 214 30% 92%;
 }
 
 /* Dark Theme */
 .dark {
-  --background: 222 47% 7%;         /* #0B1120 — bleu nuit profond */
+  --background: 222 47% 7%;
   --foreground: 210 40% 95%;
 
-  --card: 222 47% 10%;              /* #0F1A2E */
+  --card: 222 47% 10%;
   --card-foreground: 210 40% 95%;
 
   --popover: 222 47% 10%;
   --popover-foreground: 210 40% 95%;
 
-  --primary: 217 91% 60%;           /* #3B82F6 — bleu vif */
+  --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;
 
   --secondary: 222 47% 15%;
@@ -74,6 +83,14 @@
   --border: 222 47% 18%;
   --input: 222 47% 18%;
   --ring: 217 91% 60%;
+
+  /* FlashScore dark tokens */
+  --fs-league-bg: 222 47% 12%;
+  --fs-row-hover: 222 47% 14%;
+  --fs-date-active: 217 91% 60%;
+  --fs-separator: 222 47% 16%;
+  --fs-live: 0 70% 50%;
+  --fs-score-bg: 222 47% 16%;
 }
 
 @theme inline {
@@ -111,6 +128,8 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
+    /* Prevent body scroll bounce on mobile for app-like feel */
+    overscroll-behavior: none;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -119,8 +138,8 @@
   }
 }
 
-/* ── Scrollbar ──────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+/* ── Scrollbar (thin) ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--border));
@@ -130,7 +149,339 @@
   background: hsl(var(--muted-foreground) / 0.4);
 }
 
-/* ── Glass effect ───────────────────────────────────────────── */
+/* ── Hide scrollbar for date bar ───────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ══════════════════════════════════════════════════════════════
+   FlashScore-style components
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Date bar ──────────────────────────────────────────────── */
+.fs-date-bar {
+  display: flex;
+  overflow-x: auto;
+  gap: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.fs-date-bar::-webkit-scrollbar { display: none; }
+
+.fs-date-item {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  min-width: 56px;
+  user-select: none;
+}
+.fs-date-item:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--fs-row-hover));
+}
+.fs-date-item.active {
+  color: hsl(var(--primary));
+  border-bottom-color: hsl(var(--primary));
+  font-weight: 700;
+}
+.fs-date-item .date-day {
+  font-size: 0.65rem;
+  font-weight: 500;
+  opacity: 0.7;
+  margin-bottom: 1px;
+}
+.fs-date-item.active .date-day {
+  opacity: 1;
+}
+.fs-date-item .date-num {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ── League header row ─────────────────────────────────────── */
+.fs-league-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: hsl(var(--fs-league-bg));
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.fs-league-header:hover {
+  background: hsl(var(--fs-row-hover));
+}
+.fs-league-country {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  letter-spacing: 0.05em;
+}
+.fs-league-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.fs-league-count {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+.fs-league-count.has-live {
+  background: hsl(var(--fs-live) / 0.15);
+  color: hsl(var(--fs-live));
+}
+
+/* ── Match row ─────────────────────────────────────────────── */
+.fs-match-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid hsl(var(--border) / 0.3);
+  cursor: pointer;
+  transition: background 0.12s ease;
+  min-height: 40px;
+  gap: 6px;
+}
+.fs-match-row:last-child { border-bottom: none; }
+.fs-match-row:hover {
+  background: hsl(var(--fs-row-hover));
+}
+
+.fs-match-time {
+  width: 42px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+.fs-match-teams {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fs-team-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: hsl(var(--foreground) / 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fs-team-name.winner {
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+
+.fs-score-box {
+  flex-shrink: 0;
+  width: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 0;
+}
+.fs-score-box .score-val {
+  width: 20px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--fs-score-bg));
+  border-radius: 3px;
+  font-size: 0.75rem;
+}
+.fs-score-box .score-val.winner {
+  color: hsl(var(--primary));
+}
+.fs-score-box.live .score-val {
+  background: hsl(var(--fs-live) / 0.12);
+  color: hsl(var(--fs-live));
+}
+
+/* ── Live badge ────────────────────────────────────────────── */
+.fs-live-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  background: hsl(var(--fs-live) / 0.15);
+  color: hsl(var(--fs-live));
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ── Prediction chip (compact) ─────────────────────────────── */
+.fs-pred-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Bottom Navigation Bar (mobile) ────────────────────────── */
+.fs-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  background: hsl(var(--card));
+  border-top: 1px solid hsl(var(--border));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  height: 56px;
+}
+.fs-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: color 0.15s ease;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.fs-bottom-nav-item:hover,
+.fs-bottom-nav-item.active {
+  color: hsl(var(--primary));
+}
+.fs-bottom-nav-item svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ── Summary bar (Tous les matchs) ─────────────────────────── */
+.fs-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.fs-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Star button (compact) ─────────────────────────────────── */
+.fs-star-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.fs-star-btn:hover {
+  background: hsl(var(--accent));
+}
+
+/* ── Flame badge (for hot picks) ───────────────────────────── */
+.flame-badge {
+  animation: flame-pulse 2s ease-in-out infinite;
+}
+@keyframes flame-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+/* ── Animations ────────────────────────────────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.3s ease-out both;
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out both;
+}
+
+/* ── Probability bar ───────────────────────────────────────── */
+.prob-bar-fill {
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Glass effect ──────────────────────────────────────────── */
 .glass {
   background: hsl(var(--card) / 0.7);
   backdrop-filter: blur(16px) saturate(180%);
@@ -138,7 +489,17 @@
   border: 1px solid hsl(var(--border) / 0.6);
 }
 
-/* ── Gradient text ──────────────────────────────────────────── */
+/* ── Glow effects ──────────────────────────────────────────── */
+.glow-primary {
+  box-shadow: 0 0 24px hsl(var(--primary) / 0.15),
+              0 0 60px hsl(var(--primary) / 0.05);
+}
+.glow-card {
+  box-shadow: 0 2px 12px hsl(var(--primary) / 0.06),
+              0 1px 3px hsl(var(--foreground) / 0.03);
+}
+
+/* ── Gradient text ─────────────────────────────────────────── */
 .gradient-text {
   background: linear-gradient(135deg, hsl(var(--primary)), hsl(217 91% 70%));
   -webkit-background-clip: text;
@@ -146,70 +507,32 @@
   background-clip: text;
 }
 
-/* ── Glow effects ───────────────────────────────────────────── */
-.glow-primary {
-  box-shadow: 0 0 24px hsl(var(--primary) / 0.15),
-              0 0 60px hsl(var(--primary) / 0.05);
-}
-
-.glow-card {
-  box-shadow: 0 4px 24px hsl(var(--primary) / 0.08),
-              0 1px 4px hsl(var(--foreground) / 0.04);
-}
-
-/* ── Premium blur overlay ───────────────────────────────────── */
+/* ── Premium blur overlay ──────────────────────────────────── */
 .premium-blur {
   filter: blur(5px);
   user-select: none;
   pointer-events: none;
 }
 
-/* ── Flame badge ────────────────────────────────────────────── */
-.flame-badge {
-  animation: flame-pulse 2s ease-in-out infinite;
+/* ── Disclaimer footer ─────────────────────────────────────── */
+.disclaimer-text {
+  font-size: 0.65rem;
+  color: hsl(var(--muted-foreground) / 0.6);
+  line-height: 1.4;
 }
 
-@keyframes flame-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
+/* ── Mobile bottom nav spacing ─────────────────────────────── */
+@media (max-width: 767px) {
+  .has-bottom-nav {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
-/* ── Animations ─────────────────────────────────────────────── */
-@keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.4s ease-out both;
-}
-
-@keyframes slide-in-left {
-  from { opacity: 0; transform: translateX(-12px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-.animate-slide-in-left {
-  animation: slide-in-left 0.35s ease-out both;
-}
-
-/* ── Probability bar ────────────────────────────────────────── */
-.prob-bar-fill {
-  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ── Match card hover ───────────────────────────────────────── */
+/* ── Match card legacy support ─────────────────────────────── */
 .match-card {
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 .match-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px hsl(var(--primary) / 0.1);
-}
-
-/* ── Disclaimer footer ──────────────────────────────────────── */
-.disclaimer-text {
-  font-size: 0.7rem;
-  color: hsl(var(--muted-foreground) / 0.7);
-  line-height: 1.5;
+  box-shadow: 0 4px 16px hsl(var(--primary) / 0.08);
 }

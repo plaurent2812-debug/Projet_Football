@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom"
 import { lazy, Suspense, useState, useEffect } from "react"
-import { Zap, Trophy, Shield, Menu, X, LogOut, User, ChevronRight, Star } from "lucide-react"
+import { Zap, Trophy, Shield, User, Star, Radio, LayoutGrid } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -25,207 +25,172 @@ import GoalNotifications from "@/components/GoalNotifications"
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center py-32">
-      <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+    <div className="flex items-center justify-center py-24">
+      <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
     </div>
   )
 }
 
-// ── Header ────────────────────────────────────────────────────
-function Header({ mobileOpen, setMobileOpen }) {
-  const { user, signOut, role, isPremium, isAdmin } = useAuth()
+// ── Header (FlashScore-style compact) ─────────────────────────
+function Header() {
+  const { user, isPremium, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
-  const navLinks = [
-    { to: "/", label: "Accueil", exact: true },
-    { to: "/football", label: "⚽ Football" },
-    { to: "/nhl", label: "🏒 NHL" },
-    { to: "/watchlist", label: "⭐ Favoris" },
-  ]
+  const isFootball = location.pathname.startsWith('/football') || location.pathname === '/'
+  const isNHL = location.pathname.startsWith('/nhl')
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-card/80 backdrop-blur-xl shadow-sm">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-14">
+    <header className="sticky top-0 z-50 border-b border-border/60 bg-card">
+      <div className="max-w-[1200px] mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-between h-11">
 
           {/* Logo */}
-          <NavLink to="/" className="flex items-center gap-2 group shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/30">
-              <Zap className="w-4 h-4 text-primary-foreground" />
+          <NavLink to="/" className="flex items-center gap-1.5 shrink-0">
+            <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
+              <Zap className="w-3 h-3 text-primary-foreground" />
             </div>
-            <span className="text-lg font-black tracking-tight text-foreground">
+            <span className="text-sm font-black tracking-tight text-foreground hidden sm:inline">
               Proba<span className="text-primary">Lab</span>
             </span>
           </NavLink>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map(link => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                end={link.exact}
-                className={({ isActive }) => cn(
-                  "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
-                  isActive
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-                )}
-              >
-                {link.label}
-              </NavLink>
-            ))}
+          {/* Center: Sport tabs */}
+          <nav className="flex items-center gap-0">
+            <NavLink
+              to="/football"
+              className={cn(
+                "px-3 py-2 text-xs font-bold transition-colors border-b-2",
+                isFootball
+                  ? "text-primary border-primary"
+                  : "text-muted-foreground border-transparent hover:text-foreground"
+              )}
+            >
+              ⚽ Football
+            </NavLink>
+            <NavLink
+              to="/nhl"
+              className={cn(
+                "px-3 py-2 text-xs font-bold transition-colors border-b-2",
+                isNHL
+                  ? "text-primary border-primary"
+                  : "text-muted-foreground border-transparent hover:text-foreground"
+              )}
+            >
+              🏒 NHL
+            </NavLink>
             {isAdmin && (
               <>
                 <NavLink
                   to="/performance"
                   className={({ isActive }) => cn(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
-                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                    "px-3 py-2 text-xs font-bold transition-colors border-b-2 hidden md:block",
+                    isActive ? "text-primary border-primary" : "text-muted-foreground border-transparent hover:text-foreground"
                   )}
                 >
-                  Performance
+                  📊 Perf
                 </NavLink>
                 <NavLink
                   to="/admin"
                   className={({ isActive }) => cn(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150",
-                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                    "px-3 py-2 text-xs font-bold transition-colors border-b-2 hidden md:block",
+                    isActive ? "text-primary border-primary" : "text-muted-foreground border-transparent hover:text-foreground"
                   )}
                 >
-                  <Shield className="w-3.5 h-3.5 inline mr-1" />Admin
+                  <Shield className="w-3 h-3 inline mr-0.5" />Admin
                 </NavLink>
               </>
             )}
           </nav>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <ModeToggle />
 
-            {/* Premium badge */}
             {!isPremium && !isAdmin && (
               <button
                 onClick={() => navigate('/premium')}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors border border-amber-500/20"
+                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
               >
-                <Trophy className="w-3.5 h-3.5" />
-                Premium
+                <Trophy className="w-3 h-3" />
+                PRO
               </button>
             )}
 
-            {/* Auth */}
             {user ? (
               <NavLink
                 to="/profile"
                 className={({ isActive }) => cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border",
-                  isActive
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "bg-accent/40 text-foreground border-border/50 hover:bg-accent/60"
+                  "p-1.5 rounded transition-colors",
+                  isActive ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
                 )}
               >
                 <User className="w-4 h-4" />
-                <span className="hidden lg:inline">Mon compte</span>
               </NavLink>
             ) : (
               <NavLink
                 to="/login"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm shadow-primary/20"
+                className="px-2.5 py-1 rounded text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 Connexion
               </NavLink>
             )}
-
-            {/* Mobile menu toggle */}
-            <button
-              className="md:hidden p-2 rounded-lg text-muted-foreground hover:bg-accent/60 transition-colors"
-              onClick={() => setMobileOpen(o => !o)}
-            >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Mobile Menu */}
-      {mobileOpen && (
-        <div className="md:hidden border-t border-border/40 bg-card/95 backdrop-blur-xl px-4 py-3 space-y-1">
-          {navLinks.map(link => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.exact}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) => cn(
-                "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/60"
-              )}
-            >
-              {link.label}
-              <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
-            </NavLink>
-          ))}
-          {isAdmin && (
-            <>
-              <NavLink
-                to="/performance"
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) => cn(
-                  "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/60"
-                )}
-              >
-                📊 Performance
-                <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
-              </NavLink>
-              <NavLink
-                to="/admin"
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) => cn(
-                  "flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/60"
-                )}
-              >
-                <span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" /> Admin</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
-              </NavLink>
-            </>
-          )}
-          {!isPremium && !isAdmin && (
-            <NavLink
-              to="/premium"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-bold text-amber-600 bg-amber-500/10"
-            >
-              <Trophy className="w-4 h-4" /> Passer Premium
-            </NavLink>
-          )}
-        </div>
-      )}
     </header>
   )
 }
 
-// ── Footer ────────────────────────────────────────────────────
+// ── Bottom Navigation (mobile only) ───────────────────────────
+function BottomNav() {
+  const location = useLocation()
+
+  const tabs = [
+    { to: "/", label: "Tous", icon: LayoutGrid, exact: true },
+    { to: "/football", label: "Direct", icon: Radio },
+    { to: "/watchlist", label: "Favoris", icon: Star },
+    { to: "/nhl", label: "NHL", icon: () => <span className="text-base leading-none">🏒</span> },
+    { to: "/premium", label: "Premium", icon: Trophy },
+  ]
+
+  return (
+    <nav className="fs-bottom-nav md:hidden">
+      {tabs.map(tab => {
+        const isActive = tab.exact
+          ? location.pathname === tab.to
+          : location.pathname.startsWith(tab.to)
+        return (
+          <NavLink
+            key={tab.to}
+            to={tab.to}
+            className={cn("fs-bottom-nav-item", isActive && "active")}
+          >
+            <tab.icon />
+            <span>{tab.label}</span>
+          </NavLink>
+        )
+      })}
+    </nav>
+  )
+}
+
+// ── Footer (hidden on mobile, bottom nav replaces it) ─────────
 function Footer() {
   return (
-    <footer className="border-t border-border/40 bg-card/50 mt-auto">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5 text-primary" />
-            <span className="text-sm font-bold text-foreground">ProbaLab</span>
+    <footer className="hidden md:block border-t border-border/40 bg-card/50 mt-auto">
+      <div className="max-w-[1200px] mx-auto px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-primary" />
+            <span className="text-xs font-bold text-foreground">ProbaLab</span>
           </div>
-          <p className="disclaimer-text text-center max-w-lg">
-            ProbaLab fournit des analyses statistiques à titre informatif uniquement.
-            Ce site ne constitue pas un conseil en paris sportifs. Jouez de manière responsable. 18+
+          <p className="disclaimer-text text-center max-w-md">
+            Analyses statistiques à titre informatif. Pas un conseil en paris. 18+
           </p>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">CGU</a>
             <a href="#" className="hover:text-foreground transition-colors">Confidentialité</a>
-            <a href="#" className="hover:text-foreground transition-colors">Contact</a>
           </div>
         </div>
       </div>
@@ -250,42 +215,27 @@ function AdminGuard({ children }) {
 // ── Protected Route Guard ─────────────────────────────────────
 function Protected({ children }) {
   const { user, loading } = useAuth()
-
   if (loading) return <PageLoader />
-
-  if (!user) {
-    // Rediriger vers login si non connecté
-    return <LoginRedirect />
-  }
-
+  if (!user) return <LoginRedirect />
   return children
 }
 
-// Separation to use useNavigate hook
 function LoginRedirect() {
   const navigate = useNavigate()
-  useEffect(() => {
-    navigate('/login')
-  }, [navigate])
+  useEffect(() => { navigate('/login') }, [navigate])
   return null
 }
 
 // ── Main App ──────────────────────────────────────────────────
 function AppContent() {
-  const { user, loading } = useAuth()
-  const [mobileOpen, setMobileOpen] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [selectedLeague, setSelectedLeague] = useState(null)
-  const location = useLocation()
-
-  // Close mobile menu on route change
-  useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-300">
-      <Header mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+    <div className="min-h-screen flex flex-col bg-background text-foreground has-bottom-nav">
+      <Header />
 
-      <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-[1200px] mx-auto w-full">
         <Suspense fallback={<PageLoader />}>
           <div className="animate-fade-in-up">
             <Routes>
@@ -297,7 +247,6 @@ function AppContent() {
                 />
               } />
               <Route path="/football/match/:id" element={<MatchDetail />} />
-              {/* Legacy route */}
               <Route path="/match/:id" element={<MatchDetail />} />
               <Route path="/nhl" element={<NHLPage date={date} setDate={setDate} />} />
               <Route path="/nhl/match/:id" element={<NHLMatchDetail />} />
@@ -315,6 +264,7 @@ function AppContent() {
       </main>
 
       <Footer />
+      <BottomNav />
       <GoalNotifications />
     </div>
   )
@@ -323,7 +273,7 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <BrowserRouter>
           <AppContent />
         </BrowserRouter>

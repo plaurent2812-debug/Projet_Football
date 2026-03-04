@@ -1,149 +1,153 @@
 import { useState, useEffect } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { Star, Search, X, ChevronRight, Trophy, Zap } from "lucide-react"
+import { Star, Search, X, ChevronRight, Trophy } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useWatchlist } from "@/lib/useWatchlist"
 import { fetchPredictions } from "@/lib/api"
 import { supabase } from "@/lib/auth"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Flame } from "lucide-react"
 
-function MiniMatchCard({ match, isStarred, onToggleStar, sport = "football" }) {
+/* ── Mini Match Row (FlashScore-style) ─────────────────────── */
+function MiniMatchRow({ match, isStarred, onToggleStar, sport = "football" }) {
     const navigate = useNavigate()
     const isFinished = ["FT", "AET", "PEN", "Final", "FINAL", "OFF"].includes(match.status)
     const isLive = ["1H", "2H", "HT", "ET", "P", "LIVE", "1P", "2P", "3P", "OT", "SO"].includes(match.status)
     const pred = match.prediction
-    const matchDate = match.date ? new Date(match.date) : null
-    const time = matchDate ? matchDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "--:--"
+    const time = match.date ? new Date(match.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "--:--"
     const homeGoals = sport === "nhl" ? match.home_score : match.home_goals
     const awayGoals = sport === "nhl" ? match.away_score : match.away_goals
+    const homeWon = isFinished && homeGoals > awayGoals
+    const awayWon = isFinished && awayGoals > homeGoals
+    const hasScore = isFinished || isLive
 
     // Day label
+    const matchDate = match.date ? new Date(match.date) : null
     const todayStr = new Date().toISOString().slice(0, 10)
     const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
     const matchDayStr = matchDate?.toISOString().slice(0, 10)
-    const dayLabel = matchDayStr === todayStr ? "Aujourd'hui"
-        : matchDayStr === tomorrowStr ? "Demain"
-            : matchDate ? matchDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+    const dayLabel = matchDayStr === todayStr ? "Auj."
+        : matchDayStr === tomorrowStr ? "Dem."
+            : matchDate ? matchDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
                 : null
 
     return (
         <div
-            className="flex items-center gap-1.5 sm:gap-3 py-2 px-1 sm:px-3 hover:bg-accent/40 cursor-pointer border-b border-border/20 last:border-0 transition-colors group"
+            className="fs-match-row"
             onClick={() => navigate(sport === "nhl"
                 ? `/nhl/match/${match.api_fixture_id || match.id}`
                 : `/football/match/${match.id}`
             )}
         >
-            {/* Status */}
-            <div className="w-10 sm:w-14 shrink-0 text-center">
+            {/* Time */}
+            <div className="fs-match-time">
                 {isLive ? (
-                    <Badge variant="destructive" className="text-[10px] px-1 h-5 animate-pulse">LIVE</Badge>
+                    <span className="fs-live-badge">LIVE</span>
                 ) : isFinished ? (
-                    <Badge className="text-[10px] px-1 h-5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0">FT</Badge>
+                    <span className="text-[10px] font-semibold text-emerald-500">FT</span>
                 ) : (
-                    <span className="text-xs font-bold tabular-nums text-foreground/80">{time}</span>
-                )}
-                {dayLabel && !isFinished && !isLive && (
-                    <p className="text-[9px] text-muted-foreground leading-tight mt-0.5 truncate">{dayLabel}</p>
+                    <div className="flex flex-col items-center">
+                        <span>{time}</span>
+                        {dayLabel && <span className="text-[8px] text-muted-foreground/60">{dayLabel}</span>}
+                    </div>
                 )}
             </div>
 
             {/* Teams */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-                    <span className="flex-1 text-xs sm:text-sm font-medium truncate text-right">{match.home_team}</span>
-                    <div className="shrink-0 w-10 sm:w-14 text-center">
-                        {(isFinished || isLive) ? (
-                            <div className={cn(
-                                "inline-flex items-center gap-1 px-1 sm:px-1.5 py-0.5 rounded-md text-xs font-black tabular-nums",
-                                isLive ? "bg-red-500/10 text-red-500" : "text-foreground bg-muted/60"
-                            )}>
-                                <span>{homeGoals ?? "-"}</span>
-                                <span className="text-muted-foreground/40 text-[10px]">-</span>
-                                <span>{awayGoals ?? "-"}</span>
-                            </div>
-                        ) : (
-                            <span className="text-[10px] sm:text-xs font-bold text-muted-foreground/40">VS</span>
-                        )}
-                    </div>
-                    <span className="flex-1 text-xs sm:text-sm font-medium truncate text-left">{match.away_team}</span>
+            <div className="fs-match-teams">
+                <span className={cn("fs-team-name text-right", homeWon && "winner")}>{match.home_team}</span>
+                <div className={cn("fs-score-box", isLive && "live")}>
+                    {hasScore ? (
+                        <>
+                            <span className={cn("score-val", homeWon && "winner")}>{homeGoals ?? "-"}</span>
+                            <span className={cn("score-val", awayWon && "winner")}>{awayGoals ?? "-"}</span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="score-val text-muted-foreground/40">-</span>
+                            <span className="score-val text-muted-foreground/40">-</span>
+                        </>
+                    )}
                 </div>
-                {pred?.recommended_bet && !isFinished && (
-                    <p className="text-[10px] text-primary/70 mt-0.5">💡 {pred.recommended_bet}</p>
-                )}
+                <span className={cn("fs-team-name", awayWon && "winner")}>{match.away_team}</span>
             </div>
 
-            {/* Star + chevron */}
+            {/* Prediction */}
+            {pred?.recommended_bet && !isFinished && (
+                <span className="fs-pred-chip bg-primary/10 text-primary hidden sm:inline-flex truncate max-w-[80px]">
+                    {pred.recommended_bet}
+                </span>
+            )}
+
+            {/* Star */}
             <button
-                className="shrink-0 p-1 rounded-full hover:bg-amber-500/10 transition-colors"
+                className="fs-star-btn"
                 onClick={(e) => { e.stopPropagation(); onToggleStar(match.id) }}
             >
-                <Star className={cn("w-4 h-4", isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30")} />
+                <Star className={cn(
+                    "w-3.5 h-3.5 transition-colors",
+                    isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400"
+                )} />
             </button>
-            <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0" />
         </div>
     )
 }
 
+/* ── Sport Section ─────────────────────────────────────────── */
 function SportSection({ title, emoji, starredList, favTeamMatches, loading, toggleMatch, isStarred, sport }) {
     const hasContent = starredList.length > 0 || favTeamMatches.length > 0
     return (
-        <Card className="border-border/50">
-            <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <span>{emoji}</span>
-                    {title}
-                    {starredList.length > 0 && (
-                        <Badge variant="outline" className="ml-auto text-[10px]">{starredList.length} étoilé{starredList.length > 1 ? "s" : ""}</Badge>
-                    )}
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-                {loading ? (
-                    <div className="py-8 text-center">
-                        <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
-                    </div>
-                ) : !hasContent ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-                        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                            <Star className="w-6 h-6 text-primary" />
-                        </div>
-                        <h4 className="font-bold text-base mb-1">Aucun Favori {title}</h4>
-                        <p className="text-xs text-muted-foreground leading-relaxed max-w-[240px]">
-                            Cliquez sur l'étoile d'un match pour l'ajouter ici et suivre facilement vos prédictions préférées.
-                        </p>
-                    </div>
-                ) : (
-                    <>
-                        {starredList.length > 0 && (
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1.5 flex items-center gap-1">
-                                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> Matchs étoilés
-                                </p>
-                                {starredList.map(m => (
-                                    <MiniMatchCard key={m.id} match={m} isStarred={true} onToggleStar={toggleMatch} sport={sport} />
-                                ))}
-                            </div>
-                        )}
-                        {favTeamMatches.length > 0 && (
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1.5 flex items-center gap-1">
-                                    <Zap className="w-3 h-3" /> Matchs de mes équipes favorites
-                                </p>
-                                {favTeamMatches.map(m => (
-                                    <MiniMatchCard key={m.id} match={m} isStarred={isStarred(m.id)} onToggleStar={toggleMatch} sport={sport} />
-                                ))}
-                            </div>
-                        )}
-                    </>
+        <div className="bg-card border-x border-b border-border/50">
+            <div className="fs-league-header">
+                <span className="text-sm">{emoji}</span>
+                <div className="fs-league-name">{title}</div>
+                {starredList.length > 0 && (
+                    <span className="fs-league-count">{starredList.length}</span>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+            {loading ? (
+                <div className="p-3 space-y-2">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                </div>
+            ) : !hasContent ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                    <Star className="w-5 h-5 text-muted-foreground/30 mb-2" />
+                    <p className="text-xs text-muted-foreground">
+                        Aucun favori {title.toLowerCase()}. Cliquez sur l'étoile d'un match pour l'ajouter ici.
+                    </p>
+                </div>
+            ) : (
+                <>
+                    {starredList.length > 0 && (
+                        <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground px-3 pt-2 pb-1 flex items-center gap-1">
+                                <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" /> Étoilés
+                            </p>
+                            {starredList.map(m => (
+                                <MiniMatchRow key={m.id} match={m} isStarred={true} onToggleStar={toggleMatch} sport={sport} />
+                            ))}
+                        </div>
+                    )}
+                    {favTeamMatches.length > 0 && (
+                        <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground px-3 pt-2 pb-1 flex items-center gap-1">
+                                <Trophy className="w-2.5 h-2.5" /> Équipes favorites
+                            </p>
+                            {favTeamMatches.map(m => (
+                                <MiniMatchRow key={m.id} match={m} isStarred={isStarred(m.id)} onToggleStar={toggleMatch} sport={sport} />
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
     )
 }
 
+/* ═══════════════════════════════════════════════════════════
+   Watchlist Page (FlashScore-style)
+   ═══════════════════════════════════════════════════════════ */
 export default function WatchlistPage() {
     const { starredMatches, favTeams, toggleMatch, toggleTeam, isStarred } = useWatchlist()
     const [footMatches, setFootMatches] = useState([])
@@ -153,20 +157,15 @@ export default function WatchlistPage() {
 
     useEffect(() => {
         setLoading(true)
-
-        // Build array of next 7 days
         const days = Array.from({ length: 7 }, (_, i) => {
-            const d = new Date()
-            d.setDate(d.getDate() + i)
+            const d = new Date(); d.setDate(d.getDate() + i)
             return d.toISOString().slice(0, 10)
         })
 
-        // Football: one fetch per day (parallel)
         const footPromise = Promise.all(
             days.map(day => fetchPredictions(day).then(r => r.matches || []).catch(() => []))
         ).then(results => results.flat())
 
-        // NHL: single range query
         const start = new Date(); start.setHours(0, 0, 0, 0)
         const end = new Date(); end.setDate(end.getDate() + 7); end.setHours(23, 59, 59, 999)
         const nhlPromise = supabase.from('nhl_fixtures').select('*')
@@ -177,127 +176,88 @@ export default function WatchlistPage() {
             .catch(() => [])
 
         Promise.all([footPromise, nhlPromise]).then(([foot, nhl]) => {
-            // Sort both by date ascending
             foot.sort((a, b) => new Date(a.date) - new Date(b.date))
             setFootMatches(foot)
             setNhlMatches(nhl)
         }).finally(() => setLoading(false))
     }, [])
 
-    // Football splits
     const starredFoot = footMatches.filter(m => isStarred(m.id))
     const favFoot = footMatches.filter(m => !isStarred(m.id) && (favTeams.has(m.home_team) || favTeams.has(m.away_team)))
-
-    // NHL splits
     const starredNHL = nhlMatches.filter(m => isStarred(m.id))
     const favNHL = nhlMatches.filter(m => !isStarred(m.id) && (favTeams.has(m.home_team) || favTeams.has(m.away_team)))
 
-    // Autocomplete — all teams from both sports
     const allTeams = [...new Set([
         ...footMatches.flatMap(m => [m.home_team, m.away_team]),
         ...nhlMatches.flatMap(m => [m.home_team, m.away_team]),
     ])].filter(t => t && t.toLowerCase().includes(teamSearch.toLowerCase()) && !favTeams.has(t)).slice(0, 8)
 
     return (
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        <div className="animate-fade-in-up pb-4">
             {/* Header */}
-            <div>
-                <h1 className="text-xl font-black flex items-center gap-2">
-                    <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                    Mes Favoris
-                </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                    Matchs étoilés et équipes favorites du jour
-                </p>
+            <div className="fs-summary-bar">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <span className="font-bold">Mes Favoris</span>
+                <span className="text-[10px] text-muted-foreground ml-1">7 prochains jours</span>
             </div>
 
-            {/* Football section */}
-            <SportSection
-                title="Football"
-                emoji="⚽"
-                starredList={starredFoot}
-                favTeamMatches={favFoot}
-                loading={loading}
-                toggleMatch={toggleMatch}
-                isStarred={isStarred}
-                sport="football"
-            />
+            {/* Football */}
+            <SportSection title="Football" emoji="⚽"
+                starredList={starredFoot} favTeamMatches={favFoot}
+                loading={loading} toggleMatch={toggleMatch} isStarred={isStarred} sport="football" />
 
-            {/* NHL section */}
-            <SportSection
-                title="NHL"
-                emoji="🏒"
-                starredList={starredNHL}
-                favTeamMatches={favNHL}
-                loading={loading}
-                toggleMatch={toggleMatch}
-                isStarred={isStarred}
-                sport="nhl"
-            />
+            {/* NHL */}
+            <SportSection title="NHL" emoji="🏒"
+                starredList={starredNHL} favTeamMatches={favNHL}
+                loading={loading} toggleMatch={toggleMatch} isStarred={isStarred} sport="nhl" />
 
-            {/* Teams favorites */}
-            <Card className="border-border/50">
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Trophy className="w-4 h-4 text-primary" />
-                        Équipes favorites
-                        {favTeams.size > 0 && (
-                            <Badge variant="outline" className="ml-auto text-[10px]">{favTeams.size}</Badge>
-                        )}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {/* Chips */}
+            {/* Team favorites management */}
+            <div className="bg-card border-x border-b border-border/50 rounded-b px-3 py-3 space-y-3">
+                <div className="flex items-center gap-2">
+                    <Trophy className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-xs font-bold">Équipes favorites</span>
                     {favTeams.size > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                            {[...favTeams].map(team => (
-                                <span key={team} className="flex items-center gap-1.5 text-xs font-semibold bg-primary/10 text-primary px-2.5 py-1 rounded-full">
-                                    {team}
-                                    <button onClick={() => toggleTeam(team)} className="hover:text-red-500 transition-colors">
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </span>
-                            ))}
-                        </div>
+                        <Badge variant="outline" className="ml-auto text-[10px]">{favTeams.size}</Badge>
                     )}
+                </div>
 
-                    {/* Search */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                        <input
-                            className="w-full text-sm bg-muted/40 border border-border/50 rounded-lg pl-8 pr-3 py-2 outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-muted-foreground"
-                            placeholder="Rechercher une équipe (foot ou NHL)..."
-                            value={teamSearch}
-                            onChange={e => setTeamSearch(e.target.value)}
-                        />
-                    </div>
-                    {teamSearch && allTeams.length > 0 && (
-                        <div className="border border-border/50 rounded-lg overflow-hidden">
-                            {allTeams.map(team => (
-                                <button key={team} className="w-full text-left text-sm px-3 py-2 hover:bg-accent/60 border-b border-border/20 last:border-0 transition-colors"
-                                    onClick={() => { toggleTeam(team); setTeamSearch("") }}>
-                                    + {team}
+                {/* Chips */}
+                {favTeams.size > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {[...favTeams].map(team => (
+                            <span key={team} className="flex items-center gap-1 text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                {team}
+                                <button onClick={() => toggleTeam(team)} className="hover:text-red-500 transition-colors">
+                                    <X className="w-2.5 h-2.5" />
                                 </button>
-                            ))}
-                        </div>
-                    )}
-                    {teamSearch && allTeams.length === 0 && (
-                        <p className="text-xs text-muted-foreground text-center py-2">Aucune équipe trouvée</p>
-                    )}
-                    {favTeams.size === 0 && !teamSearch && (
-                        <p className="text-xs text-muted-foreground text-center py-2">Recherche une équipe pour l'ajouter à tes favoris</p>
-                    )}
-                </CardContent>
-            </Card>
+                            </span>
+                        ))}
+                    </div>
+                )}
 
-            {/* CTAs */}
-            <div className="flex justify-center gap-3">
-                <Button variant="outline" size="sm" asChild>
-                    <Link to="/football">⚽ Matchs Football</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                    <Link to="/nhl">🏒 Matchs NHL</Link>
-                </Button>
+                {/* Search */}
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                    <input
+                        className="w-full text-xs bg-muted/40 border border-border/50 rounded pl-7 pr-3 py-1.5 outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-muted-foreground"
+                        placeholder="Rechercher une équipe..."
+                        value={teamSearch}
+                        onChange={e => setTeamSearch(e.target.value)}
+                    />
+                </div>
+
+                {teamSearch && allTeams.length > 0 && (
+                    <div className="border border-border/50 rounded overflow-hidden">
+                        {allTeams.map(team => (
+                            <button key={team}
+                                className="w-full text-left text-xs px-3 py-1.5 hover:bg-accent/60 border-b border-border/20 last:border-0 transition-colors"
+                                onClick={() => { toggleTeam(team); setTeamSearch("") }}
+                            >
+                                + {team}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     )

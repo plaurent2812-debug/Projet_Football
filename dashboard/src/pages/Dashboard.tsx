@@ -1,20 +1,57 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { format, addDays } from "date-fns"
+import { format, addDays, subDays } from "date-fns"
 import { fr } from "date-fns/locale"
 import {
-    ChevronLeft, ChevronRight, Flame, Clock,
-    Trophy, Calendar, Filter, X, Activity, Target, Star
+    Flame, Trophy, ChevronDown, ChevronUp, Star,
+    Activity, Target
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { fetchPredictions } from "@/lib/api"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWatchlist } from "@/lib/useWatchlist"
 
-/* ── Match Row ─────────────────────────────────────────────── */
+/* ── FlashScore Date Bar ───────────────────────────────────── */
+function DateBar({ date, setDate }) {
+    const scrollRef = useRef(null)
+    const today = new Date()
+
+    // Build 10 days: 5 past + today + 4 future
+    const days = Array.from({ length: 10 }, (_, i) => {
+        const d = addDays(subDays(today, 5), i)
+        return {
+            date: d,
+            dateStr: d.toISOString().slice(0, 10),
+            dayName: format(d, "EEE", { locale: fr }).toUpperCase().replace('.', ''),
+            dayNum: format(d, "dd.MM."),
+            isToday: d.toISOString().slice(0, 10) === today.toISOString().slice(0, 10),
+        }
+    })
+
+    // Scroll to active on mount
+    useEffect(() => {
+        const el = scrollRef.current?.querySelector('.active')
+        if (el) el.scrollIntoView({ inline: 'center', block: 'nearest' })
+    }, [])
+
+    return (
+        <div className="fs-date-bar" ref={scrollRef}>
+            {days.map(d => (
+                <button
+                    key={d.dateStr}
+                    onClick={() => setDate(d.dateStr)}
+                    className={cn("fs-date-item", d.dateStr === date && "active")}
+                >
+                    <span className="date-day">{d.isToday ? "AJD" : d.dayName}</span>
+                    <span className="date-num">{d.dayNum}</span>
+                </button>
+            ))}
+        </div>
+    )
+}
+
+/* ── Match Row (FlashScore-style) ──────────────────────────── */
 function MatchRow({ match, isStarred, onToggleStar }) {
     const navigate = useNavigate()
     const pred = match.prediction
@@ -26,11 +63,10 @@ function MatchRow({ match, isStarred, onToggleStar }) {
     const isHot = pred?.confidence_score >= 7 && !isFinished
     const hasScore = isFinished || isLive
 
-    // Extract goals from events_json (filter out null players and penalty shootout)
+    // Goal events
     const events = (match.events_json || []).filter(e => {
         if (!e.player) return false
         if (e.comments === 'Penalty Shootout') return false
-        // Shootout goals: time=120, no extra_time. Real ET goals have extra_time (e.g. 120+2')
         if (e.time >= 120 && !e.extra_time) return false
         return true
     })
@@ -40,197 +76,162 @@ function MatchRow({ match, isStarred, onToggleStar }) {
 
     return (
         <div
-            className="match-card group px-2 sm:px-4 py-3 cursor-pointer hover:bg-accent/40 border-b border-border/30 last:border-0 transition-colors"
+            className="fs-match-row"
             onClick={() => navigate(`/football/match/${match.id}`)}
         >
-            <div className="flex items-center gap-1.5 sm:gap-2">
-                {/* Time / Status */}
-                <div className="w-10 sm:w-11 shrink-0 text-center">
-                    {isLive ? (
-                        <Badge variant="destructive" className="text-[10px] px-1 h-5 animate-pulse">
-                            {match.elapsed ? `${match.elapsed}'` : "LIVE"}
-                        </Badge>
-                    ) : isFinished ? (
-                        <Badge className="text-[10px] px-1 sm:px-1.5 h-5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0">Terminé</Badge>
+            {/* Time / Status */}
+            <div className="fs-match-time">
+                {isLive ? (
+                    <span className="fs-live-badge">
+                        {match.elapsed ? `${match.elapsed}'` : "LIVE"}
+                    </span>
+                ) : isFinished ? (
+                    <span className="text-[10px] font-semibold text-emerald-500">FT</span>
+                ) : (
+                    <span>{time}</span>
+                )}
+            </div>
+
+            {/* Teams + Score */}
+            <div className="fs-match-teams">
+                {/* Home */}
+                <div className="flex-1 flex items-center gap-1.5 min-w-0 justify-end">
+                    {hasEvents && homeEvents.length > 0 && (
+                        <span className="text-[9px] text-muted-foreground truncate hidden sm:inline">
+                            {homeEvents.map(e => `${e.player} ${e.time}'`).join(', ')}
+                        </span>
+                    )}
+                    <span className={cn("fs-team-name text-right", homeWon && "winner")}>
+                        {match.home_team}
+                    </span>
+                    {match.home_logo ? (
+                        <img src={match.home_logo} alt="" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
                     ) : (
-                        <span className="text-xs font-bold tabular-nums text-foreground/80">{time}</span>
+                        <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
+                            {match.home_team?.charAt(0)}
+                        </div>
                     )}
                 </div>
 
-                {/* Teams + Score — 3-column layout */}
-                <div className="flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2">
-                    {/* Home team */}
-                    <div className="flex-1 flex items-center gap-1.5 min-w-0 justify-end">
-                        <span className={cn("text-xs sm:text-sm truncate text-right", homeWon ? "font-bold" : "font-medium text-foreground/80")}>
-                            {match.home_team}
-                        </span>
-                        {match.home_logo ? (
-                            <img src={match.home_logo} alt="" className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 object-contain" loading="lazy" />
-                        ) : (
-                            <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
-                                {match.home_team?.charAt(0)}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Score / VS */}
-                    <div className="shrink-0 w-10 sm:w-14 text-center">
-                        {hasScore ? (
-                            <div className={cn(
-                                "inline-flex items-center gap-1 px-1 sm:px-2 py-0.5 rounded-md text-xs sm:text-sm font-black tabular-nums",
-                                isLive ? "bg-red-500/10 text-red-500" : "bg-muted/60 text-foreground"
-                            )}>
-                                <span className={homeWon ? "text-primary" : ""}>{match.home_goals ?? 0}</span>
-                                <span className="text-muted-foreground/40 text-[10px] sm:text-xs">-</span>
-                                <span className={awayWon ? "text-primary" : ""}>{match.away_goals ?? 0}</span>
-                            </div>
-                        ) : (
-                            <span className="text-[10px] sm:text-xs font-bold text-muted-foreground/30">VS</span>
-                        )}
-                    </div>
-
-                    {/* Away team */}
-                    <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                        {match.away_logo ? (
-                            <img src={match.away_logo} alt="" className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 object-contain" loading="lazy" />
-                        ) : (
-                            <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
-                                {match.away_team?.charAt(0)}
-                            </div>
-                        )}
-                        <span className={cn("text-xs sm:text-sm truncate", awayWon ? "font-bold" : "font-medium text-foreground/80")}>
-                            {match.away_team}
-                        </span>
-                    </div>
+                {/* Score */}
+                <div className={cn("fs-score-box", isLive && "live")}>
+                    {hasScore ? (
+                        <>
+                            <span className={cn("score-val", homeWon && "winner")}>{match.home_goals ?? 0}</span>
+                            <span className={cn("score-val", awayWon && "winner")}>{match.away_goals ?? 0}</span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="score-val text-muted-foreground/40">-</span>
+                            <span className="score-val text-muted-foreground/40">-</span>
+                        </>
+                    )}
                 </div>
 
-                {/* Prediction info */}
-                {(!isFinished && pred) && (
-                    <div className="shrink-0 flex flex-col items-end gap-1 w-12 sm:w-20 pl-0.5 sm:pl-1">
-                        {isHot && (
-                            <div className="flex items-center gap-0.5 sm:gap-1">
-                                <Flame className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-orange-500 flame-badge" />
-                                <span className="text-[9px] sm:text-[10px] font-bold text-orange-500">HOT</span>
-                            </div>
-                        )}
-                        {pred?.recommended_bet && (
-                            <span className="text-[8px] sm:text-[10px] font-semibold text-primary bg-primary/10 px-1 sm:px-1.5 py-0.5 rounded text-center leading-tight truncate max-w-full">
-                                {pred.recommended_bet}
-                            </span>
-                        )}
-                        {pred?.confidence_score != null && (
-                            <Badge className={cn(
-                                "text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1 sm:px-1.5 border-0",
-                                pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" :
-                                    pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" :
-                                        "bg-muted text-muted-foreground"
-                            )}>
-                                {pred.confidence_score}/10
-                            </Badge>
-                        )}
-                    </div>
-                )}
-
-                <button
-                    className="shrink-0 p-1 rounded-full hover:bg-amber-500/10 transition-colors"
-                    onClick={(e) => { e.stopPropagation(); onToggleStar(match.id) }}
-                    title={isStarred ? "Retirer des favoris" : "Ajouter aux favoris"}
-                >
-                    <Star className={cn(
-                        "w-4 h-4 transition-colors",
-                        isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400"
-                    )} />
-                </button>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 transition-colors hidden sm:block" />
+                {/* Away */}
+                <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                    {match.away_logo ? (
+                        <img src={match.away_logo} alt="" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
+                    ) : (
+                        <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
+                            {match.away_team?.charAt(0)}
+                        </div>
+                    )}
+                    <span className={cn("fs-team-name", awayWon && "winner")}>
+                        {match.away_team}
+                    </span>
+                    {hasEvents && awayEvents.length > 0 && (
+                        <span className="text-[9px] text-muted-foreground truncate hidden sm:inline">
+                            {awayEvents.map(e => `${e.player} ${e.time}'`).join(', ')}
+                        </span>
+                    )}
+                </div>
             </div>
 
-            {/* Scorers row */}
-            {hasEvents && (
-                <div className="flex items-start gap-1 sm:gap-2 mt-1.5 ml-[44px] mr-[64px] sm:ml-11 sm:mr-20">
-                    <div className="flex-1 text-right leading-tight">
-                        {homeEvents.map((e, i) => (
-                            <span key={i} className="inline-block whitespace-nowrap text-[9px] sm:text-[10px] text-muted-foreground mr-1">
-                                ⚽ {e.player}{e.detail === 'Penalty' ? ' (P)' : e.detail === 'Own Goal' ? ' (CSC)' : ''} {e.time}'{i < homeEvents.length - 1 ? ',' : ''}
-                            </span>
-                        ))}
-                    </div>
-                    <div className="w-12 sm:w-16 shrink-0" />
-                    <div className="flex-1 leading-tight">
-                        {awayEvents.map((e, i) => (
-                            <span key={i} className="inline-block whitespace-nowrap text-[9px] sm:text-[10px] text-muted-foreground mr-1">
-                                ⚽ {e.player}{e.detail === 'Penalty' ? ' (P)' : e.detail === 'Own Goal' ? ' (CSC)' : ''} {e.time}'{i < awayEvents.length - 1 ? ',' : ''}
-                            </span>
-                        ))}
-                    </div>
+            {/* Prediction chips */}
+            {(!isFinished && pred) && (
+                <div className="shrink-0 flex items-center gap-1 pl-1">
+                    {isHot && (
+                        <Flame className="w-3 h-3 text-orange-500 flame-badge" />
+                    )}
+                    {pred?.confidence_score != null && (
+                        <span className={cn(
+                            "fs-pred-chip",
+                            pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-500" :
+                                pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-500" :
+                                    "bg-muted text-muted-foreground"
+                        )}>
+                            {pred.confidence_score}/10
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Star */}
+            <button
+                className="fs-star-btn"
+                onClick={(e) => { e.stopPropagation(); onToggleStar(match.id) }}
+            >
+                <Star className={cn(
+                    "w-3.5 h-3.5 transition-colors",
+                    isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400"
+                )} />
+            </button>
+        </div>
+    )
+}
+
+/* ── League Section (collapsible) ──────────────────────────── */
+function LeagueSection({ leagueName, leagueId, countryName, matches, isStarred, onToggleStar }) {
+    const [collapsed, setCollapsed] = useState(false)
+    if (!matches?.length) return null
+
+    const liveCount = matches.filter(m => ["1H", "2H", "HT", "ET", "P", "LIVE"].includes(m.status)).length
+
+    return (
+        <div>
+            <div
+                className="fs-league-header"
+                onClick={() => setCollapsed(c => !c)}
+            >
+                {/* Country flag placeholder */}
+                <div className="w-5 h-4 rounded-sm bg-muted/60 flex items-center justify-center shrink-0">
+                    <Trophy className="w-2.5 h-2.5 text-muted-foreground" />
+                </div>
+                <div className="min-w-0">
+                    {countryName && <div className="fs-league-country">{countryName}</div>}
+                    <div className="fs-league-name">{leagueName}</div>
+                </div>
+                {liveCount > 0 && (
+                    <span className="fs-summary-badge bg-red-500/15 text-red-500 text-[10px]">{liveCount}</span>
+                )}
+                <span className={cn("fs-league-count", liveCount > 0 && "has-live")}>
+                    {matches.length}
+                </span>
+                {collapsed
+                    ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                    : <ChevronUp className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                }
+            </div>
+            {!collapsed && (
+                <div>
+                    {matches.map(m => (
+                        <MatchRow key={m.id} match={m} isStarred={isStarred(m.id)} onToggleStar={onToggleStar} />
+                    ))}
                 </div>
             )}
         </div>
     )
 }
 
-/* ── League Section ────────────────────────────────────────── */
-function LeagueSection({ leagueName, leagueId, matches, isStarred, onToggleStar }) {
-    if (!matches?.length) return null
-    return (
-        <div id={`league-${leagueId}`} className="mb-4">
-            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-accent/40 border-b border-border/30">
-                <div className="w-6 h-6 rounded bg-card border border-border/50 flex items-center justify-center shadow-sm">
-                    <Trophy className="w-3 h-3 text-muted-foreground" />
-                </div>
-                <span className="text-sm font-bold text-foreground">{leagueName}</span>
-                <span className="text-xs text-muted-foreground ml-auto">{matches.length} match{matches.length > 1 ? 's' : ''}</span>
-            </div>
-            {matches.map(m => <MatchRow key={m.id} match={m} isStarred={isStarred(m.id)} onToggleStar={onToggleStar} />)}
-        </div>
-    )
-}
-
-/* ── League Sidebar ────────────────────────────────────────── */
-function LeagueSidebar({ leagues, selectedLeague, onSelect }) {
-    return (
-        <aside className="hidden lg:block w-56 shrink-0">
-            <div className="sticky top-20 bg-card rounded-xl border border-border/50 overflow-hidden">
-                <div className="px-3 py-2.5 border-b border-border/30 bg-accent/30">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Championnats</p>
-                </div>
-                <div className="p-1.5 space-y-0.5 max-h-[70vh] overflow-y-auto">
-                    <button
-                        onClick={() => onSelect(null)}
-                        className={cn(
-                            "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors text-left",
-                            !selectedLeague ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-                        )}
-                    >
-                        <Filter className="w-3.5 h-3.5" />
-                        Tous les matchs
-                    </button>
-                    {leagues.map(({ name, id, count }) => (
-                        <button
-                            key={id}
-                            onClick={() => onSelect(id)}
-                            className={cn(
-                                "w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors text-left",
-                                selectedLeague === id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
-                            )}
-                        >
-                            <span className="truncate">{name}</span>
-                            <span className="text-[10px] bg-muted rounded px-1 shrink-0">{count}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-        </aside>
-    )
-}
-
 /* ═══════════════════════════════════════════════════════════
-   Football Dashboard Page
+   Football Dashboard Page (FlashScore-style)
    ═══════════════════════════════════════════════════════════ */
 export default function FootballPage({ date, setDate, selectedLeague, setSelectedLeague }) {
+    const navigate = useNavigate()
     const [matches, setMatches] = useState([])
     const [loading, setLoading] = useState(true)
     const [minConfidence, setMinConfidence] = useState(0)
-    const [marketFilter, setMarketFilter] = useState('all') // all, 1x2, btts, over
     const { isStarred, toggleMatch } = useWatchlist()
 
     useEffect(() => {
@@ -241,199 +242,90 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
             .finally(() => setLoading(false))
     }, [date])
 
-    const handleDateChange = (days) => {
-        setDate(addDays(new Date(date), days).toISOString().slice(0, 10))
-    }
-
     // Filter matches
     const filteredMatches = matches.filter(m => {
-        const pred = m.prediction
-        const conf = pred?.confidence_score || 0
+        const conf = m.prediction?.confidence_score || 0
         if (conf < minConfidence) return false
-
-        if (marketFilter !== 'all') {
-            const bet = (pred?.recommended_bet || "").toLowerCase()
-            if (marketFilter === '1x2' && !/victoire|match nul|vainqueur|1|2|n/.test(bet)) return false
-            if (marketFilter === 'btts' && !/btts|les deux|both teams/.test(bet)) return false
-            if (marketFilter === 'over' && !/over|plus de/.test(bet)) return false
-        }
         return true
     })
 
-    // Build league list from filtered matches
+    // Build league groups
     const byLeague = {}
     filteredMatches.forEach(m => {
         const key = m.league_id || "other"
-        if (!byLeague[key]) byLeague[key] = { name: m.league_name || "Autres", id: key, matches: [] }
+        if (!byLeague[key]) byLeague[key] = { name: m.league_name || "Autres", id: key, countryName: m.country_name, matches: [] }
         byLeague[key].matches.push(m)
     })
+    const leagues = Object.values(byLeague).sort((a, b) => a.name.localeCompare(b.name))
 
-    // Sort leagues alphabetically
-    const leagues = Object.values(byLeague)
-        .sort((a, b) => a.name.localeCompare(b.name))
-
-    // Apply sidebar league selection
-    const displayedLeagues = selectedLeague
-        ? leagues.filter(l => l.id === selectedLeague)
-        : leagues
-
-    const totalMatches = displayedLeagues.reduce((s, l) => s + l.matches.length, 0)
-    const totalRaw = matches.length
-
-    console.log("Dashboard Render:", { date, matches: matches.length, loading, leagues: leagues.length, displayed: displayedLeagues.length })
+    const totalMatches = filteredMatches.length
+    const liveCount = filteredMatches.filter(m => ["1H", "2H", "HT", "ET", "P", "LIVE"].includes(m.status)).length
 
     return (
-        <div className="flex gap-6">
-            <LeagueSidebar
-                leagues={leagues}
-                selectedLeague={selectedLeague}
-                onSelect={setSelectedLeague}
-            />
+        <div className="animate-fade-in-up">
+            {/* Date Bar */}
+            <DateBar date={date} setDate={setDate} />
 
-            {/* Main content */}
-            <div className="flex-1 min-w-0">
-                {/* Header controls: Title + Filters + Date */}
-                <div className="flex flex-col gap-4 mb-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div>
-                            <h1 className="text-xl font-black tracking-tight">⚽ Football</h1>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                {totalMatches} match{totalMatches !== 1 ? 's' : ''} affiché{totalMatches !== 1 ? 's' : ''}
-                                {totalMatches !== totalRaw && <span className="opacity-60"> (sur {totalRaw})</span>}
-                            </p>
-                        </div>
+            {/* Summary bar */}
+            <div className="fs-summary-bar">
+                <span className="flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+                    Tous les matchs
+                </span>
+                {liveCount > 0 && (
+                    <span className="fs-summary-badge bg-red-500/15 text-red-500">{liveCount}</span>
+                )}
+                <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">{totalMatches}</span>
 
-                        {/* Date navigation */}
-                        <div className="flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shadow-sm">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDateChange(-1)}>
-                                <ChevronLeft className="w-4 h-4" />
-                            </Button>
-                            <div className="flex items-center gap-2 px-3 min-w-[140px] justify-center">
-                                <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                                <span className="text-sm font-bold capitalize">
-                                    {format(new Date(date), "EEE d MMM", { locale: fr })}
-                                </span>
+                {/* Compact confidence filter */}
+                <select
+                    value={minConfidence}
+                    onChange={(e) => setMinConfidence(Number(e.target.value))}
+                    className="ml-2 text-[10px] font-semibold bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground focus:outline-none cursor-pointer"
+                >
+                    <option value={0}>Tous</option>
+                    <option value={6}>6+</option>
+                    <option value={7}>7+ Hot</option>
+                    <option value={8}>8+ Safe</option>
+                </select>
+            </div>
+
+            {/* Content */}
+            <div className="bg-card border-x border-b border-border/50 rounded-b">
+                {loading ? (
+                    <div className="animate-in fade-in duration-500">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                            <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/20">
+                                <Skeleton className="h-4 w-10 shrink-0" />
+                                <Skeleton className="h-4 flex-1" />
+                                <Skeleton className="h-5 w-12" />
+                                <Skeleton className="h-4 flex-1" />
                             </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDateChange(1)}>
-                                <ChevronRight className="w-4 h-4" />
-                            </Button>
-                        </div>
+                        ))}
                     </div>
-
-                    {/* Filter Bar */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* Confidence Filter */}
-                        <div className="relative">
-                            <select
-                                value={minConfidence}
-                                onChange={(e) => setMinConfidence(Number(e.target.value))}
-                                className="appearance-none pl-8 pr-8 py-2 bg-card border border-border/50 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-border transition-colors cursor-pointer"
-                            >
-                                <option value={0}>Toutes confiances</option>
-                                <option value={6}>Confiance 6+</option>
-                                <option value={7}>Confiance 7+ (Hot)</option>
-                                <option value={8}>Confiance 8+ (Safe)</option>
-                            </select>
-                            <Activity className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                            <ChevronRight className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rotate-90 text-muted-foreground/50 pointer-events-none" />
+                ) : leagues.length > 0 ? (
+                    leagues.map(league => (
+                        <LeagueSection
+                            key={league.id}
+                            leagueName={league.name}
+                            leagueId={league.id}
+                            countryName={league.countryName}
+                            matches={league.matches}
+                            isStarred={isStarred}
+                            onToggleStar={toggleMatch}
+                        />
+                    ))
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                            <span className="text-2xl">⚽</span>
                         </div>
-
-                        {/* Market Filter */}
-                        <div className="relative">
-                            <select
-                                value={marketFilter}
-                                onChange={(e) => setMarketFilter(e.target.value)}
-                                className="appearance-none pl-8 pr-8 py-2 bg-card border border-border/50 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-border transition-colors cursor-pointer"
-                            >
-                                <option value="all">Tous les paris</option>
-                                <option value="1x2">1X2 (Victoire)</option>
-                                <option value="btts">Les deux marquent / BTTS</option>
-                                <option value="over">Over / Under</option>
-                            </select>
-                            <Target className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                            <ChevronRight className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rotate-90 text-muted-foreground/50 pointer-events-none" />
-                        </div>
-
-                        {/* Reset Filters */}
-                        {(minConfidence > 0 || marketFilter !== 'all') && (
-                            <button
-                                onClick={() => { setMinConfidence(0); setMarketFilter('all'); }}
-                                className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                Réinitialiser
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Active filter indicator */}
-                {selectedLeague && (
-                    <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20 text-sm">
-                        <Filter className="w-3.5 h-3.5 text-primary" />
-                        <span className="font-semibold text-primary">
-                            {leagues.find(l => l.id === selectedLeague)?.name}
-                        </span>
-                        <button
-                            onClick={() => setSelectedLeague(null)}
-                            className="ml-auto p-0.5 rounded hover:bg-primary/10 transition-colors"
-                        >
-                            <X className="w-3.5 h-3.5 text-muted-foreground" />
-                        </button>
+                        <h3 className="font-bold text-sm mb-1">Aucun match programmé</h3>
+                        <p className="text-xs text-muted-foreground max-w-[220px]">
+                            Pas de rencontres pour cette date.
+                        </p>
                     </div>
                 )}
-
-                {/* Content */}
-                <Card className="border-border/50 overflow-hidden">
-                    {loading ? (
-                        <div className="flex flex-col w-full animate-in fade-in duration-500">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                                <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-border/30">
-                                    <Skeleton className="h-5 w-11" />
-                                    <div className="flex-1 flex items-center justify-between gap-4">
-                                        <Skeleton className="h-4 w-1/3" />
-                                        <Skeleton className="h-5 w-12" />
-                                        <Skeleton className="h-4 w-1/3" />
-                                    </div>
-                                    <Skeleton className="h-4 w-16" />
-                                </div>
-                            ))}
-                        </div>
-                    ) : displayedLeagues.length > 0 ? (
-                        displayedLeagues.map(league => (
-                            <LeagueSection
-                                key={league.id}
-                                leagueName={league.name}
-                                leagueId={league.id}
-                                matches={league.matches}
-                                isStarred={isStarred}
-                                onToggleStar={toggleMatch}
-                            />
-                        ))
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-24 text-center">
-                            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                                <Calendar className="w-8 h-8 text-primary" />
-                            </div>
-                            <h3 className="font-bold text-lg">Aucun match programmé</h3>
-                            <p className="text-sm text-muted-foreground mt-2 max-w-[260px] leading-relaxed">
-                                Il n'y a pas de rencontres prévues pour cette date, ou vos filtres sont trop stricts.
-                            </p>
-                            <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
-                                <Button variant="outline" onClick={() => {
-                                    setSelectedLeague(null)
-                                    setMinConfidence(0)
-                                    setMarketFilter('all')
-                                    setDate(new Date().toISOString().slice(0, 10))
-                                }}>
-                                    Revenir à aujourd'hui
-                                </Button>
-                                <Button onClick={() => navigate("/performance")}>
-                                    Voir les performances passées
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </Card>
             </div>
         </div>
     )

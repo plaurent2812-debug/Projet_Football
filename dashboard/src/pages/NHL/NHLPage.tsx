@@ -1,44 +1,50 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { format, addDays } from "date-fns"
+import { format, addDays, subDays } from "date-fns"
 import { fr } from "date-fns/locale"
-import { ChevronLeft, ChevronRight, Calendar, Flame, Clock, Star } from "lucide-react"
+import { ChevronDown, ChevronUp, Star, Flame } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/auth"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWatchlist } from "@/lib/useWatchlist"
 
 const LIVE_STATUSES = ["1P", "2P", "3P", "OT", "SO", "LIVE"]
 
-const getMatchLabel = (match) => {
-    if (match.status === "FT" || ["Final", "FINAL", "OFF"].includes(match.status)) return null
+/* ── Date Bar ──────────────────────────────────────────────── */
+function DateBar({ date, setDate }) {
+    const scrollRef = useRef(null)
+    const today = new Date()
 
-    const conf = match.confidence_score
-    const recBet = match.recommended_bet?.toLowerCase() || ""
-    const pred = match.predictions_json || {}
-    const aiHome = pred.ai_home_factor || 1.0
-    const aiAway = pred.ai_away_factor || 1.0
+    const days = Array.from({ length: 10 }, (_, i) => {
+        const d = addDays(subDays(today, 5), i)
+        return {
+            date: d,
+            dateStr: d.toISOString().slice(0, 10),
+            dayName: format(d, "EEE", { locale: fr }).toUpperCase().replace('.', ''),
+            dayNum: format(d, "dd.MM."),
+            isToday: d.toISOString().slice(0, 10) === today.toISOString().slice(0, 10),
+        }
+    })
 
-    // 1. Top Confidence
-    if (conf >= 8) return { text: "Top Confiance", color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" }
+    useEffect(() => {
+        const el = scrollRef.current?.querySelector('.active')
+        if (el) el.scrollIntoView({ inline: 'center', block: 'nearest' })
+    }, [])
 
-    // 2. Avoid (Low confidence)
-    if (conf != null && conf < 5) return { text: "À éviter", color: "bg-red-500/10 text-red-600 dark:text-red-400" }
-
-    // 3. Offensive / Open Game
-    if (aiHome > 1.2 || aiAway > 1.2 || recBet.includes("over") || recBet.includes("+")) {
-        return { text: "Match Offensif", color: "bg-orange-500/10 text-orange-600 dark:text-orange-400" }
-    }
-
-    // 4. Defensive / Under
-    if (aiHome < 0.8 || aiAway < 0.8 || recBet.includes("under") || recBet.includes("-")) {
-        return { text: "Match Défensif", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" }
-    }
-
-    return null
+    return (
+        <div className="fs-date-bar" ref={scrollRef}>
+            {days.map(d => (
+                <button
+                    key={d.dateStr}
+                    onClick={() => setDate(d.dateStr)}
+                    className={cn("fs-date-item", d.dateStr === date && "active")}
+                >
+                    <span className="date-day">{d.isToday ? "AJD" : d.dayName}</span>
+                    <span className="date-num">{d.dayNum}</span>
+                </button>
+            ))}
+        </div>
+    )
 }
 
 /* ── NHL Match Row ─────────────────────────────────────────── */
@@ -49,114 +55,97 @@ function NHLMatchRow({ match, isStarred, onToggleStar }) {
     const isLive = LIVE_STATUSES.includes(match.status)
     const homeWon = isFinished && match.home_score > match.away_score
     const awayWon = isFinished && match.away_score > match.home_score
-    const label = getMatchLabel(match)
+    const hasScore = isFinished || isLive
 
-    // Period label for live badge
     const periodLabel = {
-        "1P": "1ère",
-        "2P": "2ème",
-        "3P": "3ème",
-        "OT": "Prol.",
-        "SO": "Tirs",
-        "LIVE": "Live",
+        "1P": "1P", "2P": "2P", "3P": "3P",
+        "OT": "OT", "SO": "SO", "LIVE": "LIVE",
     }[match.status] || "Live"
 
-    const hasScore = isFinished || isLive
-    // Extract goals from stats_json
-    const goals = match.stats_json?.goals || []
-    const homeGoals = goals.filter(g => g.team?.toLowerCase().includes(match.home_team?.split(' ').pop()?.toLowerCase()))
-    const awayGoals = goals.filter(g => g.team?.toLowerCase().includes(match.away_team?.split(' ').pop()?.toLowerCase()))
+    const conf = match.confidence_score
+    const isHot = conf >= 7 && !isFinished
 
     return (
         <div
-            className="match-card group flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-accent/40 border-b border-border/30 last:border-0 transition-colors"
+            className="fs-match-row"
             onClick={() => navigate(`/nhl/match/${match.api_fixture_id || match.id}`)}
         >
             {/* Time */}
-            <div className="w-14 shrink-0 text-center">
+            <div className="fs-match-time">
                 {isLive ? (
-                    <Badge variant="destructive" className="text-[10px] px-1.5 h-5 animate-pulse">{periodLabel}</Badge>
+                    <span className="fs-live-badge">{periodLabel}</span>
                 ) : isFinished ? (
-                    <Badge className="text-[10px] px-1.5 h-5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0">Terminé</Badge>
+                    <span className="text-[10px] font-semibold text-emerald-500">FT</span>
                 ) : (
-                    <span className="text-xs font-bold tabular-nums text-foreground/80">{time}</span>
+                    <span>{time}</span>
                 )}
             </div>
 
-            {/* Teams */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-5 h-5 rounded bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
-                            {match.home_team?.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                            <span className={cn("text-sm block", homeWon ? "font-bold" : "font-medium text-foreground/80")}>
-                                {match.home_team}
-                            </span>
-                            {hasScore && homeGoals.length > 0 && (
-                                <span className="text-[10px] text-muted-foreground block truncate">
-                                    {homeGoals.map((g, i) => `⚽ ${g.player}${g.period ? ` (${g.period})` : ''}`).join(', ')}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <span className={cn("text-sm font-bold tabular-nums shrink-0",
-                        isLive ? "text-red-500" : homeWon ? "text-foreground" : "text-muted-foreground/50"
-                    )}>
-                        {match.home_score ?? (isFinished ? "0" : "-")}
+            {/* Teams + Score */}
+            <div className="fs-match-teams">
+                <div className="flex-1 flex items-center gap-1.5 min-w-0 justify-end">
+                    <span className={cn("fs-team-name text-right", homeWon && "winner")}>
+                        {match.home_team}
                     </span>
-                </div>
-                <div className="flex items-center justify-between gap-2 mt-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-5 h-5 rounded bg-primary/10 border border-border/50 shrink-0 flex items-center justify-center text-[8px] font-bold text-primary">
-                            {match.away_team?.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                            <span className={cn("text-sm block", awayWon ? "font-bold" : "font-medium text-foreground/80")}>
-                                {match.away_team}
-                            </span>
-                            {hasScore && awayGoals.length > 0 && (
-                                <span className="text-[10px] text-muted-foreground block truncate">
-                                    {awayGoals.map((g, i) => `⚽ ${g.player}${g.period ? ` (${g.period})` : ''}`).join(', ')}
-                                </span>
-                            )}
-                        </div>
+                    <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
+                        {match.home_team?.charAt(0)}
                     </div>
-                    <span className={cn("text-sm font-bold tabular-nums shrink-0",
-                        isLive ? "text-red-500" : awayWon ? "text-foreground" : "text-muted-foreground/50"
-                    )}>
-                        {match.away_score ?? (isFinished ? "0" : "-")}
+                </div>
+
+                <div className={cn("fs-score-box", isLive && "live")}>
+                    {hasScore ? (
+                        <>
+                            <span className={cn("score-val", homeWon && "winner")}>{match.home_score ?? 0}</span>
+                            <span className={cn("score-val", awayWon && "winner")}>{match.away_score ?? 0}</span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="score-val text-muted-foreground/40">-</span>
+                            <span className="score-val text-muted-foreground/40">-</span>
+                        </>
+                    )}
+                </div>
+
+                <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                    <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
+                        {match.away_team?.charAt(0)}
+                    </div>
+                    <span className={cn("fs-team-name", awayWon && "winner")}>
+                        {match.away_team}
                     </span>
                 </div>
             </div>
 
-            {/* Analytical Label */}
-            {label && (
-                <div className="hidden sm:flex shrink-0">
-                    <Badge variant="outline" className={cn("text-[10px] px-2 py-0 h-5 border-0 font-bold", label.color)}>
-                        {label.text}
-                    </Badge>
+            {/* Prediction */}
+            {(!isFinished && conf != null) && (
+                <div className="shrink-0 flex items-center gap-1 pl-1">
+                    {isHot && <Flame className="w-3 h-3 text-orange-500 flame-badge" />}
+                    <span className={cn(
+                        "fs-pred-chip",
+                        conf >= 8 ? "bg-emerald-500/15 text-emerald-500" :
+                            conf >= 6 ? "bg-amber-500/15 text-amber-500" :
+                                "bg-muted text-muted-foreground"
+                    )}>
+                        {conf}/10
+                    </span>
                 </div>
             )}
 
             <button
-                className="shrink-0 p-1 rounded-full hover:bg-amber-500/10 transition-colors"
+                className="fs-star-btn"
                 onClick={(e) => { e.stopPropagation(); onToggleStar(match.id) }}
-                title={isStarred ? "Retirer des favoris" : "Ajouter aux favoris"}
             >
                 <Star className={cn(
-                    "w-4 h-4 transition-colors",
-                    isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400"
+                    "w-3.5 h-3.5 transition-colors",
+                    isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400"
                 )} />
             </button>
-            <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 transition-colors" />
         </div>
     )
 }
 
 /* ═══════════════════════════════════════════════════════════
-   NHL Page
+   NHL Page (FlashScore-style)
    ═══════════════════════════════════════════════════════════ */
 export default function NHLPage({ date, setDate }) {
     const [matches, setMatches] = useState([])
@@ -179,10 +168,9 @@ export default function NHLPage({ date, setDate }) {
             .finally(() => { if (showLoading) setLoading(false) })
     }, [date])
 
-    // Initial fetch when date changes
     useEffect(() => { fetchMatches(true) }, [fetchMatches])
 
-    // Auto-refresh every 30s when any match is live
+    // Auto-refresh when live
     useEffect(() => {
         const hasLive = matches.some(m => LIVE_STATUSES.includes(m.status))
         if (!hasLive) return
@@ -190,84 +178,50 @@ export default function NHLPage({ date, setDate }) {
         return () => clearInterval(interval)
     }, [matches, fetchMatches])
 
-    const handleDateChange = (days) => {
-        setDate(addDays(new Date(date), days).toISOString().slice(0, 10))
-    }
+    const liveCount = matches.filter(m => LIVE_STATUSES.includes(m.status)).length
 
     return (
-        <div className="space-y-4 animate-fade-in-up">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                    <h1 className="text-xl font-black tracking-tight">🏒 NHL</h1>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                        {matches.length} match{matches.length !== 1 ? 's' : ''} ce jour
-                    </p>
-                </div>
+        <div className="animate-fade-in-up">
+            {/* Date Bar */}
+            <DateBar date={date} setDate={setDate} />
 
-                {/* Date navigation */}
-                <div className="flex items-center gap-1 bg-card border border-border/50 rounded-xl p-1 shadow-sm">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDateChange(-1)}>
-                        <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <div className="flex items-center gap-2 px-3 min-w-[140px] justify-center">
-                        <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-sm font-bold capitalize">
-                            {format(new Date(date), "EEE d MMM", { locale: fr })}
-                        </span>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => handleDateChange(1)}>
-                        <ChevronRight className="w-4 h-4" />
-                    </Button>
-                </div>
+            {/* Summary */}
+            <div className="fs-summary-bar">
+                <span className="text-base">🏒</span>
+                <span>NHL</span>
+                {liveCount > 0 && (
+                    <span className="fs-summary-badge bg-red-500/15 text-red-500">{liveCount}</span>
+                )}
+                <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">{matches.length}</span>
             </div>
 
-            {/* Matches */}
-            <Card className="border-border/50 overflow-hidden">
+            {/* Content */}
+            <div className="bg-card border-x border-b border-border/50 rounded-b">
                 {loading ? (
-                    <div className="flex flex-col w-full animate-in fade-in duration-500">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-border/30">
-                                <Skeleton className="h-5 w-14 shrink-0" />
-                                <div className="flex-1 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Skeleton className="h-5 w-5 rounded shrink-0" />
-                                            <Skeleton className="h-4 w-32" />
-                                        </div>
-                                        <Skeleton className="h-4 w-4 shrink-0" />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Skeleton className="h-5 w-5 rounded shrink-0" />
-                                            <Skeleton className="h-4 w-32" />
-                                        </div>
-                                        <Skeleton className="h-4 w-4 shrink-0" />
-                                    </div>
-                                </div>
-                                <Skeleton className="h-4 w-16 hidden sm:block shrink-0 ml-4" />
+                    <div className="animate-in fade-in duration-500">
+                        {[1, 2, 3, 4, 5].map(i => (
+                            <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/20">
+                                <Skeleton className="h-4 w-10 shrink-0" />
+                                <Skeleton className="h-4 flex-1" />
+                                <Skeleton className="h-5 w-12" />
+                                <Skeleton className="h-4 flex-1" />
                             </div>
                         ))}
                     </div>
                 ) : matches.length > 0 ? (
-                    matches.map(m => <NHLMatchRow key={m.id} match={m} isStarred={isStarred(m.id)} onToggleStar={toggleMatch} />)
+                    matches.map(m => (
+                        <NHLMatchRow key={m.id} match={m} isStarred={isStarred(m.id)} onToggleStar={toggleMatch} />
+                    ))
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-24 text-center">
-                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-                            <Calendar className="w-8 h-8 text-primary" />
-                        </div>
-                        <h3 className="font-bold text-lg">Aucun match NHL</h3>
-                        <p className="text-sm text-muted-foreground mt-2 max-w-[260px] leading-relaxed">
-                            Aucune rencontre de hockey n'est programmée pour cette date spécifique.
+                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                        <span className="text-3xl mb-3">🏒</span>
+                        <h3 className="font-bold text-sm mb-1">Aucun match NHL</h3>
+                        <p className="text-xs text-muted-foreground max-w-[220px]">
+                            Pas de rencontres NHL pour cette date.
                         </p>
-                        <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
-                            <Button variant="outline" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>
-                                Revenir à aujourd'hui
-                            </Button>
-                        </div>
                     </div>
                 )}
-            </Card>
+            </div>
         </div>
     )
 }

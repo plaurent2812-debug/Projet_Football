@@ -1,7 +1,10 @@
-import sys, os
+import os
+import sys
+
 import requests
+
 sys.path.insert(0, os.path.abspath("Projet_Football"))
-from config import API_FOOTBALL_KEY
+from src.config import API_FOOTBALL_KEY
 
 api_id = 2025020910
 HOCKEY_API_URL = "https://v1.hockey.api-sports.io"

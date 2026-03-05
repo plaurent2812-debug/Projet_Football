@@ -1,7 +1,9 @@
-import sys, os
+import os
+import sys
 from datetime import datetime
+
 sys.path.insert(0, os.path.abspath("Projet_Football"))
-from config import supabase
+from src.config import supabase
 
 today = datetime.now().strftime("%Y-%m-%d")
 print("Today is", today)
@@ -11,7 +13,8 @@ fixtures = (
     .gte("date", f"{today}T00:00:00Z")
     .lt("date", f"{today}T23:59:59Z")
     .execute()
-    .data or []
+    .data
+    or []
 )
 print("Found fixtures:", len(fixtures))
 for f in fixtures[:3]:

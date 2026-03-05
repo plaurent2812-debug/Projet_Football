@@ -396,17 +396,23 @@ def fetch_player_game_log(player_id: str) -> list[dict]:
     return data["gameLog"]
 
 
-def calculate_l5_form(game_log: list[dict]) -> dict:
-    """Calculate last-5-games form factor from game log.
+def calculate_recent_form(game_log: list[dict]) -> dict:
+    """Calculate recent form factors (L5/L10/L20) from game log.
 
     Compares L5 per-game stats vs season average.
-    Returns multipliers for goal, assist, point, shot.
+    Implements:
+    - M5 vs M10 regression (+15% if L5 points < L10 average)
+    - Max Gap Pattern (Flags "due" if current pointless streak >= max pointless streak in L20)
+    - Hard TOI Drop Filter (Massive penalty if L3 TOI < L20 TOI - 1.5 mins)
     """
     if len(game_log) < 5:
-        return {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0, "hot": False, "cold": False}
+        return {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0, "hot": False, "cold": False, "m5_m10_regression": 1.0, "max_gap_surge": 1.0, "toi_drop_penalty": 1.0}
 
-    # Last 5 games (game log is sorted newest first)
+    # Slices
     last5 = game_log[:5]
+    last10 = game_log[:10]
+    last20 = game_log[:20]
+    last3 = game_log[:3]
     all_games = game_log
 
     season_gp = max(1, len(all_games))
@@ -437,11 +443,42 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
     is_hot = point_factor > 1.2
     is_cold = point_factor < 0.8
 
+    # 1. M5 vs M10 Regression
+    l10_points = sum(g.get("points", 0) for g in last10)
+    l10_pg = l10_points / max(1, len(last10))
+    l5_pg = l5_points / 5
+    # If standard is decent, but recent is bad => positive regression
+    m5_m10_regression = 1.0
+    if l10_pg >= 0.5 and l5_pg < l10_pg:
+        m5_m10_regression = 1.15  # +15% boost
+
+    # 2. Max Gap Pattern (Pointless streaks)
+    current_streak = 0
+    max_streak = 0
+    current_count = 0
+    # Calculate max streak in L20
+    for g in last20:
+        if g.get("points", 0) == 0:
+            current_count += 1
+            if current_count > max_streak:
+                max_streak = current_count
+        else:
+            current_count = 0
+    # Calculate current ongoing streak
+    for g in game_log:
+        if g.get("points", 0) == 0:
+            current_streak += 1
+        else:
+            break
+    
+    max_gap_surge = 1.0
+    if max_streak >= 3 and current_streak >= max_streak:
+        max_gap_surge = 1.30  # +30% Signal d'Achat Majeur
+
     days_since_last_game = 999
     if all_games and "gameDate" in all_games[0]:
         try:
             from datetime import datetime
-
             last_date = datetime.strptime(all_games[0]["gameDate"], "%Y-%m-%d")
             days_since_last_game = (datetime.utcnow() - last_date).days
         except Exception:
@@ -456,14 +493,14 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
             pass
         return 0.0
 
-    l5_toi = sum(_parse_toi(g.get("toi", "00:00")) for g in last5) / max(1, len(last5))
-    season_toi_sample = sum(_parse_toi(g.get("toi", "00:00")) for g in all_games[:20]) / max(
-        1, min(20, len(all_games))
-    )
-
-    toi_drop_factor = 1.0
-    if season_toi_sample > 12.0 and l5_toi < season_toi_sample * 0.8:
-        toi_drop_factor = l5_toi / season_toi_sample
+    # 3. Hard TOI Drop Filter (L3 vs L20)
+    l3_toi = sum(_parse_toi(g.get("toi", "00:00")) for g in last3) / max(1, len(last3))
+    l20_toi = sum(_parse_toi(g.get("toi", "00:00")) for g in last20) / max(1, len(last20))
+    
+    toi_drop_penalty = 1.0
+    # If dropped by more than 1.5 minutes recently => severe penalty
+    if l20_toi > 12.0 and l3_toi < (l20_toi - 1.5):
+        toi_drop_penalty = 0.5  # -50% penalty (Hard constraint)
 
     # Shooting % Regression
     sh_pct_regression = 1.0
@@ -487,7 +524,9 @@ def calculate_l5_form(game_log: list[dict]) -> dict:
         "l5_goals": l5_goals,
         "l5_shots": l5_shots,
         "days_since_last_game": days_since_last_game,
-        "toi_drop_factor": round(toi_drop_factor, 3),
+        "m5_m10_regression": round(m5_m10_regression, 3),
+        "max_gap_surge": round(max_gap_surge, 3),
+        "toi_drop_penalty": round(toi_drop_penalty, 3),
         "sh_pct_regression": round(sh_pct_regression, 3),
     }
 
@@ -697,6 +736,7 @@ def _score_player(
     pp_goals = skater.get("powerPlayGoals", 0)
     pp_points = skater.get("powerPlayPoints", 0)
     toi_per_game = skater.get("avgToi", "00:00")
+    position_code = skater.get("positionCode", "F")  # F (Forward) or D (Defense)
 
     # Parse TOI
     try:
@@ -704,6 +744,19 @@ def _score_player(
         toi_minutes = int(parts[0]) + int(parts[1]) / 60 if len(parts) == 2 else 0
     except (ValueError, IndexError):
         toi_minutes = 0
+
+    # ─── Hard Filter Limits ───
+    # Bottom-6 / Bottom-Pairing filter
+    line_penalty = 1.0
+    if position_code == "D" and toi_minutes < 17.5:
+        line_penalty = 0.3  # Bottom-Pairing Defenseman
+    elif position_code != "D" and toi_minutes < 13.0:
+        line_penalty = 0.3  # Bottom-6 Forward
+
+    # Milestone Boost (Psychological advantage near career/season thresholds)
+    milestone_boost = 1.0
+    if points % 100 == 99 or points == 49 or points == 99:
+        milestone_boost = 1.10
 
     # ─── Volume smoothing (penalize low GP) ───
     volume_factor = min(1.0, (gp + 5) / 20.0)
@@ -771,10 +824,15 @@ def _score_player(
     # Average is ~3.0 TSH/game. Scale the PP boost by how undisciplined the opponent is
     opp_penalty_volume = max(0.8, min(1.4, opp_tsh_per_game / 3.0))
 
-    # Final PP boost: team advantage × player share × opponent penalty volume
+    # PP1 Discipline Target (Bonus si PP1 vs Equipe Indisciplinée)
+    pp1_discipline_boost = 1.0
+    if pp_share > 0.60 and opp_tsh_per_game >= 3.5:
+        pp1_discipline_boost = 1.20
+
+    # Final PP boost: team advantage × player share × opponent penalty volume × PP1 Target
     pp_boost = 1.0 + (
         team_pp_advantage * max(0.1, pp_share) * 2.0 * opp_penalty_volume
-    )
+    ) * pp1_discipline_boost
 
     # Back-to-back & 3-in-4 fatigue penalty
     b2b_penalty = fatigue_dict.get(team, 1.0)
@@ -824,8 +882,12 @@ def _score_player(
         * ai_factor
         * l5["goal"]
         * h2h_adj["goal"]
-        * toi_drop
+        * l5.get("toi_drop_penalty", 1.0)
+        * l5.get("m5_m10_regression", 1.0)
+        * l5.get("max_gap_surge", 1.0)
         * sh_regress
+        * milestone_boost
+        * line_penalty
     )
     exp_assists = (
         apg
@@ -836,7 +898,11 @@ def _score_player(
         * b2b_penalty
         * ai_factor
         * l5["assist"]
-        * toi_drop
+        * l5.get("toi_drop_penalty", 1.0)
+        * l5.get("m5_m10_regression", 1.0)
+        * l5.get("max_gap_surge", 1.0)
+        * milestone_boost
+        * line_penalty
     )
     exp_points = (
         ppg
@@ -849,8 +915,12 @@ def _score_player(
         * ai_factor
         * l5["point"]
         * h2h_adj["point"]
-        * toi_drop
+        * l5.get("toi_drop_penalty", 1.0)
+        * l5.get("m5_m10_regression", 1.0)
+        * l5.get("max_gap_surge", 1.0)
         * sh_regress
+        * milestone_boost
+        * line_penalty
     )
 
     # ─── Home & TOI adjustments ───

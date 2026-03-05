@@ -6,6 +6,7 @@ Serves prediction data from Supabase to the React frontend.
 
 from __future__ import annotations
 
+import math
 import os
 import subprocess
 import sys
@@ -420,7 +421,7 @@ def _get_league_map() -> dict:
 # ─── Expected Value (EV+) Calculator ─────────────────────────────
 def _calculate_ev(proba: float | None, odds: float | None) -> float | None:
     """EV = (Probability * Odds) - 1. Returns an edge representing expected ROI."""
-    if not proba or not odds or pd.isna(odds):
+    if not proba or not odds or (isinstance(odds, float) and math.isnan(odds)):
         return None
     edge = (proba / 100.0) * odds - 1.0
     return round(edge * 100, 2)  # Return as percentage (e.g. 5.4 for +5.4% EV)

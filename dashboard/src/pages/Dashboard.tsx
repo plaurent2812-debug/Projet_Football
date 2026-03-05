@@ -4,7 +4,7 @@ import { format, addDays, subDays } from "date-fns"
 import { fr } from "date-fns/locale"
 import {
     Flame, Trophy, ChevronDown, ChevronUp, Star,
-    Activity, Target
+    Activity, Target, BrainCircuit
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { fetchPredictions } from "@/lib/api"
@@ -130,6 +130,12 @@ function MatchRow({ match, isStarred, onToggleStar }) {
             {/* Prediction chips */}
             {(!isFinished && pred) && (
                 <div className="shrink-0 flex items-center gap-1 pl-1">
+                    {pred?.model_version === "meta_v2" && (
+                        <div className="flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded text-[10px] font-bold text-primary mr-1">
+                            <BrainCircuit className="w-3 h-3" />
+                            V2
+                        </div>
+                    )}
                     {isHot && (
                         <Flame className="w-3 h-3 text-orange-500 flame-badge" />
                     )}

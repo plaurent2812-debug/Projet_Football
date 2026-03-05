@@ -259,6 +259,12 @@ export default function PerformancePage() {
                             accent="bg-emerald-500/10 text-emerald-400"
                         />
                         <StatTile
+                            value={data.brier_score_1x2?.toFixed(3) || "—"}
+                            label="Brier Score (1X2)"
+                            icon={Activity}
+                            accent="bg-blue-500/10 text-blue-400"
+                        />
+                        <StatTile
                             value={data.avg_confidence}
                             label="Confiance moyenne"
                             icon={Zap}

@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Optional
 
 class AIFeatures(BaseModel):
     """Schéma de validation stricte pour l'extraction de features sportives par l'IA Gemini."""
@@ -39,11 +40,11 @@ class AIFeatures(BaseModel):
         ..., 
         description="Analyse narrative courte (3-5 phrases) justifiant les scores attribués."
     )
-    likely_scorer: str | None = Field(
+    likely_scorer: Optional[str] = Field(
         default=None, 
         description="Nom du buteur le plus probable selon l'analyse du match."
     )
-    likely_scorer_reason: str | None = Field(
+    likely_scorer_reason: Optional[str] = Field(
         default=None, 
         description="Explication courte justifiant le choix du buteur."
     )

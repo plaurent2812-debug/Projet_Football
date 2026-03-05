@@ -238,8 +238,9 @@ def calculate_team_strengths(league_id: int) -> dict | None:
         ``"league_avg_home"`` and ``"league_avg_away"`` averages, or
         ``None`` if insufficient data is available.
     """
-    standings = (
-        supabase.table("team_standings")
+    # ── Option 1 : Récupérer les stats xG de la Vue Supabase ──
+    xg_stats = (
+        supabase.table("team_xg_stats")
         .select("*")
         .eq("league_id", league_id)
         .eq("season", SEASON)
@@ -247,65 +248,54 @@ def calculate_team_strengths(league_id: int) -> dict | None:
         .data
     )
 
-    if not standings or len(standings) < 4:
+    if not xg_stats or len(xg_stats) < 4:
+        # Fallback de sécurité si la vue n'est pas peuplée
         return None
 
-    # Moyennes de la ligue
-    total_home_for = sum(s["home_goals_for"] for s in standings)
-    total_home_against = sum(s["home_goals_against"] for s in standings)
-    total_away_for = sum(s["away_goals_for"] for s in standings)
-    total_away_against = sum(s["away_goals_against"] for s in standings)
-    total_home_played = max(sum(s["home_played"] for s in standings), 1)
-    total_away_played = max(sum(s["away_played"] for s in standings), 1)
+    # Moyennes de la ligue basées sur les xG
+    total_xg_for = sum((s["xg_for_total"] or 0) for s in xg_stats)
+    total_xg_against = sum((s["xg_against_total"] or 0) for s in xg_stats)
+    total_matches = max(sum(s["matches_played"] for s in xg_stats), 1)
 
-    league_avg_home_goals = total_home_for / total_home_played
-    league_avg_away_goals = total_away_for / total_away_played
-    league_avg_home_conceded = total_home_against / total_home_played
-    league_avg_away_conceded = total_away_against / total_away_played
+    # Note: La vue agglomère Home et Away pour l'instant (on le séparera plus tard si besoin)
+    league_avg_xg_scored = total_xg_for / total_matches
+    league_avg_xg_conceded = total_xg_against / total_matches
 
-    # Extraire le home advantage global (fallback/prior)
-
+    # Avantage domicile global fallback
     strengths = {}
-    for s in standings:
+    for s in xg_stats:
         tid = s["team_api_id"]
-        hp = max(s["home_played"], 1)
-        ap = max(s["away_played"], 1)
+        mp = max(s["matches_played"], 1)
 
-        # Ratios bruts
-        raw_home_atk = (s["home_goals_for"] / hp) / max(league_avg_home_goals, 0.5)
-        raw_home_def = (s["home_goals_against"] / hp) / max(league_avg_home_conceded, 0.5)
-        raw_away_atk = (s["away_goals_for"] / ap) / max(league_avg_away_goals, 0.5)
-        raw_away_def = (s["away_goals_against"] / ap) / max(league_avg_away_conceded, 0.5)
+        # Ratios bruts xG
+        team_avg_xg_for = (s["xg_for_total"] or 0) / mp
+        team_avg_xg_against = (s["xg_against_total"] or 0) / mp
+        
+        # Vu que xg_stats agglomère home/away, pour l'instant on utilise la même force
+        raw_atk = team_avg_xg_for / max(league_avg_xg_scored, 0.5)
+        raw_def = team_avg_xg_against / max(league_avg_xg_conceded, 0.5)
 
-        # Calcul de l'avantage domicile propre à l'équipe
-        # Ratio: performance à domicile vs extérieur
-        # On utilise une régression bayésienne très forte (poids=15) car l'avantage
-        # domicile d'une équipe met plusieurs saisons à se dessiner clairement,
-        # on veut éviter de sur-réagir à 10 matchs.
-        home_perf_ratio = raw_home_atk * raw_away_def
-        away_perf_ratio = raw_away_atk * raw_home_def
-        raw_home_adv = home_perf_ratio / max(away_perf_ratio, 0.5)
-        # L'avantage "neutre" sans biais est de 1.0 (les équipes jouent de la même façon)
-        # Mais on regresse vers le bonus moyen de la ligue (ex: 1.12)
-        team_home_adv = regress_to_mean(raw_home_adv, hp + ap, HOME_XG_BONUS, weight=15)
+        raw_home_atk = raw_atk
+        raw_home_def = raw_def
+        raw_away_atk = raw_atk
+        raw_away_def = raw_def
 
-        # Régression vers la moyenne pour les petits échantillons
-        # Les équipes avec peu de matchs sont tirées vers 1.0 (force moyenne)
+        # Pour pallier à la vue agrégée, l'avantage domicile est fixé au bonus xG de la ligue (ex: 1.12)
+        # On regresse la performance si échantillon faible
         strengths[tid] = {
-            "home_attack": regress_to_mean(raw_home_atk, hp, 1.0),
-            "home_defense": regress_to_mean(raw_home_def, hp, 1.0),
-            "away_attack": regress_to_mean(raw_away_atk, ap, 1.0),
-            "away_defense": regress_to_mean(raw_away_def, ap, 1.0),
-            "home_advantage": round(
-                max(1.0, min(team_home_adv, 1.30)), 3
-            ),  # Plafonné entre 1.00 et 1.30
+            "home_attack": regress_to_mean(raw_home_atk, mp, 1.0),
+            "home_defense": regress_to_mean(raw_home_def, mp, 1.0),
+            "away_attack": regress_to_mean(raw_away_atk, mp, 1.0),
+            "away_defense": regress_to_mean(raw_away_def, mp, 1.0),
+            "home_advantage": HOME_XG_BONUS
         }
 
+    # Pour xg_home et xg_away, on simule que Home marque X% de plus globalement
     return {
         "strengths": strengths,
-        "league_avg_home": league_avg_home_goals,
-        "league_avg_away": league_avg_away_goals,
-        "avg_matches_played": (total_home_played + total_away_played) / len(standings),
+        "league_avg_home": league_avg_xg_scored * (HOME_XG_BONUS),
+        "league_avg_away": league_avg_xg_scored * (2.0 - HOME_XG_BONUS),
+        "avg_matches_played": total_matches / len(xg_stats),
     }
 
 
@@ -448,38 +438,17 @@ def get_elo_probs(home_elo: float, away_elo: float, league_id: int | None = None
         Dictionary with keys ``"elo_home"``, ``"elo_draw"``, ``"elo_away"``
         as rounded integer percentages.
     """
-    adj_home = home_elo + HOME_ELO_ADVANTAGE
-    # Estimer la probabilité de base du nul pour cette ligue (ex: 0.26)
-    draw_base = DRAW_FACTOR_BY_LEAGUE.get(league_id, DRAW_FACTOR) if league_id else DRAW_FACTOR
+    # On utilise simplement l'ELO_EXPECTED pour les win et loss
+    p_home = elo_expected(home_elo + HOME_ELO_ADVANTAGE, away_elo)
+    p_away = elo_expected(away_elo, home_elo + HOME_ELO_ADVANTAGE)
 
-    # Modèle de Rue & Salvesen : on introduit une largeur de nul δ (delta)
-    # P(nul à ELO égal) = draw_base
-    # 2 / (1 + 10^(δ/400)) = 1 - draw_base
-    # δ = 400 * log10( 2 / (1 - draw_base) - 1 )
-    draw_base = max(0.01, min(0.99, draw_base))  # Sécurité
-    delta = 400 * math.log10((2.0 / (1.0 - draw_base)) - 1.0)
-
-    diff = (home_elo + HOME_ELO_ADVANTAGE) - away_elo
-
-    # P(Home) = P(Perf_Home - Perf_Away > δ)
-    p_home = 1.0 / (1.0 + 10 ** (-(diff - delta) / 400))
-
-    # P(Away) = P(Perf_Home - Perf_Away < -δ)
-    p_away = 1.0 - (1.0 / (1.0 + 10 ** (-(diff + delta) / 400)))
-
-    # P(Draw) = Ce qui reste entre -δ et +δ
-    p_draw = 1.0 - p_home - p_away
-
-    # Plancher de sécurité à 1% au cas où les écarts sont extrêmes
-    p_draw = max(0.01, p_draw)
-    total = p_home + p_draw + p_away
+    # Normalisation sur 100% (sans nul)
+    total = p_home + p_away
     p_home /= total
-    p_draw /= total
     p_away /= total
 
     return {
         "elo_home": round(p_home * 100),
-        "elo_draw": round(p_draw * 100),
         "elo_away": round(p_away * 100),
     }
 
@@ -1075,190 +1044,48 @@ def get_injury_impact(
     team_total_assists = max(sum(s["assists"] or 0 for s in team_stats), 1)
     team_total_minutes = max(sum(s["minutes_played"] or 0 for s in team_stats), 1)
 
-    # ── 4. Calculer l'impact par joueur, par poste ──
-    attack_penalty = 0.0
-    defense_penalty = 0.0
-    injured_details = []
-
+    # ── 4. Construire la liste des blessés améliorée pour le VORP ──
+    missing_players = []
+    
     for inj in injured_raw:
         pid = inj.get("player_api_id")
         if not pid:
             continue
+            
         position = pos_map.get(pid, "Unknown")
-        s = stats_map.get(pid)
+        s = stats_map.get(pid, {})
         name = inj.get("player_name", "?")
         reason = inj.get("reason", "?")
-        impact_label = "mineur"
-        impact_attack = 0.0
-        impact_defense = 0.0
+        
+        rating = s.get("rating", 6.0)
+        mins = s.get("minutes_played", 0)
+        is_starter = mins > getattr(team_total_minutes, "real", 0) * 0.03
 
-        if not s or not s.get("minutes_played") or s["minutes_played"] < 90:
-            # Joueur sans stats → impact minimal
-            injured_details.append(
-                {
-                    "player_name": name,
-                    "position": position,
-                    "reason": reason,
-                    "impact": "minimal",
-                    "impact_attack": 0,
-                    "impact_defense": 0,
-                }
-            )
-            continue
+        missing_players.append({
+            "player_name": name,
+            "position": position,
+            "reason": reason,
+            "rating": rating,
+            "minutes_played": mins,
+            "is_starter": is_starter,
+            "goals": s.get("goals", 0),
+            "assists": s.get("assists", 0),
+        })
 
-        mins = s["minutes_played"]
-        is_starter = mins > team_total_minutes * 0.03  # >3% du temps total = titulaire probable
-        rating = s.get("rating") or 6.0
-
-        if position == "Goalkeeper":
-            # ── GARDIEN : impact énorme sur la défense ──
-            goals_conceded = s.get("goals_conceded") or 0
-            saves = s.get("saves") or 0
-            s.get("clean_sheets") or 0
-            goals_conceded * 90 / max(mins, 1)
-            save_rate = saves / max(saves + goals_conceded, 1)
-
-            if is_starter:
-                # Gardien titulaire absent = gros problème
-                if rating >= 7.0:
-                    impact_defense = 0.20  # Gardien d'élite → +20% buts concédés
-                    impact_label = "CRITIQUE"
-                elif rating >= 6.5:
-                    impact_defense = 0.15
-                    impact_label = "majeur"
-                else:
-                    impact_defense = 0.10
-                    impact_label = "significatif"
-                # Bonus si gardien a un bon save rate
-                if save_rate > 0.72:
-                    impact_defense += 0.05
-            else:
-                impact_defense = 0.02
-                impact_label = "mineur"
-
-        elif position == "Attacker":
-            # ── ATTAQUANT : impact sur l'attaque ──
-            goals = s.get("goals") or 0
-            goal_share = goals / team_total_goals  # Part des buts de l'équipe
-
-            # Un attaquant qui représente >30% des buts = critique
-            if goal_share >= 0.30:
-                impact_attack = 0.20
-                impact_label = "CRITIQUE"
-            elif goal_share >= 0.20:
-                impact_attack = 0.15
-                impact_label = "majeur"
-            elif goal_share >= 0.10:
-                impact_attack = 0.10
-                impact_label = "significatif"
-            elif goals >= 3:
-                impact_attack = 0.05
-                impact_label = "modéré"
-            else:
-                impact_attack = 0.02
-                impact_label = "mineur"
-
-            # Tireur de penalty absent
-            pen_taken = (s.get("penalty_scored") or 0) + (s.get("penalty_missed") or 0)
-            if pen_taken >= 2:
-                impact_attack += 0.03
-                _severity = {
-                    "CRITIQUE": 6,
-                    "majeur": 5,
-                    "significatif": 4,
-                    "modéré": 3,
-                    "mineur": 2,
-                    "minimal": 1,
-                }
-                if _severity.get("modéré", 0) > _severity.get(impact_label, 0):
-                    impact_label = "modéré"
-
-        elif position == "Midfielder":
-            # ── MILIEU : impact hybride (surtout passes décisives) ──
-            goals = s.get("goals") or 0
-            assists = s.get("assists") or 0
-            goal_share = goals / team_total_goals
-            assist_share = assists / team_total_assists
-            key_passes = s.get("passes_key") or 0
-            kp_per_90 = key_passes * 90 / max(mins, 1)
-
-            # Milieu créateur (beaucoup de passes clés)
-            if kp_per_90 > 2.0 or assist_share >= 0.25:
-                impact_attack = 0.12
-                impact_label = "majeur"
-            elif kp_per_90 > 1.0 or assist_share >= 0.15:
-                impact_attack = 0.07
-                impact_label = "significatif"
-
-            # Milieu buteur
-            if goal_share >= 0.15:
-                impact_attack += 0.08
-                impact_label = "majeur"
-            elif goal_share >= 0.08:
-                impact_attack += 0.04
-
-            # Rating élevé = joueur important
-            if rating >= 7.2 and is_starter:
-                impact_defense = 0.05  # Milieu défensif clé
-                impact_attack = max(impact_attack, 0.05)
-                impact_label = "majeur"
-
-        elif position == "Defender":
-            # ── DÉFENSEUR : impact sur la défense ──
-            if is_starter:
-                if rating >= 7.0:
-                    impact_defense = 0.12
-                    impact_label = "majeur"
-                elif rating >= 6.5:
-                    impact_defense = 0.08
-                    impact_label = "significatif"
-                else:
-                    impact_defense = 0.04
-                    impact_label = "modéré"
-
-                # Défenseur buteur (corners, coups francs)
-                goals = s.get("goals") or 0
-                if goals >= 3:
-                    impact_attack = 0.03
-            else:
-                impact_defense = 0.02
-                impact_label = "mineur"
-
-        attack_penalty += impact_attack
-        defense_penalty += impact_defense
-
-        injured_details.append(
-            {
-                "player_name": name,
-                "position": position,
-                "reason": reason,
-                "impact": impact_label,
-                "impact_attack": round(impact_attack, 3),
-                "impact_defense": round(impact_defense, 3),
-                "goals": s.get("goals") or 0,
-                "assists": s.get("assists") or 0,
-                "rating": rating,
-                "minutes": mins,
-                "is_starter": is_starter,
-            }
-        )
-
-    # ── 5. Calcul des facteurs finaux ──
-    # attack_factor < 1.0 = moins de buts marqués
-    attack_factor = max(0.70, 1.0 - attack_penalty)
-    # defense_factor > 1.0 = plus de buts encaissés
-    defense_factor = min(1.35, 1.0 + defense_penalty)
-
-    # Trier par impact (les plus critiques en premier)
-    impact_order = {
-        "CRITIQUE": 0,
-        "majeur": 1,
-        "significatif": 2,
-        "modéré": 3,
-        "mineur": 4,
-        "minimal": 5,
+    # ── 5. Calcul des facteurs finaux via VORP ──
+    from src.models.injury_vorp import calculate_vorp_impact
+    team_context = {
+        "total_goals": getattr(team_total_goals, "real", 1),
+        "total_assists": getattr(team_total_assists, "real", 1)
     }
-    injured_details.sort(key=lambda x: impact_order.get(x["impact"], 5))
+    
+    attack_factor, defense_factor = calculate_vorp_impact(missing_players, team_context)
+
+    # ── 6. Préparation des détails pour l'affichage/log ──
+    injured_details = missing_players  # Could be augmented by VORP impact strings if needed, keeping simple for now
+    
+    # Sort roughly by importance (starters with highest rating first)
+    injured_details.sort(key=lambda x: (x["is_starter"], x["rating"] or 0.0), reverse=True)
 
     return attack_factor, defense_factor, injured_details
 
@@ -1752,9 +1579,9 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
             + elo_probs["elo_home"] * w_elo
             + market["market_home"] * w_market
         )
+        # On fait pleinement confiance au Poisson Bivarié pour la probabilité du Nul (Phase 4.3)
         final_draw = (
-            poisson_probs["proba_draw"] * w_poisson
-            + elo_probs["elo_draw"] * w_elo
+            poisson_probs["proba_draw"] * (w_poisson + w_elo)
             + market["market_draw"] * w_market
         )
         final_away = (
@@ -1766,7 +1593,7 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         w_p = WEIGHT_POISSON_NO_MARKET
         w_e = WEIGHT_ELO_NO_MARKET
         final_home = poisson_probs["proba_home"] * w_p + elo_probs["elo_home"] * w_e
-        final_draw = poisson_probs["proba_draw"] * w_p + elo_probs["elo_draw"] * w_e
+        final_draw = poisson_probs["proba_draw"] * (w_p + w_e)
         final_away = poisson_probs["proba_away"] * w_p + elo_probs["elo_away"] * w_e
 
     # Normaliser à 100%

@@ -19,7 +19,7 @@ from google import genai
 from google.genai import types
 from src.models.scorer_engine import predict_scorers
 from src.models.stats_engine import analyze_match, update_elo_from_results
-from src.pipeline.inference import predict_meta_1x2
+from src.pipeline.inference import predict_meta
 
 # ── Client Gemini ─────────────────────────────────────────────
 if not GEMINI_API_KEY:
@@ -284,11 +284,14 @@ def ask_gemini(system_prompt: str, user_prompt: str) -> str | None:
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=0.2,
-                max_output_tokens=1500,
+                max_output_tokens=4000,
                 response_mime_type="application/json",
             ),
         )
-        return response.text
+        text = response.text
+        if text is None:
+            logger.warning(f"Gemini response has no text! Raw response: {response}")
+        return text
     except Exception as e:
         logger.error("Erreur Gemini : %s", e)
         return None
@@ -351,16 +354,27 @@ def blend_predictions(stats_result: dict, ai_result: AIFeatures | None) -> dict:
         final["ai_features"] = {}
         final["analysis_text"] = f"Analyse stats uniquement. xG: {stats_result.get('xg_home')}-{stats_result.get('xg_away')}."
 
-    # Interroger le Meta-Modèle XGBoost (Phase 2)
-    meta_preds = predict_meta_1x2(stats_result, ai_features_dict)
+    # Interroger les Meta-Modèles XGBoost (Phase 2)
+    meta_preds = predict_meta(stats_result, ai_features_dict)
     if meta_preds:
         # Override les probabilités avec celles de XGBoost
-        final["proba_home"] = meta_preds["proba_home_meta"]
-        final["proba_draw"] = meta_preds["proba_draw_meta"]
-        final["proba_away"] = meta_preds["proba_away_meta"]
-        final["model_version"] = "meta_v1"
+        if "proba_home_meta" in meta_preds:
+            final["proba_home"] = meta_preds["proba_home_meta"]
+            final["proba_draw"] = meta_preds["proba_draw_meta"]
+            final["proba_away"] = meta_preds["proba_away_meta"]
+            
+        if "proba_btts_meta" in meta_preds:
+            final["proba_btts"] = meta_preds["proba_btts_meta"]
+            
+        if "proba_over_15_meta" in meta_preds:
+            final["proba_over_15"] = meta_preds["proba_over_15_meta"]
+            
+        if "proba_over_25_meta" in meta_preds:
+            final["proba_over_2_5"] = meta_preds["proba_over_25_meta"]
+            
+        final["model_version"] = "meta_v2"
     else:
-        # Indiquer la version (features_v1 = Phase 1 de la refonte)
+        # Indiquer la version (features_v1 = Phase 1 de la refonte sans ML finalisé)
         final["model_version"] = "features_v1"
 
     # Pour l'instant on reprend la recommandation 100% issue des stats (Phase 1)

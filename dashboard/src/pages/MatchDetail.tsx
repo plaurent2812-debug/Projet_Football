@@ -240,6 +240,12 @@ export default function MatchDetailPage() {
                             {fixture?.league_name || "Football"}
                         </span>
                         <div className="flex items-center gap-2">
+                            {p?.model_version === "meta_v2" && (
+                                <Badge variant="outline" className="border-primary/50 text-primary text-[10px] h-5 px-1.5 flex items-center gap-1 bg-primary/5">
+                                    <BrainCircuit className="w-3 h-3" />
+                                    Meta V2
+                                </Badge>
+                            )}
                             {isHot && (
                                 <div className="flex items-center gap-1">
                                     <Flame className="w-3.5 h-3.5 text-orange-500 flame-badge" />

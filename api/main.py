@@ -756,6 +756,7 @@ def get_performance(days: int = Query(30, description="Rolling window in days"))
         total_with_pred = 0
         total_conf = 0
         value_bets_count = 0
+        brier_sum = 0
         daily: dict[str, dict] = {}
 
         for f in finished:
@@ -781,10 +782,25 @@ def get_performance(days: int = Query(30, description="Rolling window in days"))
             actual_result = "H" if hg > ag else ("D" if hg == ag else "A")
             actual_btts = hg > 0 and ag > 0
 
-            # 1X2 accuracy
+            # 1X2 accuracy & Brier Score
             ph = get_val("proba_home", 33)
             pd_val = get_val("proba_draw", 33)
             pa = get_val("proba_away", 33)
+            
+            # Normalize to 0-1
+            p_h = ph / 100.0
+            p_d = pd_val / 100.0
+            p_a = pa / 100.0
+
+            # Actual outcome array [H, D, A]
+            o_h = 1 if actual_result == "H" else 0
+            o_d = 1 if actual_result == "D" else 0
+            o_a = 1 if actual_result == "A" else 0
+
+            # Brier score for this match: sum of squared differences
+            brier_match = (p_h - o_h)**2 + (p_d - o_d)**2 + (p_a - o_a)**2
+            brier_sum += brier_match
+
             predicted_result = "H" if ph >= pd_val and ph >= pa else ("A" if pa >= pd_val else "D")
             if predicted_result == actual_result:
                 correct_1x2 += 1
@@ -857,6 +873,7 @@ def get_performance(days: int = Query(30, description="Rolling window in days"))
             "accuracy_score": _pct(correct_score, total_score),
             "avg_confidence": round(total_conf / total_with_pred, 1) if total_with_pred else 0,
             "value_bets": value_bets_count,
+            "brier_score_1x2": round(brier_sum / total_with_pred, 3) if total_with_pred else 0,
             "daily_stats": sorted(daily.values(), key=lambda x: x["date"]),
         }
 

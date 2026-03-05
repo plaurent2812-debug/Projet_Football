@@ -599,6 +599,42 @@ def retrain_models():
         return {"status": "error", "message": str(e)}
 
 
+@router.post("/retrain-meta-model")
+def retrain_meta_model():
+    """Endpoint for Trigger.dev to trigger XGBoost Meta-Model training (Phase 2 & 3)."""
+    logger.info("[MLOps] 🚀 Déclenchement du réentrainement Méta-Modèle XGBoost...")
+    try:
+        from src.training.prepare_meta_dataset import extract_meta_dataset
+        from src.training.train_meta_1x2 import train_meta_1x2
+
+        # 1. Extraction des données (jointure Predictions + Fixtures réelles)
+        dataset_path = "meta_dataset.csv"
+        df = extract_meta_dataset()
+        if df.empty:
+            return {"status": "skipped", "message": "Pas assez de données pour l'entraînement Meta"}
+        
+        df.to_csv(dataset_path, index=False)
+
+        # 2. Entraînement et Sauvegarde du Modèle
+        metrics = train_meta_1x2(dataset_path=dataset_path, model_dir="models/football")
+
+        # 3. Notification Telegram
+        if metrics:
+            msg = (
+                f"🤖 *XGBoost Meta-Modèle Ré-entraîné*\n\n"
+                f"📊 *Échantillons :* {metrics['samples']} matchs\n"
+                f"🎯 *Log Loss (CV) :* {metrics['log_loss']}\n"
+                f"✅ *Accuracy (CV) :* {metrics['accuracy'] * 100:.1f}%\n\n"
+                f"Le modèle a été mis à jour avec succès en production."
+            )
+            _send_telegram_message(msg)
+
+        return {"status": "ok", "message": "XGBoost Meta-Model successfully retrained and saved", "metrics": metrics}
+    except Exception as e:
+        logger.error(f"[MLOps] Meta-Model Retraining Failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 @router.post("/fetch-lineups")
 def fetch_lineups():
     """Fetch H-1 lineups for upcoming matches and store in Supabase."""

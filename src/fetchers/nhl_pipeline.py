@@ -1480,7 +1480,7 @@ def run_nhl_pipeline() -> dict:
         fixtures_data.append(
             {
                 "api_fixture_id": game_id,
-                "date": today,  # NHL schedule date (North American hockey day)
+                "date": start_time,  # startTimeUTC — frontend handles timezone display
                 "status": "NS",
                 "home_team": home_name,
                 "away_team": away_name,

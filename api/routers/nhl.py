@@ -696,12 +696,11 @@ def get_nhl_meta_analysis(date: str = None):
     """Return the DeepThink strategic meta-analysis for today's NHL games.
 
     Fetches from nhl_data_lake where player_id = 'META_ANALYSIS'.
-    Falls back to first fixture's analysis_text if not found.
     """
     if not date:
         date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
 
-    # Try 1: Direct meta_analysis from nhl_data_lake
+    # Fetch meta_analysis from nhl_data_lake
     try:
         resp = (
             supabase.table("nhl_data_lake")
@@ -713,31 +712,15 @@ def get_nhl_meta_analysis(date: str = None):
         )
         if resp.data and len(resp.data) > 0:
             row = resp.data[0]
-            # The meta_analysis might be stored in a dedicated column or player_name
-            analysis = row.get("meta_analysis") or row.get("player_name", "")
+            # Try dedicated column first, then player_name fallback
+            analysis = row.get("meta_analysis") or ""
+            if not analysis or len(analysis) < 50:
+                # Fallback: analysis stored in player_name field
+                pname = row.get("player_name", "")
+                if pname and len(pname) > 50 and pname != "DeepThink Analysis":
+                    analysis = pname
             if analysis and len(analysis) > 50:
                 return {"ok": True, "date": date, "analysis": analysis, "source": "deepthink"}
-    except Exception:
-        pass
-
-    # Try 2: Check if any fixture has a meta-analysis style text
-    try:
-        start = f"{date}T00:00:00"
-        end = f"{date}T23:59:59"
-        resp = (
-            supabase.table("nhl_fixtures")
-            .select("analysis_text")
-            .gte("date", start)
-            .lte("date", end)
-            .not_.is_("analysis_text", "null")
-            .limit(1)
-            .execute()
-        )
-        if resp.data:
-            # Return first analysis as fallback
-            text = resp.data[0].get("analysis_text", "")
-            if text:
-                return {"ok": True, "date": date, "analysis": text, "source": "gemini"}
     except Exception:
         pass
 

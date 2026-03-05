@@ -1469,6 +1469,62 @@ def run_nhl_pipeline() -> dict:
 
     logger.info(f"[NHL] ✅ {len(fixtures_data)} matchs insérés dans nhl_fixtures")
 
+    # 9. 🧠 DeepThink Strategic Meta-Analysis (ONE call per pipeline run)
+    if fixtures_data and all_players:
+        try:
+            meta_analysis = generate_deepthink_meta_analysis(
+                fixtures_data, all_players, standings, fatigue_dict, special_teams
+            )
+            if meta_analysis:
+                # Store as special row in nhl_data_lake
+                try:
+                    supabase.table("nhl_data_lake").delete().eq(
+                        "player_id", "META_ANALYSIS"
+                    ).eq("date", today).execute()
+                except Exception:
+                    pass
+                try:
+                    # Try with dedicated meta_analysis column first
+                    supabase.table("nhl_data_lake").insert(
+                        {
+                            "date": today,
+                            "player_id": "META_ANALYSIS",
+                            "player_name": "DeepThink Analysis",
+                            "team": "NHL",
+                            "opp": "ALL",
+                            "algo_score_goal": 0,
+                            "algo_score_shot": 0,
+                            "is_home": 0,
+                            "python_prob": 0,
+                            "python_vol": 0,
+                            "meta_analysis": meta_analysis,
+                        }
+                    ).execute()
+                    logger.info("[NHL] ✅ DeepThink meta-analysis saved")
+                except Exception as e1:
+                    # Fallback: store in player_name field if meta_analysis column doesn't exist
+                    logger.warning(f"[NHL] meta_analysis column insert failed ({e1}), trying fallback...")
+                    try:
+                        supabase.table("nhl_data_lake").insert(
+                            {
+                                "date": today,
+                                "player_id": "META_ANALYSIS",
+                                "player_name": meta_analysis,
+                                "team": "NHL",
+                                "opp": "ALL",
+                                "algo_score_goal": 0,
+                                "algo_score_shot": 0,
+                                "is_home": 0,
+                                "python_prob": 0,
+                                "python_vol": 0,
+                            }
+                        ).execute()
+                        logger.info("[NHL] ✅ DeepThink meta-analysis saved (fallback)")
+                    except Exception as e2:
+                        logger.error(f"[NHL] Error saving meta-analysis: {e2}")
+        except Exception as e:
+            logger.warning(f"[NHL] DeepThink meta-analysis failed: {e}")
+
     return {
         "status": "ok",
         "matches": len(fixtures_data),
@@ -1487,3 +1543,134 @@ def run_nhl_pipeline() -> dict:
             for f in fixtures_data
         ],
     }
+
+
+def generate_deepthink_meta_analysis(
+    fixtures_data: list[dict],
+    all_players: list[dict],
+    standings: dict,
+    fatigue_dict: dict,
+    special_teams: dict,
+) -> str | None:
+    """Generate a strategic meta-analysis of the entire NHL evening using DeepThink.
+
+    Uses Gemini with extended thinking for deep reasoning across all matches.
+    Returns a markdown-formatted analysis string, or None on failure.
+    """
+    try:
+        from google import genai
+        from google.genai import types
+        from src.config import GEMINI_API_KEY
+
+        if not GEMINI_API_KEY:
+            return None
+
+        gclient = genai.Client(api_key=GEMINI_API_KEY)
+    except ImportError:
+        logger.warning("[NHL] google-genai not available for DeepThink")
+        return None
+
+    # Build comprehensive data summary for DeepThink
+    matches_summary = []
+    for f in fixtures_data:
+        home = f["home_team"]
+        away = f["away_team"]
+        h_abbrev = next((k for k, v in TEAM_NAMES.items() if v == home), "")
+        a_abbrev = next((k for k, v in TEAM_NAMES.items() if v == away), "")
+
+        # Get special teams data
+        h_st = special_teams.get(h_abbrev, {})
+        a_st = special_teams.get(a_abbrev, {})
+        h_stand = standings.get(h_abbrev, {})
+        a_stand = standings.get(a_abbrev, {})
+
+        h_fatigue = fatigue_dict.get(h_abbrev, 1.0)
+        a_fatigue = fatigue_dict.get(a_abbrev, 1.0)
+
+        # Top players for this match
+        match_top = [
+            p for p in all_players
+            if p["team"] in (h_abbrev, a_abbrev)
+        ]
+        match_top.sort(key=lambda p: p.get("prob_point", 0), reverse=True)
+        top5 = match_top[:5]
+
+        players_str = "\n".join([
+            f"    - {p['player_name']} ({p['team']}): "
+            f"Point {p.get('prob_point', 0):.0f}%, But {p.get('prob_goal', 0):.0f}%, "
+            f"Tirs {p.get('shots_per_game', 0):.1f}/m, "
+            f"PP boost {p.get('pp_boost', 1.0):.2f}, "
+            f"PP share {p.get('pp_share', 0):.1%}, "
+            f"{'🔥 HOT' if p.get('l5_form', {}).get('hot') else '🥶 COLD' if p.get('l5_form', {}).get('cold') else ''}"
+            for p in top5
+        ])
+
+        fatigue_tag = ""
+        if h_fatigue < 1.0:
+            fatigue_tag += f" ⚠️ {h_abbrev} B2B ({h_fatigue:.2f})"
+        if a_fatigue < 1.0:
+            fatigue_tag += f" ⚠️ {a_abbrev} B2B ({a_fatigue:.2f})"
+
+        matches_summary.append(
+            f"### {home} vs {away}\n"
+            f"  Win%: {home} {f.get('proba_home', 50)}% — {away} {f.get('proba_away', 50)}%\n"
+            f"  Over 5.5: {f.get('proba_over_55', 50)}%\n"
+            f"  {home}: PP {h_st.get('pp_pct', 0.20):.1%}, L10 GAA {h_stand.get('l10_gaa', 0)}\n"
+            f"  {away}: PK {a_st.get('pk_pct', 0.80):.1%}, TSH/gm {a_st.get('tsh_per_game', 3.0):.1f}, "
+            f"SA/gm {a_st.get('shots_against_per_game', 30):.1f}\n"
+            f"  {away}: PP {a_st.get('pp_pct', 0.20):.1%}, L10 GAA {a_stand.get('l10_gaa', 0)}\n"
+            f"  {home}: PK {h_st.get('pk_pct', 0.80):.1%}, TSH/gm {h_st.get('tsh_per_game', 3.0):.1f}, "
+            f"SA/gm {h_st.get('shots_against_per_game', 30):.1f}\n"
+            f"  Fatigue:{fatigue_tag or ' Aucune'}\n"
+            f"  AI factors: {home} {f.get('ai_home_factor', 1.0)}, {away} {f.get('ai_away_factor', 1.0)}\n"
+            f"  Top joueurs:\n{players_str}"
+        )
+
+    system_prompt = (
+        "Tu es un expert analytique NHL de niveau élite. Tu t'adresses à des parieurs avertis.\n\n"
+        "**MISSION** : Analyse en profondeur TOUS les matchs de la soirée. "
+        "Identifie les 3 MEILLEURS SPOTS (opportunités à haute value) en croisant les données.\n\n"
+        "**Données fournies** : Probabilités calculées par le modèle Poisson, "
+        "PP%/PK% des équipes, fatigue B2B, PK L10 estimé, pénalités concédées adverses, "
+        "Tirs concédés, forme récente (L5), PP share des joueurs.\n\n"
+        "**RAISONNEMENT ATTENDU** : Pour chaque spot identifié, tu dois :\n"
+        "1. Expliquer POURQUOI c'est un bon spot (croisement de plusieurs facteurs)\n"
+        "2. Identifier le MARCHÉ cible (But O/U 0.5, Point O/U 0.5, Tirs O/U 2.5)\n"
+        "3. Donner un niveau de CONFIANCE (⭐ à ⭐⭐⭐)\n"
+        "4. Mentionner les RISQUES potentiels\n\n"
+        "**FORMAT** : Rédige en français, style direct de parieur expert. "
+        "Commence par un titre '🧠 Analyse Stratégique' puis les 3 spots. "
+        "Termine par un bref résumé de la soirée (1-2 phrases).\n"
+        "Max 500 mots total. Sois percutant et précis."
+    )
+
+    user_prompt = (
+        f"Soirée NHL du {datetime.utcnow().strftime('%d/%m/%Y')} — "
+        f"{len(fixtures_data)} matchs à analyser :\n\n"
+        + "\n\n".join(matches_summary)
+    )
+
+    try:
+        logger.info("[NHL] 🧠 DeepThink: Generating strategic meta-analysis...")
+        response = gclient.models.generate_content(
+            model="gemini-2.5-pro",
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.4,
+                max_output_tokens=2000,
+                thinking_config=types.ThinkingConfig(
+                    thinking_budget=8000,
+                ),
+            ),
+        )
+        result = response.text
+        if result and len(result) > 50:
+            logger.info(f"[NHL] 🧠 DeepThink analysis generated ({len(result)} chars)")
+            return result
+        else:
+            logger.warning("[NHL] DeepThink returned empty/short response")
+            return None
+    except Exception as e:
+        logger.warning(f"[NHL] DeepThink generation failed: {e}")
+        return None

@@ -464,6 +464,7 @@ def ingest_suivi_algo(req: IngestSuiviAlgoRequest):
         out = {k: v for k, v in row.items() if k in SUIVI_ALGO_COLUMNS}
         if "resultat" in out:
             out["résultat"] = out.pop("resultat")
+        out["model_version"] = "v1"
         return out
 
     try:

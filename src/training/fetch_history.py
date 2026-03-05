@@ -175,6 +175,7 @@ def upsert_fixtures_batch(fixtures: list[dict], league_id: int, season: int) -> 
                 "home_goals": goals["home"],
                 "away_goals": goals["away"],
                 "referee_name": f.get("referee"),
+                "model_version": "v1",
                 "stats_json": {
                     "venue": f.get("venue", {}),
                     "status_short": "FT",

@@ -613,7 +613,7 @@ def run_brain() -> None:
                 "confidence_score": final.get("confidence_score", 5),
                 "likely_scorer": final.get("likely_scorer"),
                 "likely_scorer_proba": final.get("likely_scorer_proba"),
-                "model_version": final.get("model_version", "hybrid_v3"),
+                "model_version": "v1",
                 "stats_json": final.get("stats_json"),
             }
 

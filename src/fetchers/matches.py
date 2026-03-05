@@ -120,6 +120,7 @@ def fetch_and_store(date_from: str = None, date_to: str = None) -> None:
                     "status": fixture["status"]["short"],
                     "home_goals": goals.get("home"),
                     "away_goals": goals.get("away"),
+                    "model_version": "v1",
                     "stats_json": stats_raw,
                 }
 

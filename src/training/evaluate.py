@@ -174,7 +174,7 @@ def evaluate_match(fixture: dict, prediction: dict) -> dict:
         "pred_penalty": p_pen,
         "pred_recommended": prediction.get("recommended_bet", ""),
         "pred_confidence": prediction.get("confidence_score"),
-        "model_version": prediction.get("model_version"),
+        "model_version": "v1",
         "actual_home_goals": hg,
         "actual_away_goals": ag,
         "actual_result": actual_result,

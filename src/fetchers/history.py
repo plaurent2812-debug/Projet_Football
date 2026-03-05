@@ -77,6 +77,7 @@ def fetch_finished_fixtures() -> list[int]:
                     "home_goals": goals.get("home"),
                     "away_goals": goals.get("away"),
                     "referee_name": referee_name,
+                    "model_version": "v1",
                     "stats_json": {
                         "venue": fix.get("venue"),
                         "status_short": fix["status"]["short"],

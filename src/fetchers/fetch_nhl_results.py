@@ -161,6 +161,7 @@ def evaluate_nhl_predictions(days_back=3):
                     "score_reel": str(actual_val),
                     "proba_predite": ml_prob,
                     "python_prob": ml_prob,
+                    "model_version": "v1",
                     "cote": 1.0,  # Dummy odds, maybe fetch later if integrated
                     "id_ref": api_id,
                 }

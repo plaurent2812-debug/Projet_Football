@@ -170,6 +170,7 @@ def evaluate_recent_matches(days_back=7):
                     "brier_score_1x2": round(brier_1x2, 4),
                     "log_loss": round(ll_1x2, 4),
                     "result_1x2_ok": ok_1x2,
+                    "model_version": "v1",
                 }
 
                 if existing_res.data:

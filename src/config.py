@@ -53,6 +53,9 @@ GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
 # ── Client Supabase ──────────────────────────────────────────────
 supabase: Client = create_client(SUPABASE_URL or "", SUPABASE_KEY or "")
 
+# ── Moteur V2 (A/B Testing) ──────────────────────────────────────
+USE_V2_STACK: bool = False
+
 # ── Ligues suivies ───────────────────────────────────────────────
 LEAGUES: list[dict[str, int | str]] = [
     {"id": 61, "name": "Ligue 1", "country": "France"},

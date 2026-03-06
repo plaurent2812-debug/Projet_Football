@@ -1999,6 +1999,44 @@ def _run_pipeline_background(mode: str):
             _pipeline_state["process"] = None
 
 
+@app.post("/api/cron/run-pipeline")
+def cron_run_pipeline(body: dict, authorization: str = Header(None)):
+    """
+    Trigger the pipeline via Trigger.dev scheduled tasks.
+    Authenticated via CRON_SECRET (not Supabase JWT).
+    Body: { "mode": "nhl" | "full" | "analyze" | "data" | "results" }
+    """
+    expected = f"Bearer {os.getenv('CRON_SECRET', 'super_secret_probalab_2026')}"
+    if authorization != expected:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    mode = body.get("mode", "full")
+    if mode not in ("full", "data", "analyze", "results", "nhl"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Invalid mode")
+
+    with _pipeline_lock:
+        if _pipeline_state["status"] == "running":
+            return {"message": "Pipeline already running — skipping", "status": "skipped"}
+
+        _pipeline_state["status"] = "running"
+        _pipeline_state["mode"] = mode
+        _pipeline_state["started_at"] = datetime.now().isoformat()
+        _pipeline_state["finished_at"] = None
+        _pipeline_state["logs"] = ""
+        _pipeline_state["return_code"] = None
+
+    thread = threading.Thread(target=_run_pipeline_background, args=(mode,), daemon=True)
+    thread.start()
+
+    return {
+        "ok": True,
+        "message": f"Pipeline '{mode}' started via cron",
+        "started_at": _pipeline_state["started_at"],
+    }
+
+
 @app.post("/api/admin/run-pipeline")
 def admin_run_pipeline(
     mode: str = Query("full", description="Pipeline mode: full, data, analyze, results, or nhl"),

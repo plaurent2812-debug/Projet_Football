@@ -607,15 +607,8 @@ def get_best_bets(
         except Exception as e:
             result["football_error"] = str(e)
 
-    # ── NHL best bets ─────────────────────────────────────────────
-    if sport in (None, "nhl"):
-        try:
-            # Target odds window: 1.70 – 2.20
-            # 1.70 implied = 100/1.70 = 58.8% proba = 0.588 decimal
-            # 2.20 implied = 100/2.20 = 45.5% proba = 0.455 decimal
-            PROB_MIN = 0.455  # = cote 2.20
-            PROB_MAX = 0.588  # = cote 1.70
-
+            # Fetch wider net (35%-72% proba = odds ~1.39–2.86)
+            # then score by composite: confidence + sweet spot bonus + no extreme penalty
             nhl_resp = (
                 supabase.table("nhl_data_lake")
                 .select(
@@ -624,22 +617,53 @@ def get_best_bets(
                 )
                 .eq("date", date)
                 .neq("player_id", "META_ANALYSIS")
-                .gte("python_prob", PROB_MIN)  # cote <= 2.20
-                .lte("python_prob", PROB_MAX)  # cote >= 1.70
+                .gte("python_prob", 0.35)   # at most cote ~2.86
+                .lte("python_prob", 0.72)   # at least cote ~1.39
                 .order("python_prob", desc=True)
-                .limit(20)
+                .limit(40)                  # pull more to find best composite
                 .execute()
             )
 
+            def nhl_composite_score(prob_pct, implied_odds, algo_goal):
+                """Score a bet: reward confidence + sweet spot odds + algo bonus."""
+                # Base = confidence (prob over 40% threshold)
+                base = max(0, prob_pct - 40)
+
+                # Sweet spot bonus: peak score at 1.85 (the ideal cote), falling off at edges
+                # Uses a bell curve centered on 1.85
+                target = 1.85
+                spread = 0.35  # half-width of sweet zone
+                distance = abs(implied_odds - target)
+                sweet_bonus = max(0, (1 - distance / spread)) * 25  # up to +25 pts
+
+                # EV proxy: higher prob relative to odds = more value
+                # Capped since odds are implied from prob (can't compute true EV without bookie odds)
+                ev_proxy = prob_pct * 0.3
+
+                # Algo goal signal bonus
+                algo_bonus = min(10, float(algo_goal or 0) * 5)
+
+                return base + sweet_bonus + ev_proxy + algo_bonus
+
             nhl_bets = []
+            seen_ids = set()
             for p in (nhl_resp.data or []):
+                pid = p.get("player_id", "")
+                if pid in seen_ids:
+                    continue
+                seen_ids.add(pid)
                 prob_raw = float(p.get("python_prob") or 0)
-                prob = round(prob_raw * 100, 1)  # convert to percentage
-                implied_odds = round(100 / prob, 2) if prob > 0 else 0
-                # Double-check odds window (1.65–2.25 with slight margin)
-                if not (1.65 <= implied_odds <= 2.25):
+                prob = round(prob_raw * 100, 1)
+                if prob <= 0:
+                    continue
+                implied_odds = round(100 / prob, 2)
+                # Hard exclude extreme cotes (< 1.40 or > 2.60)
+                if implied_odds < 1.40 or implied_odds > 2.60:
                     continue
                 home_away = "vs" if p.get("is_home") else "@"
+                composite = nhl_composite_score(prob, implied_odds, p.get("algo_score_goal"))
+                # Flag if in sweet zone
+                in_target = 1.65 <= implied_odds <= 2.25
 
                 nhl_bets.append({
                     "id": None,
@@ -650,10 +674,14 @@ def get_best_bets(
                     "odds": implied_odds,
                     "confidence": min(10, int(prob / 10)),
                     "proba_model": prob,
+                    "is_value": in_target,
                     "algo_score_goal": p.get("algo_score_goal") or 0,
+                    "composite": composite,
                     "result": "PENDING",
                 })
 
+            # Sort by composite score, take top 5
+            nhl_bets.sort(key=lambda x: -x["composite"])
             result["nhl"] = nhl_bets[:5]
 
             # Fallback: if no data for that date, use nhl_fixtures + most recent nhl_data_lake
@@ -701,16 +729,16 @@ def get_best_bets(
                             fx_by_abbrev[a_abbrev] = {"opp": h_abbrev, "opp_name": h_name, "is_home": False}
 
                         # Get most recent nhl_data_lake for these abbreviations
-                        # Same odds window: 1.70–2.20 → proba 0.455–0.588
+                        # Wide range — composite scoring will pick the best ones
                         recent_resp = (
                             supabase.table("nhl_data_lake")
                             .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, algo_score_shot, date")
                             .in_("team", list(abbrev_teams))
                             .neq("player_id", "META_ANALYSIS")
-                            .gte("python_prob", 0.455)  # cote <= 2.20
-                            .lte("python_prob", 0.588)  # cote >= 1.70
+                            .gte("python_prob", 0.35)
+                            .lte("python_prob", 0.72)
                             .order("python_prob", desc=True)
-                            .limit(30)
+                            .limit(50)
                             .execute()
                         )
 
@@ -725,15 +753,18 @@ def get_best_bets(
                                 continue
                             seen_players.add(pid)
                             prob_raw = float(p.get("python_prob") or 0)
-                            prob = round(prob_raw * 100, 1)  # convert to %
-                            implied_odds = round(100 / prob, 2) if prob > 0 else 0
-                            if not (1.65 <= implied_odds <= 2.25):
+                            prob = round(prob_raw * 100, 1)
+                            if prob <= 0:
+                                continue
+                            implied_odds = round(100 / prob, 2)
+                            if implied_odds < 1.40 or implied_odds > 2.60:
                                 continue
                             fx_info = fx_by_abbrev[team_abbrev]
                             opp_name = fx_info["opp_name"]
                             home_away = "vs" if fx_info["is_home"] else "@"
-                            implied_odds = round(100 / prob, 2)
                             team_name = NHL_ABBREV_TO_NAME.get(team_abbrev, team_abbrev)
+                            composite = nhl_composite_score(prob, implied_odds, p.get("algo_score_goal"))
+                            in_target = 1.65 <= implied_odds <= 2.25
 
                             nhl_bets_fallback.append({
                                 "id": None,
@@ -744,16 +775,19 @@ def get_best_bets(
                                 "odds": implied_odds,
                                 "confidence": min(10, int(prob / 10)),
                                 "proba_model": prob,
+                                "is_value": in_target,
                                 "algo_score_goal": p.get("algo_score_goal") or 0,
+                                "composite": composite,
                                 "result": "PENDING",
                                 "note": f"Données du {p.get('date', '')}",
                             })
-                            if len(nhl_bets_fallback) >= 5:
-                                break
 
-                        result["nhl"] = nhl_bets_fallback
+                        # Sort by composite, take top 5
+                        nhl_bets_fallback.sort(key=lambda x: -x["composite"])
+                        result["nhl"] = nhl_bets_fallback[:5]
                         if nhl_bets_fallback:
                             result["nhl_note"] = f"Pipeline NHL pas encore lancé pour le {date} — données approximatives basées sur la dernière analyse disponible."
+
                 except Exception as ex:
                     result["nhl_fallback_error"] = str(ex)
 

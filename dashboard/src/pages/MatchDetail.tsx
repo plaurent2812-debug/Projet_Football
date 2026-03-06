@@ -350,11 +350,11 @@ export default function MatchDetailPage() {
 
             {/* True Value Bet Banner (Football) */}
             {(() => {
-                if (!matchData?.value_edges || Object.keys(matchData.value_edges).length === 0) return null;
+                if (!p?.value_edges || Object.keys(p.value_edges).length === 0) return null;
 
                 // Find highest edge
-                const edges = matchData.value_edges;
-                const odds = matchData.odds || {};
+                const edges = p.value_edges;
+                const odds = p.odds || fixture?.odds || {};
                 let bestKey = null;
                 let maxEdge = 0;
 

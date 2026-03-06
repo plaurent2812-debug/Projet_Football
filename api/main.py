@@ -607,6 +607,10 @@ def get_best_bets(
         except Exception as e:
             result["football_error"] = str(e)
 
+
+    # ── NHL best bets ─────────────────────────────────────────────
+    if sport in (None, "nhl"):
+        try:
             # Fetch wider net (35%-72% proba = odds ~1.39–2.86)
             # then score by composite: confidence + sweet spot bonus + no extreme penalty
             nhl_resp = (

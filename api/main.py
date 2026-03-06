@@ -610,6 +610,12 @@ def get_best_bets(
     # ── NHL best bets ─────────────────────────────────────────────
     if sport in (None, "nhl"):
         try:
+            # Target odds window: 1.70 – 2.20
+            # 1.70 implied = 100/1.70 = 58.8% proba = 0.588 decimal
+            # 2.20 implied = 100/2.20 = 45.5% proba = 0.455 decimal
+            PROB_MIN = 0.455  # = cote 2.20
+            PROB_MAX = 0.588  # = cote 1.70
+
             nhl_resp = (
                 supabase.table("nhl_data_lake")
                 .select(
@@ -618,7 +624,8 @@ def get_best_bets(
                 )
                 .eq("date", date)
                 .neq("player_id", "META_ANALYSIS")
-                .gte("python_prob", 0.50)  # stored as decimal: 0.70 = 70%
+                .gte("python_prob", PROB_MIN)  # cote <= 2.20
+                .lte("python_prob", PROB_MAX)  # cote >= 1.70
                 .order("python_prob", desc=True)
                 .limit(20)
                 .execute()
@@ -628,9 +635,10 @@ def get_best_bets(
             for p in (nhl_resp.data or []):
                 prob_raw = float(p.get("python_prob") or 0)
                 prob = round(prob_raw * 100, 1)  # convert to percentage
-                if prob < 50:
+                implied_odds = round(100 / prob, 2) if prob > 0 else 0
+                # Double-check odds window (1.65–2.25 with slight margin)
+                if not (1.65 <= implied_odds <= 2.25):
                     continue
-                implied_odds = round(100 / prob, 2)
                 home_away = "vs" if p.get("is_home") else "@"
 
                 nhl_bets.append({
@@ -693,12 +701,14 @@ def get_best_bets(
                             fx_by_abbrev[a_abbrev] = {"opp": h_abbrev, "opp_name": h_name, "is_home": False}
 
                         # Get most recent nhl_data_lake for these abbreviations
+                        # Same odds window: 1.70–2.20 → proba 0.455–0.588
                         recent_resp = (
                             supabase.table("nhl_data_lake")
                             .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, algo_score_shot, date")
                             .in_("team", list(abbrev_teams))
                             .neq("player_id", "META_ANALYSIS")
-                            .gte("python_prob", 0.50)  # stored as decimal
+                            .gte("python_prob", 0.455)  # cote <= 2.20
+                            .lte("python_prob", 0.588)  # cote >= 1.70
                             .order("python_prob", desc=True)
                             .limit(30)
                             .execute()
@@ -716,7 +726,8 @@ def get_best_bets(
                             seen_players.add(pid)
                             prob_raw = float(p.get("python_prob") or 0)
                             prob = round(prob_raw * 100, 1)  # convert to %
-                            if prob < 50:
+                            implied_odds = round(100 / prob, 2) if prob > 0 else 0
+                            if not (1.65 <= implied_odds <= 2.25):
                                 continue
                             fx_info = fx_by_abbrev[team_abbrev]
                             opp_name = fx_info["opp_name"]

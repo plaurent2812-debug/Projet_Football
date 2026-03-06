@@ -128,52 +128,54 @@ function MatchRow({ match, isStarred, onToggleStar }) {
             </div>
 
             {/* Prediction chips */}
-            {(!isFinished && pred) && (
-                <div className="shrink-0 flex items-center gap-1.5 pl-2">
-                    {/* Match Style Tags */}
-                    {(() => {
-                        const probaOver25 = pred?.proba_over_25 ?? pred?.proba_over_2_5
-                        if (probaOver25 != null && probaOver25 >= 58) {
-                            return (
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 flex items-center gap-1">
-                                    <Flame className="w-2.5 h-2.5" />
-                                    Offensif
-                                </span>
-                            )
-                        }
-                        if (probaOver25 != null && probaOver25 <= 42) {
-                            return (
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400">
-                                    Défensif
-                                </span>
-                            )
-                        }
-                        return null
-                    })()}
+            <div className="shrink-0 w-[110px] flex items-center gap-1.5 pl-2 justify-end">
+                {(!isFinished && pred) && (
+                    <>
+                        {/* Match Style Tags */}
+                        {(() => {
+                            const probaOver25 = pred?.proba_over_25 ?? pred?.proba_over_2_5
+                            if (probaOver25 != null && probaOver25 >= 58) {
+                                return (
+                                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 flex items-center gap-1">
+                                        <Flame className="w-2.5 h-2.5" />
+                                        Offensif
+                                    </span>
+                                )
+                            }
+                            if (probaOver25 != null && probaOver25 <= 42) {
+                                return (
+                                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400">
+                                        Défensif
+                                    </span>
+                                )
+                            }
+                            return null
+                        })()}
 
-                    <div className="flex items-center gap-1 ml-0.5">
-                        {pred?.model_version === "meta_v2" && (
-                            <div className="flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded text-[10px] font-bold text-primary mr-1">
-                                <BrainCircuit className="w-3 h-3" />
-                                V2
-                            </div>
-                        )}
-                        {isHot && (
-                            <Flame className="w-3 h-3 text-orange-500 flame-badge" />
-                        )}
-                        {pred?.confidence_score != null && (
-                            <span className={cn(
-                                "fs-pred-chip",
-                                pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-500" :
-                                    pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-500" :
-                                        "bg-muted text-muted-foreground"
-                            )}>
-                                {pred.confidence_score}/10
-                            </span>
-                        )}
-                    </div>
-                </div>
-            )}
+                        <div className="flex items-center gap-1 ml-0.5">
+                            {pred?.model_version === "meta_v2" && (
+                                <div className="flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded text-[10px] font-bold text-primary mr-1">
+                                    <BrainCircuit className="w-3 h-3" />
+                                    V2
+                                </div>
+                            )}
+                            {isHot && (
+                                <Flame className="w-3 h-3 text-orange-500 flame-badge" />
+                            )}
+                            {pred?.confidence_score != null && (
+                                <span className={cn(
+                                    "fs-pred-chip",
+                                    pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-500" :
+                                        pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-500" :
+                                            "bg-muted text-muted-foreground"
+                                )}>
+                                    {pred.confidence_score}/10
+                                </span>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
 
             {/* Star */}
             <button

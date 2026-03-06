@@ -68,6 +68,12 @@ LEAGUES: list[dict[str, int | str]] = [
     {"id": 78, "name": "Bundesliga", "country": "Germany"},
     {"id": 2, "name": "Champions League", "country": "World"},
     {"id": 3, "name": "Europa League", "country": "World"},
+    # Coupes nationales
+    {"id": 66, "name": "Coupe de France", "country": "France"},
+    {"id": 45, "name": "FA Cup", "country": "England"},
+    {"id": 143, "name": "Copa del Rey", "country": "Spain"},
+    {"id": 137, "name": "Coppa Italia", "country": "Italy"},
+    {"id": 81, "name": "DFB-Pokal", "country": "Germany"},
 ]
 
 

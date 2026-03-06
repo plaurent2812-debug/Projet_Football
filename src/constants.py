@@ -171,6 +171,12 @@ DRAW_FACTOR_BY_LEAGUE: dict[int, float] = {
     78: 0.22,  # Bundesliga
     2: 0.22,  # Champions League
     3: 0.24,  # Europa League
+    # Coupes nationales (moins de nuls: prolongations/tirs au but)
+    66: 0.20,  # Coupe de France
+    45: 0.20,  # FA Cup
+    143: 0.21,  # Copa del Rey
+    137: 0.22,  # Coppa Italia
+    81: 0.19,  # DFB-Pokal
 }
 
 

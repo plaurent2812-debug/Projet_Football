@@ -225,8 +225,9 @@ function BetCard({ bet, sport, date, isAdmin, onResultUpdate }) {
     )
 }
 
-// ── Stats Dashboard ───────────────────────────────────────────
-function StatsDashboard({ stats }) {
+// ── Stats Dashboard (Admin only) ────────────────────────────
+function StatsDashboard({ stats, isAdmin }) {
+    if (!isAdmin) return null
     if (!stats || stats.error) return null
 
     const { global: g, football: f, nhl: n } = stats
@@ -243,16 +244,16 @@ function StatsDashboard({ stats }) {
                 <p className="text-xs text-muted-foreground mb-2">{label}</p>
                 <div className="flex items-end gap-2">
                     <span className="text-2xl font-black">{data.win_rate}%</span>
-                    <span className="text-xs text-muted-foreground mb-0.5">taux de réussite</span>
+                    <span className="text-xs text-muted-foreground mb-0.5">réussite</span>
                 </div>
                 <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                     <span className="text-emerald-400 font-semibold">{data.wins}W</span>
                     <span className="text-red-400 font-semibold">{data.losses}L</span>
-                    <span className={cn("font-bold", data.roi_pct >= 0 ? "text-emerald-400" : "text-red-400")}>
+                    {data.voids > 0 && <span className="text-slate-400">{data.voids} nul</span>}
+                    <span className={cn("font-bold ml-auto", data.roi_pct >= 0 ? "text-emerald-400" : "text-red-400")}>
                         ROI {data.roi_pct >= 0 ? "+" : ""}{data.roi_pct}%
                     </span>
                 </div>
-                {/* Mini bar */}
                 <div className="mt-2 h-1.5 rounded-full bg-border/40 overflow-hidden">
                     <div
                         className="h-full bg-emerald-500 rounded-full transition-all duration-700"
@@ -263,20 +264,72 @@ function StatsDashboard({ stats }) {
         )
     }
 
+    // Market name display
+    const marketLabels = {
+        "Victoire domicile": "Victoire domicile",
+        "Victoire extérieur": "Victoire extérieur",
+        "Match nul": "Match nul",
+        "BTTS — Les deux équipes marquent": "BTTS",
+        "Over 2.5 buts": "Over 2.5 buts",
+        "Over 1.5 buts": "Over 1.5 buts",
+        "Over 3.5 buts": "Over 3.5 buts",
+        "player_points_over_0.5": "Over 0.5 Pts (NHL)",
+    }
+
+    const byMarket = stats.by_market || {}
+    const sortedMarkets = Object.entries(byMarket).sort((a, b) => b[1].total - a[1].total)
+
     return (
         <div className="mt-6">
             <div className="flex items-center gap-2 mb-4">
                 <BarChart3 className="w-4 h-4 text-primary" />
                 <h2 className="text-sm font-bold">Performance ProbaLab</h2>
-                <span className="text-[10px] text-muted-foreground">({g.total} paris résolus)</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/15 text-primary">Admin</span>
+                <span className="text-[10px] text-muted-foreground ml-1">({g.total} paris résolus)</span>
             </div>
+
+            {/* Global stats cards */}
             <div className="grid grid-cols-3 gap-3">
                 <StatCard label="🌍 Global" data={g} color="border-primary/20 bg-primary/5" />
                 <StatCard label="⚽ Football" data={f} color="border-emerald-500/20 bg-emerald-500/5" />
                 <StatCard label="🏒 NHL" data={n} color="border-cyan-500/20 bg-cyan-500/5" />
             </div>
 
-            {/* Timeline mini chart */}
+            {/* Market breakdown table */}
+            {sortedMarkets.length > 0 && (
+                <div className="mt-4 rounded-xl border border-border/60 bg-card overflow-hidden">
+                    <div className="px-4 py-2.5 border-b border-border/40">
+                        <p className="text-xs font-semibold">Détail par type de pari</p>
+                    </div>
+                    <div className="divide-y divide-border/30">
+                        {sortedMarkets.map(([market, data]) => (
+                            <div key={market} className="flex items-center justify-between px-4 py-2.5">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <span className="text-xs text-foreground font-medium truncate">
+                                        {marketLabels[market] || market}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground shrink-0">
+                                        {data.total} paris
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <span className="text-xs font-bold">{data.win_rate}%</span>
+                                    <span className="text-[10px] text-emerald-400">{data.wins}W</span>
+                                    <span className="text-[10px] text-red-400">{data.losses}L</span>
+                                    <span className={cn(
+                                        "text-[10px] font-semibold w-14 text-right",
+                                        data.roi_pct >= 0 ? "text-emerald-400" : "text-red-400"
+                                    )}>
+                                        {data.roi_pct >= 0 ? "+" : ""}{data.roi_pct}%
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 30-day timeline */}
             {stats.timeline?.length > 0 && (
                 <div className="mt-4 rounded-xl border border-border/60 bg-card p-4">
                     <p className="text-xs text-muted-foreground mb-3">Historique 30 jours</p>
@@ -508,8 +561,16 @@ export default function ParisDuSoir() {
                 />
             )}
 
-            {/* Stats */}
-            <StatsDashboard stats={stats} />
+            {/* NHL fallback note */}
+            {bets?.nhl_note && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/8 px-3 py-2 mb-3 flex items-start gap-2">
+                    <span className="text-amber-400 text-xs shrink-0">⚠️</span>
+                    <p className="text-[10px] text-amber-400/80">{bets.nhl_note}</p>
+                </div>
+            )}
+
+            {/* Stats — admin only */}
+            <StatsDashboard stats={stats} isAdmin={isAdmin} />
         </div>
     )
 }

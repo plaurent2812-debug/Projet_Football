@@ -524,13 +524,12 @@ def get_best_bets(
         try:
             next_day = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
 
-            # Get fixtures for that date
+            # Get fixtures for that date (all statuses — include not-started AND live/finished for tracking)
             fx_resp = (
                 supabase.table("fixtures")
-                .select("id, home_team, away_team, date")
+                .select("id, home_team, away_team, date, status")
                 .gte("date", f"{date}T00:00:00Z")
                 .lt("date", f"{next_day}T00:00:00Z")
-                .eq("status", "NS")
                 .execute()
             )
             fx_map = {f["id"]: f for f in (fx_resp.data or [])}
@@ -648,6 +647,84 @@ def get_best_bets(
 
             result["nhl"] = nhl_bets[:5]
 
+            # Fallback: if no data for that date, try to use data from nhl_fixtures + most recent nhl_data_lake
+            if not nhl_bets:
+                try:
+                    nxt = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
+                    fixtures_resp = (
+                        supabase.table("nhl_fixtures")
+                        .select("home_team, away_team, date")
+                        .gte("date", f"{date}T00:00:00Z")
+                        .lt("date", f"{nxt}T00:00:00Z")
+                        .execute()
+                    )
+                    nhl_fixtures = fixtures_resp.data or []
+
+                    if nhl_fixtures:
+                        # Get team abbreviations from fixtures
+                        teams_in_play = set()
+                        for fx in nhl_fixtures:
+                            teams_in_play.add(fx.get("home_team", ""))
+                            teams_in_play.add(fx.get("away_team", ""))
+
+                        # Get most recent nhl_data_lake for these teams
+                        recent_resp = (
+                            supabase.table("nhl_data_lake")
+                            .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, algo_score_shot, date")
+                            .in_("team", list(teams_in_play))
+                            .neq("player_id", "META_ANALYSIS")
+                            .gte("python_prob", 50)
+                            .order("python_prob", desc=True)
+                            .limit(30)
+                            .execute()
+                        )
+
+                        # Build fixture lookup for opp
+                        fx_by_team = {}
+                        for fx in nhl_fixtures:
+                            h, a = fx.get("home_team", ""), fx.get("away_team", "")
+                            fx_by_team[h] = {"opp": a, "is_home": True}
+                            fx_by_team[a] = {"opp": h, "is_home": False}
+
+                        nhl_bets_fallback = []
+                        seen_players = set()
+                        for p in (recent_resp.data or []):
+                            team = p.get("team", "")
+                            if team not in fx_by_team:
+                                continue
+                            pid = p.get("player_id", "")
+                            if pid in seen_players:
+                                continue
+                            seen_players.add(pid)
+                            prob = float(p.get("python_prob") or 0)
+                            fx_info = fx_by_team[team]
+                            opp = fx_info["opp"]
+                            is_home = fx_info["is_home"]
+                            home_away = "vs" if is_home else "@"
+                            implied_odds = round(100 / prob, 2)
+
+                            nhl_bets_fallback.append({
+                                "id": None,
+                                "player_name": p.get("player_name", ""),
+                                "team": team,
+                                "label": f"{p.get('player_name', '')} Over 0.5 Points — {team} {home_away} {opp}",
+                                "market": "player_points_over_0.5",
+                                "odds": implied_odds,
+                                "confidence": min(10, int(prob / 10)),
+                                "proba_model": round(prob, 1),
+                                "algo_score_goal": p.get("algo_score_goal") or 0,
+                                "result": "PENDING",
+                                "note": f"Données du {p.get('date', '')}",
+                            })
+                            if len(nhl_bets_fallback) >= 5:
+                                break
+
+                        result["nhl"] = nhl_bets_fallback
+                        if nhl_bets_fallback:
+                            result["nhl_note"] = f"Pipeline NHL pas encore lancé pour le {date} — données approximatives basées sur la dernière analyse disponible."
+                except Exception:
+                    pass
+
         except Exception as e:
             result["nhl_error"] = str(e)
 
@@ -736,51 +813,65 @@ def save_best_bets(body: dict):
 
 @app.get("/api/best-bets/stats")
 def get_best_bets_stats():
-    """Return win rate and ROI stats for the performance dashboard."""
+    """Return win rate and ROI stats for the performance dashboard, including market breakdown."""
     try:
         resp = (
             supabase.table("best_bets")
-            .select("sport, result, date, odds")
+            .select("sport, result, date, odds, market")
             .neq("result", "PENDING")
-            .neq("result", "VOID")
             .order("date", desc=True)
-            .limit(200)
+            .limit(500)
             .execute()
         )
         rows = resp.data or []
 
         def calc_stats(bets):
-            wins = sum(1 for b in bets if b["result"] == "WIN")
-            losses = sum(1 for b in bets if b["result"] == "LOSS")
+            # Exclude VOID from win rate calc
+            resolved = [b for b in bets if b["result"] in ("WIN", "LOSS")]
+            wins = sum(1 for b in resolved if b["result"] == "WIN")
+            losses = sum(1 for b in resolved if b["result"] == "LOSS")
+            voids = sum(1 for b in bets if b["result"] == "VOID")
             total = wins + losses
             win_rate = round(wins / total * 100, 1) if total else 0
-            # ROI: assuming flat 1% stake (normalized to 1 unit)
             roi = 0
-            for b in bets:
+            for b in resolved:
                 if b["result"] == "WIN":
                     roi += (float(b.get("odds") or 1.85) - 1)
                 else:
                     roi -= 1
             roi_pct = round(roi / total * 100, 1) if total else 0
-            return {"wins": wins, "losses": losses, "total": total, "win_rate": win_rate, "roi_pct": roi_pct}
+            return {"wins": wins, "losses": losses, "voids": voids, "total": total, "win_rate": win_rate, "roi_pct": roi_pct}
 
         football = [b for b in rows if b["sport"] == "football"]
         nhl = [b for b in rows if b["sport"] == "nhl"]
 
-        # 30-day timeline
+        # ── Market breakdown ──────────────────────────────────────
         from collections import defaultdict
+        market_stats = defaultdict(list)
+        for b in rows:
+            market_stats[b.get("market", "unknown")].append(b)
+
+        market_breakdown = {}
+        for market, bets in market_stats.items():
+            s = calc_stats(bets)
+            if s["total"] > 0:
+                market_breakdown[market] = s
+
+        # 30-day timeline
         timeline = defaultdict(lambda: {"wins": 0, "losses": 0})
         for b in rows:
-            d = b["date"]
-            if b["result"] == "WIN":
-                timeline[d]["wins"] += 1
-            else:
-                timeline[d]["losses"] += 1
+            if b["result"] in ("WIN", "LOSS"):
+                d = b["date"]
+                if b["result"] == "WIN":
+                    timeline[d]["wins"] += 1
+                else:
+                    timeline[d]["losses"] += 1
 
         return {
             "global": calc_stats(rows),
             "football": calc_stats(football),
             "nhl": calc_stats(nhl),
+            "by_market": market_breakdown,
             "timeline": [{"date": k, **v} for k, v in sorted(timeline.items())[-30:]],
         }
     except Exception as e:

@@ -4,10 +4,10 @@ import { format, addDays, subDays } from "date-fns"
 import { fr } from "date-fns/locale"
 import {
     Flame, Trophy, ChevronDown, ChevronUp, Star,
-    Activity, Target, BrainCircuit
+    Activity, Target, BrainCircuit, Brain, Sparkles
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { fetchPredictions } from "@/lib/api"
+import { fetchPredictions, fetchFootballMetaAnalysis } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWatchlist } from "@/lib/useWatchlist"
@@ -47,6 +47,113 @@ function DateBar({ date, setDate }) {
                     <span className="date-num">{d.dayNum}</span>
                 </button>
             ))}
+        </div>
+    )
+}
+
+/* ── DeepThink Meta-Analysis Card ──────────────────────────── */
+function FootballMetaAnalysisCard({ date }) {
+    const [analysis, setAnalysis] = useState(null)
+    const [loading, setLoading] = useState(true)
+    const [expanded, setExpanded] = useState(true)
+
+    useEffect(() => {
+        setLoading(true)
+        setAnalysis(null)
+        fetchFootballMetaAnalysis(date)
+            .then(data => {
+                if (data?.ok && data.analysis) {
+                    setAnalysis(data.analysis)
+                }
+            })
+            .catch(() => { })
+            .finally(() => setLoading(false))
+    }, [date])
+
+    if (loading) {
+        return (
+            <div className="mx-2 mb-3 rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-card to-blue-500/5 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 animate-pulse" />
+                    <Skeleton className="h-4 w-40" />
+                </div>
+                <Skeleton className="h-3 w-full mb-2" />
+                <Skeleton className="h-3 w-3/4 mb-2" />
+                <Skeleton className="h-3 w-5/6" />
+            </div>
+        )
+    }
+
+    if (!analysis) return null
+
+    const lines = analysis.split('\n').filter(l => l.trim())
+
+    return (
+        <div className="mx-2 mb-3 rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-card to-blue-500/5 overflow-hidden">
+            {/* Header */}
+            <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-emerald-500/5 transition-colors"
+            >
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center shrink-0">
+                    <Brain className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 text-left">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold">Analyse Stratégique</span>
+                        <Sparkles className="w-3 h-3 text-emerald-400" />
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 uppercase tracking-wider">
+                            DeepThink
+                        </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Méta-analyse IA de la journée — spots à haute value
+                    </p>
+                </div>
+                {expanded ? (
+                    <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                ) : (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                )}
+            </button>
+
+            {/* Content */}
+            {expanded && (
+                <div className="px-4 pb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="border-t border-emerald-500/10 pt-3 space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+                        {lines.map((line, i) => {
+                            if (line.startsWith('# ') || line.startsWith('⚽ Analyse')) return null
+                            if (line.match(/^-{3,}$/)) return <hr key={i} className="border-emerald-500/10 my-2" />
+                            if (line.startsWith('## ') || line.startsWith('### ')) {
+                                return <h4 key={i} className="text-xs font-bold text-foreground pt-2 first:pt-0">{line.replace(/^#+\s*/, '')}</h4>
+                            }
+                            if (line.match(/^Spot\s*\d/i)) {
+                                return <h4 key={i} className="text-xs font-bold text-foreground pt-2">{line}</h4>
+                            }
+                            if (line.includes('⭐')) {
+                                return <p key={i} className="text-xs text-amber-400 font-medium">{line}</p>
+                            }
+                            if (line.includes('**')) {
+                                const parts = line.split(/\*\*/)
+                                return (
+                                    <p key={i} className="text-xs text-muted-foreground leading-relaxed">
+                                        {parts.map((part, j) =>
+                                            j % 2 === 1 ? <strong key={j} className="text-foreground font-semibold">{part}</strong> : <span key={j}>{part}</span>
+                                        )}
+                                    </p>
+                                )
+                            }
+                            if (line.startsWith('- ') || line.startsWith('• ')) {
+                                return <p key={i} className="text-xs text-muted-foreground leading-relaxed pl-3 border-l-2 border-emerald-500/20">{line.replace(/^[-•]\s*/, '')}</p>
+                            }
+                            if (line.match(/^\d+\.\s/)) {
+                                return <p key={i} className="text-xs text-muted-foreground leading-relaxed pl-3 border-l-2 border-blue-500/20">{line}</p>
+                            }
+                            return <p key={i} className="text-xs text-muted-foreground leading-relaxed">{line}</p>
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -299,6 +406,9 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
                     <option value={8}>8+ Safe</option>
                 </select>
             </div>
+
+            {/* DeepThink Meta-Analysis */}
+            <FootballMetaAnalysisCard date={date} />
 
             {/* Content */}
             <div className="bg-card border-x border-b border-border/50 rounded-b">

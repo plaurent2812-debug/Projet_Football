@@ -455,6 +455,56 @@ def _get_ev_edges(pred: dict, odds: dict) -> dict:
     return {k: v for k, v in edges.items() if v is not None and v > 2.0}
 
 
+# ─── Football DeepThink Meta-Analysis ───────────────────────────
+
+
+@app.get("/api/football/meta_analysis")
+def get_football_meta_analysis(
+    date: str | None = Query(None, description="ISO date YYYY-MM-DD"),
+):
+    """Return the DeepThink strategic meta-analysis for football matches."""
+    if not date:
+        date = datetime.now().strftime("%Y-%m-%d")
+
+    # Try dedicated table first
+    try:
+        resp = (
+            supabase.table("football_meta_analysis")
+            .select("*")
+            .eq("date", date)
+            .limit(1)
+            .execute()
+        )
+        if resp.data and len(resp.data) > 0:
+            row = resp.data[0]
+            analysis = row.get("analysis", "")
+            if analysis and len(analysis) > 50:
+                return {"ok": True, "date": date, "analysis": analysis, "source": "deepthink"}
+    except Exception:
+        pass
+
+    # Fallback: check predictions table for special meta row
+    try:
+        resp = (
+            supabase.table("predictions")
+            .select("analysis_text, recommended_bet")
+            .eq("fixture_id", "00000000-0000-0000-0000-000000000000")
+            .eq("model_version", "deepthink_meta")
+            .limit(1)
+            .execute()
+        )
+        if resp.data and len(resp.data) > 0:
+            row = resp.data[0]
+            analysis = row.get("analysis_text", "")
+            bet_date = (row.get("recommended_bet") or "").replace("DeepThink ", "")
+            if analysis and len(analysis) > 50 and bet_date == date:
+                return {"ok": True, "date": date, "analysis": analysis, "source": "deepthink_fallback"}
+    except Exception:
+        pass
+
+    return {"ok": False, "date": date, "analysis": None, "source": None}
+
+
 @app.get("/api/predictions")
 def get_predictions(
     date: str | None = Query(None, description="ISO date YYYY-MM-DD"),

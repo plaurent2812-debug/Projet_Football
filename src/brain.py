@@ -661,6 +661,170 @@ def run_brain() -> None:
     logger.info("  ✅ Pipeline terminé : %s matchs analysés", len(matches))
     logger.info("=" * 60)
 
+    # ── 4. 🧠 DeepThink Strategic Meta-Analysis ──────────────────
+    if matches:
+        try:
+            _generate_football_deepthink(matches, league_names)
+        except Exception as e:
+            logger.warning(f"[Football] DeepThink meta-analysis failed: {e}")
+
+
+def _generate_football_deepthink(matches: list, league_names: dict) -> None:
+    """Generate a DeepThink strategic meta-analysis across all football matches."""
+    from datetime import datetime
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Fetch today's predictions for meta-analysis context
+    try:
+        preds = (
+            supabase.table("predictions")
+            .select(
+                "fixture_id, proba_home, proba_draw, proba_away, "
+                "proba_btts, proba_over_2_5, proba_over_15, "
+                "recommended_bet, confidence_score, analysis_text"
+            )
+            .order("confidence_score", desc=True)
+            .limit(60)
+            .execute()
+            .data or []
+        )
+    except Exception:
+        preds = []
+
+    if not preds:
+        logger.info("[Football] No predictions available for DeepThink.")
+        return
+
+    # Enrich with fixture info
+    fixture_ids = [p["fixture_id"] for p in preds if p.get("fixture_id")]
+    fixtures_map = {}
+    if fixture_ids:
+        try:
+            fx_data = (
+                supabase.table("fixtures")
+                .select("id, home_team, away_team, league_id, date, status")
+                .in_("id", fixture_ids)
+                .eq("status", "NS")
+                .gte("date", f"{today}T00:00:00Z")
+                .lt("date", f"{today}T23:59:59Z")
+                .execute()
+                .data or []
+            )
+            fixtures_map = {f["id"]: f for f in fx_data}
+        except Exception:
+            pass
+
+    if not fixtures_map:
+        logger.info("[Football] No NS fixtures for DeepThink today.")
+        return
+
+    # Build match summaries
+    summaries = []
+    for p in preds:
+        fix = fixtures_map.get(p.get("fixture_id"))
+        if not fix:
+            continue
+        league = league_names.get(fix.get("league_id"), "")
+        summaries.append(
+            f"### {fix['home_team']} vs {fix['away_team']} ({league})\n"
+            f"  1X2 : {p.get('proba_home', 0)}% - {p.get('proba_draw', 0)}% - {p.get('proba_away', 0)}%\n"
+            f"  BTTS : {p.get('proba_btts', 50)}% | Over 2.5 : {p.get('proba_over_2_5', 50)}%\n"
+            f"  Over 1.5 : {p.get('proba_over_15', 70)}%\n"
+            f"  Pari recommandé : {p.get('recommended_bet', 'N/A')} "
+            f"(confiance : {p.get('confidence_score', 0)}/10)\n"
+            f"  Analyse IA : {(p.get('analysis_text') or '')[:200]}"
+        )
+
+    if not summaries:
+        return
+
+    system_prompt = (
+        "Tu es un expert analytique football de niveau élite. Tu t'adresses à des parieurs avertis.\n\n"
+        "**MISSION** : Analyse en profondeur TOUS les matchs de la journée. "
+        "Identifie les 3 MEILLEURS SPOTS (opportunités à haute value) en croisant les données.\n\n"
+        "**Données fournies** : Probabilités 1X2, xG attendus, BTTS, Over/Under, "
+        "paris recommandés par le modèle avec score de confiance, et l'analyse IA de chaque match.\n\n"
+        "**RAISONNEMENT ATTENDU** : Pour chaque spot identifié, tu dois :\n"
+        "1. Expliquer POURQUOI c'est un bon spot (croisement de plusieurs facteurs)\n"
+        "2. Identifier le MARCHÉ cible (1X2, BTTS, Over 2.5, Over 1.5, Score exact...)\n"
+        "3. Donner un niveau de CONFIANCE (⭐ à ⭐⭐⭐)\n"
+        "4. Mentionner les RISQUES potentiels\n\n"
+        "**FORMAT** : Rédige en français, style direct de parieur expert. "
+        "Commence par un titre '⚽ Analyse Stratégique' puis les 3 spots. "
+        "Termine par un bref résumé de la journée (1-2 phrases).\n"
+        "Max 500 mots total. Sois percutant et précis."
+    )
+
+    user_prompt = (
+        f"Journée Football du {datetime.utcnow().strftime('%d/%m/%Y')} — "
+        f"{len(summaries)} matchs à analyser :\n\n"
+        + "\n\n".join(summaries)
+    )
+
+    try:
+        gclient = genai.Client(api_key=GEMINI_API_KEY)
+
+        logger.info("[Football] 🧠 DeepThink: Generating strategic meta-analysis...")
+        response = gclient.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=user_prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.4,
+                max_output_tokens=8192,
+                thinking_config=types.ThinkingConfig(
+                    thinking_budget=4096,
+                ),
+            ),
+        )
+
+        result = ""
+        if response and response.candidates:
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, "text") and part.text:
+                    result += part.text
+        if not result:
+            result = getattr(response, "text", "") or ""
+
+        if not result or len(result) < 100:
+            logger.warning("[Football] DeepThink returned empty/short response")
+            return
+
+        logger.info(f"[Football] 🧠 DeepThink analysis generated ({len(result)} chars)")
+
+        # Store in football_meta_analysis table (upsert by date)
+        try:
+            supabase.table("football_meta_analysis").upsert(
+                {"date": today, "analysis": result, "n_matches": len(summaries)},
+                on_conflict="date",
+            ).execute()
+            logger.info("[Football] ✅ DeepThink meta-analysis saved")
+        except Exception as e1:
+            # Fallback: create table might not exist, store in predictions as special row
+            logger.warning(f"[Football] football_meta_analysis table error ({e1}), trying fallback...")
+            try:
+                # Delete old meta if exists
+                supabase.table("predictions").delete().eq(
+                    "fixture_id", "00000000-0000-0000-0000-000000000000"
+                ).execute()
+            except Exception:
+                pass
+            try:
+                supabase.table("predictions").insert({
+                    "fixture_id": "00000000-0000-0000-0000-000000000000",
+                    "model_version": "deepthink_meta",
+                    "analysis_text": result,
+                    "confidence_score": 10,
+                    "recommended_bet": f"DeepThink {today}",
+                }).execute()
+                logger.info("[Football] ✅ DeepThink saved (fallback to predictions)")
+            except Exception as e2:
+                logger.error(f"[Football] Error saving meta-analysis: {e2}")
+
+    except Exception as e:
+        logger.warning(f"[Football] DeepThink generation failed: {e}")
+
 
 if __name__ == "__main__":
     run_brain()

@@ -1044,11 +1044,11 @@ def calculate_win_prob(home: str, away: str, standings: dict, fatigue_dict: dict
     h = standings.get(home, {})
     a = standings.get(away, {})
 
-    # Estimation des buts par match
-    h_gf = float(h.get("goalsFor", 250)) / max(1, h.get("gamesPlayed", 82))
-    h_ga = float(h.get("goalsAgainst", 250)) / max(1, h.get("gamesPlayed", 82))
-    a_gf = float(a.get("goalsFor", 250)) / max(1, a.get("gamesPlayed", 82))
-    a_ga = float(a.get("goalsAgainst", 250)) / max(1, a.get("gamesPlayed", 82))
+    # Per-game goals scored & conceded (already computed by fetch_standings)
+    h_gf = float(h.get("gf_per_game", 3.1))  # goals scored per game
+    h_ga = float(h.get("gaa", 3.1))            # goals conceded per game
+    a_gf = float(a.get("gf_per_game", 3.1))
+    a_ga = float(a.get("gaa", 3.1))
 
     league_gf = 3.1  # Moyenne historique NHL
 
@@ -1061,16 +1061,29 @@ def calculate_win_prob(home: str, away: str, standings: dict, fatigue_dict: dict
     h_xg = h_atk * a_def * league_gf * 1.05
     a_xg = a_atk * h_def * league_gf * 0.95
 
-    # Ajustement spécial équipes spéciales (PP/PK) et forme (L10)
+    # Ajustement forme récente (L10)
     h_form = h.get("l10_pts_pct", 0.5)
     a_form = a.get("l10_pts_pct", 0.5)
 
     h_xg *= 0.9 + 0.2 * h_form
     a_xg *= 0.9 + 0.2 * a_form
 
+    # Ajustement PP/PK (special teams edge)
+    h_pp = h.get("pp_pct", 0.20)
+    a_pk = a.get("pk_pct", 0.80)
+    a_pp = a.get("pp_pct", 0.20)
+    h_pk = h.get("pk_pct", 0.80)
+    # A strong PP vs weak PK = slight xG boost
+    h_xg *= 1.0 + 0.1 * (h_pp - (1.0 - a_pk))
+    a_xg *= 1.0 + 0.1 * (a_pp - (1.0 - h_pk))
+
     # Fatigue
     h_xg *= fatigue_dict.get(home, 1.0)
     a_xg *= fatigue_dict.get(away, 1.0)
+
+    # Clamp xG to reasonable range
+    h_xg = max(1.5, min(5.5, h_xg))
+    a_xg = max(1.5, min(5.5, a_xg))
 
     # Grille Poisson pour prédire le vainqueur et l'Over
     import numpy as np
@@ -1087,7 +1100,6 @@ def calculate_win_prob(home: str, away: str, standings: dict, fatigue_dict: dict
     draw_reg = float(np.trace(grid))
 
     # Répartition du nul (Prolongation / Tirs au but)
-    # On distribue au prorata des forces en présence
     ot_home_share = (
         home_win_reg / (home_win_reg + away_win_reg) if (home_win_reg + away_win_reg) > 0 else 0.5
     )

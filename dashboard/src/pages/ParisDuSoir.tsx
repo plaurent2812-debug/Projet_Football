@@ -175,9 +175,25 @@ function BetCard({ bet, sport, date, isAdmin, onResultUpdate }) {
                     </span>
                     <div className="flex flex-col">
                         <span>{bet.proba_model?.toFixed(0)}% modèle</span>
+                        {bet.proba_bookmaker != null && (
+                            <span className="text-[10px] text-muted-foreground">
+                                {bet.proba_bookmaker.toFixed(0)}% bookmaker
+                            </span>
+                        )}
                         <ConfStars conf={bet.confidence} />
                     </div>
+                    {bet.ev != null && bet.ev > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400">
+                            EV +{(bet.ev * 100).toFixed(1)}%
+                        </span>
+                    )}
+                    {bet.bookmaker && (
+                        <span className="text-[9px] text-muted-foreground opacity-60 capitalize">
+                            {bet.bookmaker}
+                        </span>
+                    )}
                 </div>
+
 
                 {isAdmin && (
                     <div className="flex items-center gap-1">

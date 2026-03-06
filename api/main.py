@@ -611,192 +611,186 @@ def get_best_bets(
     # ── NHL best bets ─────────────────────────────────────────────
     if sport in (None, "nhl"):
         try:
-            # Fetch wider net (35%-72% proba = odds ~1.39–2.86)
-            # then score by composite: confidence + sweet spot bonus + no extreme penalty
-            nhl_resp = (
-                supabase.table("nhl_data_lake")
-                .select(
-                    "player_id, player_name, team, opp, is_home, "
-                    "python_prob, algo_score_goal, algo_score_shot"
-                )
-                .eq("date", date)
-                .neq("player_id", "META_ANALYSIS")
-                .gte("python_prob", 0.35)   # at most cote ~2.86
-                .lte("python_prob", 0.72)   # at least cote ~1.39
-                .order("python_prob", desc=True)
-                .limit(40)                  # pull more to find best composite
+            # ── Step 1: Real bookmaker odds from nhl_odds ─────────
+            real_odds_resp = (
+                supabase.table("nhl_odds")
+                .select("player_name, bookmaker, over_odds, home_team, away_team, game_id, line")
+                .eq("game_date", date)
+                .gte("over_odds", 1.40)    # cotes >= 1.40 uniquement
+                .order("over_odds", desc=True)
+                .limit(200)
                 .execute()
             )
+            real_odds_raw = real_odds_resp.data or []
 
-            def nhl_composite_score(prob_pct, implied_odds, algo_goal):
-                """Score a bet: reward confidence + sweet spot odds + algo bonus."""
-                # Base = confidence (prob over 40% threshold)
-                base = max(0, prob_pct - 40)
-
-                # Sweet spot bonus: peak score at 1.85 (the ideal cote), falling off at edges
-                # Uses a bell curve centered on 1.85
-                target = 1.85
-                spread = 0.35  # half-width of sweet zone
-                distance = abs(implied_odds - target)
-                sweet_bonus = max(0, (1 - distance / spread)) * 25  # up to +25 pts
-
-                # EV proxy: higher prob relative to odds = more value
-                # Capped since odds are implied from prob (can't compute true EV without bookie odds)
-                ev_proxy = prob_pct * 0.3
-
-                # Algo goal signal bonus
-                algo_bonus = min(10, float(algo_goal or 0) * 5)
-
-                return base + sweet_bonus + ev_proxy + algo_bonus
-
-            nhl_bets = []
-            seen_ids = set()
-            for p in (nhl_resp.data or []):
-                pid = p.get("player_id", "")
-                if pid in seen_ids:
+            # Build player→best odds map (pick the highest odds across bookmakers = best value)
+            # and game context (home/away) for each player
+            player_odds_map: dict[str, dict] = {}
+            for row in real_odds_raw:
+                name = row.get("player_name", "").strip()
+                if not name:
                     continue
-                seen_ids.add(pid)
-                prob_raw = float(p.get("python_prob") or 0)
-                prob = round(prob_raw * 100, 1)
-                if prob <= 0:
+                odds_val = float(row.get("over_odds") or 0)
+                if odds_val <= 1.0:
                     continue
-                implied_odds = round(100 / prob, 2)
-                # Hard exclude extreme cotes (< 1.40 or > 2.60)
-                if implied_odds < 1.40 or implied_odds > 2.60:
-                    continue
-                home_away = "vs" if p.get("is_home") else "@"
-                composite = nhl_composite_score(prob, implied_odds, p.get("algo_score_goal"))
-                # Flag if in sweet zone
-                in_target = 1.65 <= implied_odds <= 2.25
-
-                nhl_bets.append({
-                    "id": None,
-                    "player_name": p.get("player_name", ""),
-                    "team": p.get("team", ""),
-                    "label": f"{p.get('player_name', '')} Over 0.5 Points — {p.get('team', '')} {home_away} {p.get('opp', '')}",
-                    "market": "player_points_over_0.5",
-                    "odds": implied_odds,
-                    "confidence": min(10, int(prob / 10)),
-                    "proba_model": prob,
-                    "is_value": in_target,
-                    "algo_score_goal": p.get("algo_score_goal") or 0,
-                    "composite": composite,
-                    "result": "PENDING",
-                })
-
-            # Sort by composite score, take top 5
-            nhl_bets.sort(key=lambda x: -x["composite"])
-            result["nhl"] = nhl_bets[:5]
-
-            # Fallback: if no data for that date, use nhl_fixtures + most recent nhl_data_lake
-            # nhl_fixtures stores FULL names ("Detroit Red Wings")
-            # nhl_data_lake stores ABBREVIATIONS ("DET") → need a mapping table
-            if not nhl_bets:
-                try:
-                    NHL_NAME_TO_ABBREV = {
-                        "Anaheim Ducks": "ANA", "Boston Bruins": "BOS", "Buffalo Sabres": "BUF",
-                        "Calgary Flames": "CGY", "Carolina Hurricanes": "CAR", "Chicago Blackhawks": "CHI",
-                        "Colorado Avalanche": "COL", "Columbus Blue Jackets": "CBJ", "Dallas Stars": "DAL",
-                        "Detroit Red Wings": "DET", "Edmonton Oilers": "EDM", "Florida Panthers": "FLA",
-                        "Los Angeles Kings": "LAK", "Minnesota Wild": "MIN", "Montreal Canadiens": "MTL",
-                        "Montréal Canadiens": "MTL", "Nashville Predators": "NSH", "New Jersey Devils": "NJD",
-                        "New York Islanders": "NYI", "New York Rangers": "NYR", "Ottawa Senators": "OTT",
-                        "Philadelphia Flyers": "PHI", "Pittsburgh Penguins": "PIT", "San Jose Sharks": "SJS",
-                        "Seattle Kraken": "SEA", "St. Louis Blues": "STL", "Tampa Bay Lightning": "TBL",
-                        "Toronto Maple Leafs": "TOR", "Utah Hockey Club": "UTA", "Vancouver Canucks": "VAN",
-                        "Vegas Golden Knights": "VGK", "Washington Capitals": "WSH", "Winnipeg Jets": "WPG",
+                existing = player_odds_map.get(name)
+                if existing is None or odds_val > existing["odds"]:
+                    player_odds_map[name] = {
+                        "odds": odds_val,
+                        "bookmaker": row.get("bookmaker", ""),
+                        "home_team": row.get("home_team", ""),
+                        "away_team": row.get("away_team", ""),
+                        "game_id": row.get("game_id", ""),
+                        "line": float(row.get("line") or 0.5),
                     }
-                    NHL_ABBREV_TO_NAME = {v: k for k, v in NHL_NAME_TO_ABBREV.items()}
 
-                    nxt = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
-                    fixtures_resp = (
-                        supabase.table("nhl_fixtures")
-                        .select("home_team, away_team, date")
-                        .gte("date", f"{date}T00:00:00Z")
-                        .lt("date", f"{nxt}T00:00:00Z")
-                        .execute()
-                    )
-                    nhl_fixtures = fixtures_resp.data or []
+            has_real_odds = len(player_odds_map) > 0
 
-                    if nhl_fixtures:
-                        # Convert full names → abbreviations + build home/away lookup
-                        abbrev_teams = set()
-                        fx_by_abbrev = {}
-                        for fx in nhl_fixtures:
-                            h_name = fx.get("home_team", "")
-                            a_name = fx.get("away_team", "")
-                            h_abbrev = NHL_NAME_TO_ABBREV.get(h_name, h_name[:3].upper())
-                            a_abbrev = NHL_NAME_TO_ABBREV.get(a_name, a_name[:3].upper())
-                            abbrev_teams.add(h_abbrev)
-                            abbrev_teams.add(a_abbrev)
-                            fx_by_abbrev[h_abbrev] = {"opp": a_abbrev, "opp_name": a_name, "is_home": True}
-                            fx_by_abbrev[a_abbrev] = {"opp": h_abbrev, "opp_name": h_name, "is_home": False}
+            # ── Step 2: Model probabilities from nhl_data_lake ────
+            # Primary: today's date. Fallback handled below if empty.
+            model_resp = (
+                supabase.table("nhl_data_lake")
+                .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, date")
+                .eq("date", date)
+                .neq("player_id", "META_ANALYSIS")
+                .gte("python_prob", 0.10)
+                .order("python_prob", desc=True)
+                .limit(200)
+                .execute()
+            )
+            model_rows = model_resp.data or []
 
-                        # Get most recent nhl_data_lake (last 7 days) for today's teams
-                        # Order by date DESC first to get freshest data, then by python_prob
-                        cutoff = (datetime.fromisoformat(date) - timedelta(days=7)).strftime("%Y-%m-%d")
-                        recent_resp = (
-                            supabase.table("nhl_data_lake")
-                            .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, algo_score_shot, date")
-                            .in_("team", list(abbrev_teams))
-                            .neq("player_id", "META_ANALYSIS")
-                            .gte("python_prob", 0.35)
-                            .lte("python_prob", 0.72)
-                            .gte("date", cutoff)            # only last 7 days
-                            .order("date", desc=True)       # freshest first
-                            .limit(100)                     # more rows to find best unique players
-                            .execute()
-                        )
+            # If no model data for today, try last 7 days (fallback)
+            if not model_rows:
+                cutoff = (datetime.fromisoformat(date) - timedelta(days=7)).strftime("%Y-%m-%d")
+                model_resp = (
+                    supabase.table("nhl_data_lake")
+                    .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, date")
+                    .neq("player_id", "META_ANALYSIS")
+                    .gte("python_prob", 0.10)
+                    .gte("date", cutoff)
+                    .order("date", desc=True)
+                    .limit(200)
+                    .execute()
+                )
+                model_rows = model_resp.data or []
 
-                        nhl_bets_fallback = []
-                        seen_players = set()
-                        for p in (recent_resp.data or []):
-                            team_abbrev = p.get("team", "")
-                            if team_abbrev not in fx_by_abbrev:
-                                continue
-                            pid = p.get("player_id", "")
-                            if pid in seen_players:
-                                continue
-                            seen_players.add(pid)
-                            prob_raw = float(p.get("python_prob") or 0)
-                            prob = round(prob_raw * 100, 1)
-                            if prob <= 0:
-                                continue
-                            implied_odds = round(100 / prob, 2)
-                            if implied_odds < 1.40 or implied_odds > 2.60:
-                                continue
-                            fx_info = fx_by_abbrev[team_abbrev]
-                            opp_name = fx_info["opp_name"]
-                            home_away = "vs" if fx_info["is_home"] else "@"
-                            team_name = NHL_ABBREV_TO_NAME.get(team_abbrev, team_abbrev)
-                            composite = nhl_composite_score(prob, implied_odds, p.get("algo_score_goal"))
-                            in_target = 1.65 <= implied_odds <= 2.25
+            # Build model map: player_name → {prob, team, ...}
+            # Keep only the most recent entry per player
+            model_map: dict[str, dict] = {}
+            seen_model = set()
+            for m in model_rows:
+                name = m.get("player_name", "").strip()
+                if name in seen_model:
+                    continue
+                seen_model.add(name)
+                model_map[name] = m
 
-                            nhl_bets_fallback.append({
-                                "id": None,
-                                "player_name": p.get("player_name", ""),
-                                "team": team_abbrev,
-                                "label": f"{p.get('player_name', '')} Over 0.5 Points — {team_name} {home_away} {opp_name}",
-                                "market": "player_points_over_0.5",
-                                "odds": implied_odds,
-                                "confidence": min(10, int(prob / 10)),
-                                "proba_model": prob,
-                                "is_value": in_target,
-                                "algo_score_goal": p.get("algo_score_goal") or 0,
-                                "composite": composite,
-                                "result": "PENDING",
-                                "note": f"Données du {p.get('date', '')}",
-                            })
+            # ── Step 3: Fuzzy name matching helper ────────────────
+            def normalize_name(s: str) -> str:
+                """Lowercase, remove accents & punctuation for matching."""
+                import unicodedata
+                s = unicodedata.normalize("NFD", s.lower())
+                s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+                return s.replace("-", " ").replace("'", "").strip()
 
-                        # Sort by composite, take top 5
-                        nhl_bets_fallback.sort(key=lambda x: -x["composite"])
-                        result["nhl"] = nhl_bets_fallback[:5]
-                        if nhl_bets_fallback:
-                            result["nhl_note"] = f"Pipeline NHL pas encore lancé pour le {date} — données approximatives basées sur la dernière analyse disponible."
+            # ── Step 4: Join odds + model → value bets ────────────
+            nhl_bets = []
 
-                except Exception as ex:
-                    result["nhl_fallback_error"] = str(ex)
+            if has_real_odds:
+                # MODE A: Real odds available — only show genuine value bets
+                norm_model_map = {normalize_name(k): v for k, v in model_map.items()}
 
+                for player_name, odds_data in player_odds_map.items():
+                    bookie_odds = odds_data["odds"]
+                    bookie_implied_prob = 100.0 / bookie_odds  # in %
+
+                    # Match player to model via normalized name
+                    norm_name = normalize_name(player_name)
+                    model_data = norm_model_map.get(norm_name)
+
+                    # Try partial match if exact fails
+                    if model_data is None:
+                        parts = norm_name.split()
+                        if len(parts) >= 2:
+                            last = parts[-1]
+                            for k, v in norm_model_map.items():
+                                if last in k:
+                                    model_data = v
+                                    break
+
+                    if model_data is None:
+                        continue  # no model data → skip
+
+                    model_prob_raw = float(model_data.get("python_prob") or 0)
+                    model_prob = round(model_prob_raw * 100, 1)
+                    if model_prob <= 0:
+                        continue
+
+                    # ── Value bet filter: model must be more optimistic ──
+                    # EV = model_prob/100 * bookie_odds - 1 (expected return per €1)
+                    ev = round(model_prob_raw * bookie_odds - 1, 3)
+                    if ev <= 0:
+                        continue  # negative EV → not a value bet
+
+                    # Build label from odds data game context
+                    ht = odds_data.get("home_team", "")
+                    at = odds_data.get("away_team", "")
+                    team_abbrev = model_data.get("team", "")
+                    NHL_ABBREV_TO_NAME_LOCAL = {
+                        "ANA": "Anaheim Ducks", "BOS": "Boston Bruins", "BUF": "Buffalo Sabres",
+                        "CGY": "Calgary Flames", "CAR": "Carolina Hurricanes", "CHI": "Chicago Blackhawks",
+                        "COL": "Colorado Avalanche", "CBJ": "Columbus Blue Jackets", "DAL": "Dallas Stars",
+                        "DET": "Detroit Red Wings", "EDM": "Edmonton Oilers", "FLA": "Florida Panthers",
+                        "LAK": "Los Angeles Kings", "MIN": "Minnesota Wild", "MTL": "Montréal Canadiens",
+                        "NSH": "Nashville Predators", "NJD": "New Jersey Devils", "NYI": "New York Islanders",
+                        "NYR": "New York Rangers", "OTT": "Ottawa Senators", "PHI": "Philadelphia Flyers",
+                        "PIT": "Pittsburgh Penguins", "SJS": "San Jose Sharks", "SEA": "Seattle Kraken",
+                        "STL": "St. Louis Blues", "TBL": "Tampa Bay Lightning", "TOR": "Toronto Maple Leafs",
+                        "UTA": "Utah Hockey Club", "VAN": "Vancouver Canucks", "VGK": "Vegas Golden Knights",
+                        "WSH": "Washington Capitals", "WPG": "Winnipeg Jets",
+                    }
+                    team_name = NHL_ABBREV_TO_NAME_LOCAL.get(team_abbrev, team_abbrev)
+                    is_home = model_data.get("is_home", False)
+                    if ht and at:
+                        label = f"{player_name} Over 0.5 Points — {ht} vs {at}"
+                    else:
+                        opp = model_data.get("opp", "")
+                        home_away = "vs" if is_home else "@"
+                        label = f"{player_name} Over 0.5 Points — {team_name} {home_away} {opp}"
+
+                    # Sort key: EV first, then bookie_odds
+                    nhl_bets.append({
+                        "id": None,
+                        "player_name": player_name,
+                        "team": team_abbrev,
+                        "label": label,
+                        "market": "player_points_over_0.5",
+                        "odds": round(bookie_odds, 2),        # VRAIE cote bookmaker
+                        "confidence": min(10, max(1, int(ev * 20))),
+                        "proba_model": model_prob,
+                        "proba_bookmaker": round(bookie_implied_prob, 1),
+                        "ev": ev,
+                        "bookmaker": odds_data.get("bookmaker", ""),
+                        "is_value": ev > 0.03,                # EV > 3% = bonne value
+                        "algo_score_goal": model_data.get("algo_score_goal") or 0,
+                        "result": "PENDING",
+                        "odds_source": "real",
+                    })
+
+                # Sort by EV descending, take top 5
+                nhl_bets.sort(key=lambda x: -x["ev"])
+                result["nhl"] = nhl_bets[:5]
+                result["nhl_odds_source"] = "real"
+
+            else:
+                # MODE B: No real odds yet — show model-only (clearly labeled, no fake cotes)
+                result["nhl"] = []
+                result["nhl_note"] = (
+                    f"Les cotes bookmaker NHL pour le {date} ne sont pas encore disponibles "
+                    f"(fetch planifié à 21h). Revenez plus tard pour voir les vraies cotes."
+                )
+                result["nhl_odds_source"] = "pending"
 
         except Exception as e:
             result["nhl_error"] = str(e)
@@ -907,6 +901,30 @@ def nhl_fetch_game_stats(body: dict, authorization: str = Header(None)):
         return result
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/nhl/fetch-odds")
+def nhl_fetch_odds(body: dict, authorization: str = Header(None)):
+    """
+    Fetches real NHL player prop odds from The Odds API and stores in nhl_odds.
+    Called by the NHL pipeline (schedule-nhl-pipeline or admin trigger).
+    Requires ODDS_API_KEY env var to be set.
+    """
+    expected = f"Bearer {os.getenv('CRON_SECRET', 'super_secret_probalab_2026')}"
+    if authorization != expected:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    date = body.get("date") or datetime.now().strftime("%Y-%m-%d")
+
+    try:
+        from src.nhl.fetch_odds import run as fetch_nhl_odds
+        result = fetch_nhl_odds(date)
+        return result
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 
 
 @app.post("/api/best-bets/resolve")

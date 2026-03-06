@@ -732,8 +732,9 @@ def get_best_bets(
                             fx_by_abbrev[h_abbrev] = {"opp": a_abbrev, "opp_name": a_name, "is_home": True}
                             fx_by_abbrev[a_abbrev] = {"opp": h_abbrev, "opp_name": h_name, "is_home": False}
 
-                        # Get most recent nhl_data_lake for these abbreviations
-                        # Wide range — composite scoring will pick the best ones
+                        # Get most recent nhl_data_lake (last 7 days) for today's teams
+                        # Order by date DESC first to get freshest data, then by python_prob
+                        cutoff = (datetime.fromisoformat(date) - timedelta(days=7)).strftime("%Y-%m-%d")
                         recent_resp = (
                             supabase.table("nhl_data_lake")
                             .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, algo_score_shot, date")
@@ -741,8 +742,9 @@ def get_best_bets(
                             .neq("player_id", "META_ANALYSIS")
                             .gte("python_prob", 0.35)
                             .lte("python_prob", 0.72)
-                            .order("python_prob", desc=True)
-                            .limit(50)
+                            .gte("date", cutoff)            # only last 7 days
+                            .order("date", desc=True)       # freshest first
+                            .limit(100)                     # more rows to find best unique players
                             .execute()
                         )
 

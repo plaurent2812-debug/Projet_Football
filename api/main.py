@@ -647,29 +647,31 @@ def get_best_bets(
             has_real_odds = len(player_odds_map) > 0
 
             # ── Step 2: Model probabilities from nhl_data_lake ────
-            # Primary: today's date. Fallback handled below if empty.
+            # Primary: today's date. Requires python_prob >= 0.30 (point proba, not goal proba).
+            # Goal-prob pipeline runs produce values 0.10-0.20 which are incompatible
+            # with Over 0.5 Points bookmaker props (which price at 1.40-2.00).
             model_resp = (
                 supabase.table("nhl_data_lake")
                 .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, date")
                 .eq("date", date)
                 .neq("player_id", "META_ANALYSIS")
-                .gte("python_prob", 0.10)
+                .gte("python_prob", 0.30)   # 0.30+ = point probability range
                 .order("python_prob", desc=True)
                 .limit(200)
                 .execute()
             )
             model_rows = model_resp.data or []
 
-            # If no model data for today, try last 7 days (fallback)
+            # If no valid point-prob data for today, try last 14 days
             if not model_rows:
-                cutoff = (datetime.fromisoformat(date) - timedelta(days=7)).strftime("%Y-%m-%d")
+                cutoff = (datetime.fromisoformat(date) - timedelta(days=14)).strftime("%Y-%m-%d")
                 model_resp = (
                     supabase.table("nhl_data_lake")
                     .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, date")
                     .neq("player_id", "META_ANALYSIS")
-                    .gte("python_prob", 0.10)
+                    .gte("python_prob", 0.30)   # Only take point-proba data
                     .gte("date", cutoff)
-                    .order("date", desc=True)
+                    .order("python_prob", desc=True)  # best players first
                     .limit(200)
                     .execute()
                 )

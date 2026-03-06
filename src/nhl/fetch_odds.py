@@ -108,15 +108,18 @@ def fetch_player_props(event_id: str, home_team: str, away_team: str) -> list[di
             if market.get("key") != "player_points":
                 continue
             for outcome in market.get("outcomes", []):
-                name = outcome.get("name", "")       # ex: "Cole Caufield"
-                desc = outcome.get("description", "") # ex: "Over" or "Under"
+                # The Odds API format: name = 'Over'/'Under', description = player name
+                direction = outcome.get("name", "").lower()   # 'over' or 'under'
+                name = outcome.get("description", "").strip()  # player name
                 price = outcome.get("price", 0.0)
-                point = outcome.get("point", None)   # ex: 0.5
+                point = outcome.get("point", None)   # ex: 0.5 or 1.5
 
-                if not name or desc.lower() != "over":
+                if not name or direction != "over":
                     continue
-                if point is not None and point > 1.0:
-                    continue  # On veut only Over 0.5 (pas Over 1.5, 2.5...)
+                # Only keep Over 0.5 (standard NHL point prop)
+                # Some books offer Over 1.5 — we only want the 0.5 line
+                if point is not None and float(point) > 0.5:
+                    continue
 
                 rows.append({
                     "game_id": event_id,

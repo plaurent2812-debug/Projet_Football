@@ -2,10 +2,21 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/auth'
 import { Users, Crown, Shield, User, Trash2, Search, RefreshCw, ChevronDown } from 'lucide-react'
 
+const API_BASE = import.meta.env.VITE_API_URL || 'https://web-production-ff663.up.railway.app'
+
 const ROLE_CONFIG = {
     admin: { label: 'Admin', color: 'text-red-400 bg-red-500/15 border-red-500/30', icon: Shield },
     premium: { label: 'Premium', color: 'text-amber-400 bg-amber-500/15 border-amber-500/30', icon: Crown },
     free: { label: 'Free', color: 'text-slate-400 bg-slate-500/15 border-slate-500/30', icon: User },
+}
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+    const { data } = await supabase.auth.getSession()
+    const token = data?.session?.access_token
+    return {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    }
 }
 
 export default function AdminUsers() {
@@ -18,12 +29,11 @@ export default function AdminUsers() {
     const fetchUsers = async () => {
         setLoading(true)
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .order('created_at', { ascending: false })
-            if (error) throw error
-            setUsers(data || [])
+            const headers = await getAuthHeaders()
+            const res = await fetch(`${API_BASE}/api/trigger/admin/users`, { headers })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const data = await res.json()
+            setUsers(data.users || [])
         } catch (e) {
             console.error('Error fetching users:', e)
         } finally {
@@ -36,25 +46,31 @@ export default function AdminUsers() {
     const updateRole = async (userId: string, newRole: string) => {
         if (!window.confirm(`Changer le rôle en "${newRole}" ?`)) return
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ role: newRole })
-                .eq('id', userId)
-            if (error) throw error
+            const headers = await getAuthHeaders()
+            const res = await fetch(`${API_BASE}/api/trigger/admin/users/${userId}/role`, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({ role: newRole }),
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u))
             setEditingId(null)
-        } catch (e) {
+        } catch (e: any) {
             alert('Erreur: ' + e.message)
         }
     }
 
     const deleteUser = async (userId: string, email: string) => {
-        if (!window.confirm(`Supprimer définitivement ${email || userId} ? Cette action est irréversible.`)) return
+        if (!window.confirm(`⚠️ Supprimer définitivement ${email || userId} ?\n\nCette action supprime le compte de Supabase Auth ET le profil. C'est irréversible.`)) return
         try {
-            const { error } = await supabase.from('profiles').delete().eq('id', userId)
-            if (error) throw error
+            const headers = await getAuthHeaders()
+            const res = await fetch(`${API_BASE}/api/trigger/admin/users/${userId}`, {
+                method: 'DELETE',
+                headers,
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
             setUsers(prev => prev.filter(u => u.id !== userId))
-        } catch (e) {
+        } catch (e: any) {
             alert('Erreur: ' + e.message)
         }
     }

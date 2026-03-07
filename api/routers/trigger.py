@@ -105,10 +105,59 @@ router = APIRouter(
 )
 
 
+class RoleUpdate(BaseModel):
+    role: str
+
+
 class AnalyzeRequest(BaseModel):
     fixture_id: str
 
 
+# ─── Admin User Management ──────────────────────────────────────
+
+
+@router.get("/admin/users")
+def admin_list_users():
+    """List all user profiles (admin only)."""
+    result = (
+        supabase.table("profiles")
+        .select("*")
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return {"users": result.data or []}
+
+
+@router.put("/admin/users/{user_id}/role")
+def admin_update_role(user_id: str, body: RoleUpdate):
+    """Update a user's role (admin only)."""
+    if body.role not in ("free", "premium", "admin"):
+        raise HTTPException(status_code=400, detail="Role must be free, premium, or admin")
+    result = (
+        supabase.table("profiles")
+        .update({"role": body.role})
+        .eq("id", user_id)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "ok", "user": result.data[0]}
+
+
+@router.delete("/admin/users/{user_id}")
+def admin_delete_user(user_id: str):
+    """Delete a user from auth.users and profiles (admin only)."""
+    try:
+        supabase.auth.admin.delete_user(user_id)
+    except Exception as e:
+        logger.warning(f"[Admin] Auth delete failed for {user_id}: {e}")
+
+    try:
+        supabase.table("profiles").delete().eq("id", user_id).execute()
+    except Exception as e:
+        logger.warning(f"[Admin] Profile delete failed for {user_id}: {e}")
+
+    return {"status": "ok", "deleted": user_id}
 SYSTEM_PROMPT = """Tu es un expert en paris sportifs spécialisé dans le Live Betting.
 On te fournit les statistiques à la mi-temps d'un match (tirs, possession, xG, corners, score).
 Ton but est de proposer une analyse courte et percutante (3 phrases max) si tu détectes

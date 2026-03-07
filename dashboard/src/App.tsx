@@ -118,7 +118,7 @@ function Header() {
               <NavLink
                 to="/paris-du-soir"
                 className={({ isActive }) => cn(
-                  "px-3 py-2 text-xs font-bold transition-colors border-b-2 hidden md:flex items-center gap-1",
+                  "px-3 py-2 text-xs font-bold transition-colors border-b-2 flex items-center gap-1",
                   isActive ? "text-amber-400 border-amber-400" : "text-muted-foreground border-transparent hover:text-foreground"
                 )}
               >
@@ -195,13 +195,21 @@ function NHLIcon() {
 
 function BottomNav() {
   const location = useLocation()
+  const { isPremium, isAdmin } = useAuth()
 
-  const tabs = [
-    { to: "/", label: "Tous", icon: LayoutGrid, exact: true },
-    { to: "/football", label: "Direct", icon: Radio },
-    { to: "/watchlist", label: "Favoris", icon: Star },
-    { to: "/premium", label: "Premium", icon: Trophy },
-  ]
+  const tabs = isPremium || isAdmin
+    ? [
+      { to: "/", label: "Tous", icon: LayoutGrid, exact: true },
+      { to: "/football", label: "Football", icon: Radio },
+      { to: "/nhl", label: "NHL", icon: Target },
+      { to: "/paris-du-soir", label: "Paris", icon: Trophy },
+    ]
+    : [
+      { to: "/", label: "Tous", icon: LayoutGrid, exact: true },
+      { to: "/football", label: "Direct", icon: Radio },
+      { to: "/watchlist", label: "Favoris", icon: Star },
+      { to: "/premium", label: "Premium", icon: Trophy },
+    ]
 
   return (
     <nav className="fs-bottom-nav md:hidden">

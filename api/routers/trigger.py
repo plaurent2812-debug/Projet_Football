@@ -204,18 +204,27 @@ def admin_stats():
 @router.get("/admin/api-quota")
 def admin_api_quota():
     """Check API-Football remaining quota."""
-    import requests
+    import requests as req_lib
     try:
-        from src.config import API_HEADERS
-        resp = requests.get(
+        from src.config import API_FOOTBALL_KEY
+        headers = {
+            "x-rapidapi-host": "v3.football.api-sports.io",
+            "x-rapidapi-key": API_FOOTBALL_KEY,
+        }
+        resp = req_lib.get(
             "https://v3.football.api-sports.io/status",
-            headers=API_HEADERS,
+            headers=headers,
             timeout=10,
         )
         data = resp.json()
-        account = data.get("response", {}).get("account", {})
-        requests_info = data.get("response", {}).get("requests", {})
-        subscription = data.get("response", {}).get("subscription", {})
+        response = data.get("response", {}) if isinstance(data, dict) else {}
+        if isinstance(response, list) and len(response) > 0:
+            response = response[0]
+        if not isinstance(response, dict):
+            response = {}
+        account = response.get("account", {})
+        requests_info = response.get("requests", {})
+        subscription = response.get("subscription", {})
         return {
             "current": requests_info.get("current", 0),
             "limit_day": requests_info.get("limit_day", 0),

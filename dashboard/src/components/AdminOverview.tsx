@@ -110,7 +110,7 @@ export default function AdminOverview() {
                             { name: 'Railway (backend)', cost: '~5€', color: 'text-orange-400' },
                             { name: 'Vercel (frontend)', cost: '0€', color: 'text-emerald-400' },
                             { name: 'Supabase (DB)', cost: '0€', color: 'text-violet-400' },
-                            { name: 'Trigger.dev', cost: '0€', color: 'text-cyan-400' },
+                            { name: 'Trigger.dev', cost: '10€', color: 'text-cyan-400' },
                         ].map(item => (
                             <div key={item.name} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                                 <span className="text-sm text-muted-foreground">{item.name}</span>
@@ -119,7 +119,7 @@ export default function AdminOverview() {
                         ))}
                         <div className="flex items-center justify-between pt-2 border-t border-white/20">
                             <span className="text-sm font-bold">Total estimé</span>
-                            <span className="text-lg font-black text-foreground">~50€/mois</span>
+                            <span className="text-lg font-black text-foreground">~60€/mois</span>
                         </div>
                     </div>
                 </div>

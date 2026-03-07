@@ -357,6 +357,15 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
             .then(r => setMatches(r.matches || []))
             .catch(console.error)
             .finally(() => setLoading(false))
+
+        // Auto-refresh every 30s for live matches (skip cache)
+        const interval = setInterval(() => {
+            fetchPredictions(date, true)
+                .then(r => setMatches(r.matches || []))
+                .catch(console.error)
+        }, 30_000)
+
+        return () => clearInterval(interval)
     }, [date])
 
     // Filter matches

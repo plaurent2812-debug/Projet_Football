@@ -12,12 +12,12 @@ async function getAuthHeaders() {
 const cache = {}
 const CACHE_TTL = 60 * 1000 // 60 seconds
 
-export async function fetchPredictions(date) {
+export async function fetchPredictions(date, skipCache = false) {
     const params = date ? `?date=${date}` : ''
     const url = `${API_BASE}/predictions${params}`
 
     // Check cache
-    if (cache[url] && Date.now() - cache[url].timestamp < CACHE_TTL) {
+    if (!skipCache && cache[url] && Date.now() - cache[url].timestamp < CACHE_TTL) {
         return cache[url].data
     }
 

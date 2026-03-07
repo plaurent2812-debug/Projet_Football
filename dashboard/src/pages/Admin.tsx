@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { Protected } from '@/lib/auth'
 import { triggerPipeline, triggerNHLPipeline, fetchPipelineStatus, stopPipeline } from '@/lib/api'
 import { Shield, Play, Loader2, Cpu, Terminal, Activity, Server, Database, StopCircle, Clock, Calendar } from 'lucide-react'
+import AdminUsers from '@/components/AdminUsers'
 
 function AdminDashboard() {
     const [status, setStatus] = useState(null)
@@ -360,6 +361,9 @@ function AdminDashboard() {
                         </div>
                     </div>
                 </div>
+
+                {/* ─── User Management ─── */}
+                <AdminUsers />
             </div>
         </div>
     )

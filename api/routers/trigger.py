@@ -158,6 +158,83 @@ def admin_delete_user(user_id: str):
         logger.warning(f"[Admin] Profile delete failed for {user_id}: {e}")
 
     return {"status": "ok", "deleted": user_id}
+
+
+@router.get("/admin/stats")
+def admin_stats():
+    """Site-wide KPIs for admin overview."""
+    from datetime import datetime, timedelta
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    week_ago = (datetime.utcnow() - timedelta(days=7)).isoformat()
+
+    stats = {}
+    try:
+        # User counts
+        profiles = supabase.table("profiles").select("role", count="exact").execute()
+        stats["total_users"] = profiles.count or len(profiles.data or [])
+        roles = {}
+        for p in profiles.data or []:
+            r = p.get("role", "free")
+            roles[r] = roles.get(r, 0) + 1
+        stats["users_by_role"] = roles
+
+        # Today's predictions
+        preds_today = supabase.table("predictions").select("id", count="exact").gte("created_at", today).execute()
+        stats["predictions_today"] = preds_today.count or len(preds_today.data or [])
+
+        # Today's fixtures
+        fixtures_today = supabase.table("fixtures").select("id", count="exact").gte("match_date", today).lte("match_date", today + "T23:59:59").execute()
+        stats["matches_today"] = fixtures_today.count or len(fixtures_today.data or [])
+
+        # Total predictions all time
+        preds_all = supabase.table("predictions").select("id", count="exact").execute()
+        stats["predictions_total"] = preds_all.count or len(preds_all.data or [])
+
+        # Recent signups (last 7 days)
+        recent = supabase.table("profiles").select("id", count="exact").gte("created_at", week_ago).execute()
+        stats["signups_last_7d"] = recent.count or len(recent.data or [])
+
+    except Exception as e:
+        logger.error(f"[Admin] Stats error: {e}")
+
+    return stats
+
+
+@router.get("/admin/api-quota")
+def admin_api_quota():
+    """Check API-Football remaining quota."""
+    import requests
+    try:
+        from src.config import API_HEADERS
+        resp = requests.get(
+            "https://v3.football.api-sports.io/status",
+            headers=API_HEADERS,
+            timeout=10,
+        )
+        data = resp.json()
+        account = data.get("response", {}).get("account", {})
+        requests_info = data.get("response", {}).get("requests", {})
+        subscription = data.get("response", {}).get("subscription", {})
+        return {
+            "current": requests_info.get("current", 0),
+            "limit_day": requests_info.get("limit_day", 0),
+            "remaining": (requests_info.get("limit_day", 0) - requests_info.get("current", 0)),
+            "plan": subscription.get("plan", "unknown"),
+            "end": subscription.get("end", ""),
+            "firstname": account.get("firstname", ""),
+        }
+    except Exception as e:
+        logger.error(f"[Admin] API quota check error: {e}")
+        return {"error": str(e)}
+
+
+@router.get("/admin/leagues")
+def admin_get_leagues():
+    """Get currently tracked leagues."""
+    from src.config import LEAGUES
+    return {"leagues": LEAGUES}
+
 SYSTEM_PROMPT = """Tu es un expert en paris sportifs spécialisé dans le Live Betting.
 On te fournit les statistiques à la mi-temps d'un match (tirs, possession, xG, corners, score).
 Ton but est de proposer une analyse courte et percutante (3 phrases max) si tu détectes

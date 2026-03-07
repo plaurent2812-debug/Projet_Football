@@ -2,13 +2,19 @@
 import { useState, useEffect } from 'react'
 import { Protected } from '@/lib/auth'
 import { triggerPipeline, triggerNHLPipeline, fetchPipelineStatus, stopPipeline } from '@/lib/api'
-import { Shield, Play, Loader2, Cpu, Terminal, Activity, Server, Database, StopCircle, Clock, Calendar, Users, Settings } from 'lucide-react'
+import { Shield, Play, Loader2, Cpu, Terminal, Activity, Server, Database, StopCircle, Clock, Calendar, Users, Wrench, Globe, BarChart3 } from 'lucide-react'
 import AdminUsers from '@/components/AdminUsers'
+import AdminOverview from '@/components/AdminOverview'
+import AdminLeagues from '@/components/AdminLeagues'
+import AdminTools from '@/components/AdminTools'
 
 const TABS = [
+    { id: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
     { id: 'users', label: 'Utilisateurs', icon: Users },
     { id: 'pipeline', label: 'Pipeline', icon: Cpu },
     { id: 'automations', label: 'Automatisations', icon: Clock },
+    { id: 'leagues', label: 'Ligues', icon: Globe },
+    { id: 'tools', label: 'Outils', icon: Wrench },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -19,7 +25,7 @@ function AdminDashboard() {
     const [msg, setMsg] = useState('')
     const [nhlLoading, setNhlLoading] = useState(false)
     const [nhlMsg, setNhlMsg] = useState('')
-    const [activeTab, setActiveTab] = useState<TabId>('users')
+    const [activeTab, setActiveTab] = useState<TabId>('overview')
 
     const refreshStatus = async () => {
         try {
@@ -135,6 +141,9 @@ function AdminDashboard() {
                         )
                     })}
                 </div>
+
+                {/* ── Tab: Overview ── */}
+                {activeTab === 'overview' && <AdminOverview />}
 
                 {/* ── Tab: Users ── */}
                 {activeTab === 'users' && <AdminUsers />}
@@ -399,6 +408,12 @@ function AdminDashboard() {
                         </div>
                     </div>
                 )}
+
+                {/* ── Tab: Leagues ── */}
+                {activeTab === 'leagues' && <AdminLeagues />}
+
+                {/* ── Tab: Tools ── */}
+                {activeTab === 'tools' && <AdminTools />}
             </div>
         </div>
     )

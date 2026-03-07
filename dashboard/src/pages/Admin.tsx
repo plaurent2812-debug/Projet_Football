@@ -125,8 +125,8 @@ function AdminDashboard() {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isActive
-                                        ? 'bg-primary text-primary-foreground shadow-md'
-                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                                    ? 'bg-primary text-primary-foreground shadow-md'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                                     }`}
                             >
                                 <Icon className="w-4 h-4" />
@@ -339,7 +339,7 @@ function AdminDashboard() {
                                 </h3>
                                 {[
                                     { time: '08:00', paris: '09:00', cron: '0 8 * * *', name: 'Schedule Daily', desc: '⚽ Matchs du jour + halftime/70min monitors\n🏒 NHL Performance eval' },
-                                    { time: '*/1 min', paris: '24/7', cron: '* * * * *', name: 'Live Tracker', desc: '⚽ Live scores (11h-23h) + momentum (*/5min)\n🏒 NHL live scores (16h-08h)' },
+                                    { time: '*/1 min', paris: '24/7', cron: '* * * * *', name: 'Live Tracker', desc: '⚽ Scores */1min (1 call) · Events+Stats */5min (detail)\n🏒 NHL live scores (16h-08h)' },
                                     { time: '10:00 / 15:00', paris: '11:00 / 16:00', cron: '0 10,15 * * *', name: 'Value Bets', desc: '⚽ Football value bets (10h UTC)\n🏒 NHL value bets (15h UTC)' },
                                 ].map((t, i) => (
                                     <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-white/5 hover:bg-white/8 transition-colors">

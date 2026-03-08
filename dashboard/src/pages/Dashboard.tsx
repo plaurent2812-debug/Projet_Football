@@ -416,7 +416,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                         {/* Match Style Tags */}
                         {(() => {
                             const probaOver25 = pred?.proba_over_25 ?? pred?.proba_over_2_5
-                            if (probaOver25 != null && probaOver25 >= 58) {
+                            if (probaOver25 != null && probaOver25 >= 50) {
                                 return (
                                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 flex items-center gap-1">
                                         <Flame className="w-2.5 h-2.5" />
@@ -424,7 +424,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                                     </span>
                                 )
                             }
-                            if (probaOver25 != null && probaOver25 <= 42) {
+                            if (probaOver25 != null && probaOver25 <= 35) {
                                 return (
                                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400">
                                         Défensif

@@ -249,6 +249,7 @@ CONSIGNES STRICTES :
   * -1.0 = Extrême négatif / Désastreux
 - Rédige une analyse brève (3-5 phrases) justifiant tes scores.
 - Évite le jargon de data scientist (ELO, Poisson), utilise des termes de scouting/football.
+- ⚠️ LANGUE OBLIGATOIRE : Tous les champs textuels (analysis_text, likely_scorer_reason) DOIVENT être rédigés EN FRANÇAIS. Ne réponds JAMAIS en anglais.
 
 IMPORTANT : Réponds UNIQUEMENT avec un objet JSON valide respectant SCRUPULEUSEMENT cette structure, sans texte avant ni après :
 {{
@@ -257,9 +258,9 @@ IMPORTANT : Réponds UNIQUEMENT avec un objet JSON valide respectant SCRUPULEUSE
   "injury_tactical_impact": float (-1.0 à 1.0, 1.0 avantage Domicile, -1.0 avantage Extérieur),
   "cohesion_score": float (-1.0 à 1.0),
   "style_risk": float (-1.0 à 1.0, 1.0 ultra-offensif attendu, -1.0 bus défensif),
-  "analysis_text": "Analyse narrative de 3-5 phrases expliquant ces notes.",
+  "analysis_text": "Analyse narrative EN FRANÇAIS de 3-5 phrases expliquant ces notes.",
   "likely_scorer": "Nom du buteur probable ou null",
-  "likely_scorer_reason": "Pourquoi ce joueur, ou null"
+  "likely_scorer_reason": "Explication EN FRANÇAIS de pourquoi ce joueur, ou null"
 }}"""
 
     user_prompt = f"""{data_block}
@@ -308,6 +309,76 @@ def ask_gemini(system_prompt: str, user_prompt: str) -> str | None:
     except Exception as e:
         logger.error("Erreur Gemini : %s", e)
         return None
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  FALLBACK ANALYSIS (when Gemini is unavailable)
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _build_fallback_analysis(stats_result: dict) -> str:
+    """Build a meaningful French analysis from available stats when Gemini fails."""
+    xg_home = stats_result.get("xg_home", 1.3)
+    xg_away = stats_result.get("xg_away", 1.1)
+    xg_total = xg_home + xg_away
+    p_home = stats_result.get("proba_home", 33)
+    p_draw = stats_result.get("proba_draw", 33)
+    p_away = stats_result.get("proba_away", 33)
+    p_btts = stats_result.get("proba_btts", 50)
+    p_over25 = stats_result.get("proba_over_25", 45)
+
+    # Determine match profile
+    parts = []
+
+    # xG assessment
+    if xg_total >= 3.0:
+        parts.append(f"Les xG attendus sont élevés ({xg_home:.2f} - {xg_away:.2f}), annonçant un match ouvert avec de nombreuses occasions.")
+    elif xg_total >= 2.2:
+        parts.append(f"Les xG attendus ({xg_home:.2f} - {xg_away:.2f}) suggèrent un match équilibré avec un potentiel offensif correct.")
+    else:
+        parts.append(f"Les xG attendus sont modérés ({xg_home:.2f} - {xg_away:.2f}), ce qui laisse présager un match plutôt fermé.")
+
+    # Favorite assessment
+    if p_home >= 55:
+        parts.append(f"L'équipe à domicile est nettement favorite ({p_home}%) grâce à sa supériorité statistique.")
+    elif p_away >= 55:
+        parts.append(f"L'équipe visiteuse est favorite ({p_away}%) malgré son déplacement, un profil intéressant.")
+    elif abs(p_home - p_away) < 10:
+        parts.append(f"Les équipes se tiennent de très près ({p_home}% - {p_draw}% - {p_away}%), un match incertain.")
+    else:
+        dom = "domicile" if p_home > p_away else "extérieur"
+        parts.append(f"Léger avantage pour l'équipe à {dom}, mais le match reste ouvert.")
+
+    # Goals market
+    if p_over25 >= 55:
+        parts.append(f"Le marché Over 2.5 buts est bien orienté ({p_over25}%), les deux équipes ayant un profil offensif.")
+    elif p_over25 <= 35:
+        parts.append(f"Profil défensif pour cette rencontre avec seulement {p_over25}% de chances de voir plus de 2.5 buts.")
+
+    # BTTS
+    if p_btts >= 60:
+        parts.append(f"Les deux équipes devraient marquer (BTTS à {p_btts}%).")
+    elif p_btts <= 35:
+        parts.append(f"Il est peu probable que les deux équipes trouvent le chemin des filets (BTTS à {p_btts}%).")
+
+    # Context from form/rest if available
+    ctx = stats_result.get("context", {})
+    form_home = ctx.get("form_home")
+    form_away = ctx.get("form_away")
+    if form_home and isinstance(form_home, list):
+        wins_h = form_home.count("W")
+        if wins_h >= 4:
+            parts.append("L'équipe à domicile est en grande forme récente.")
+        elif wins_h <= 1:
+            parts.append("L'équipe à domicile traverse une période difficile.")
+    if form_away and isinstance(form_away, list):
+        wins_a = form_away.count("W")
+        if wins_a >= 4:
+            parts.append("Les visiteurs affichent une belle dynamique.")
+        elif wins_a <= 1:
+            parts.append("Les visiteurs manquent de confiance en déplacement.")
+
+    return " ".join(parts[:4])  # Keep it concise: max 4 sentences
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -365,7 +436,7 @@ def blend_predictions(stats_result: dict, ai_result: AIFeatures | None) -> dict:
         final["likely_scorer_reason"] = ai_result.likely_scorer_reason
     else:
         final["ai_features"] = {}
-        final["analysis_text"] = f"Analyse stats uniquement. xG: {stats_result.get('xg_home')}-{stats_result.get('xg_away')}."
+        final["analysis_text"] = _build_fallback_analysis(stats_result)
 
     # Interroger les Meta-Modèles XGBoost (Phase 2)
     meta_preds = predict_meta(stats_result, ai_features_dict)
@@ -548,7 +619,7 @@ def run_brain() -> None:
 
         # Sleep to avoid [Errno 35] Resource temporarily unavailable (API limits)
         import time
-        time.sleep(1.0)
+        time.sleep(2.0)
 
         # ── D. Fusion ────────────────────────────────────────────
         try:

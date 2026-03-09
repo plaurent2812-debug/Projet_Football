@@ -611,6 +611,8 @@ def get_best_bets(
     # ── NHL best bets ─────────────────────────────────────────────
     if sport in (None, "nhl"):
         try:
+            next_day = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
+
             # ── Step 1: Real bookmaker odds from nhl_odds ─────────
             real_odds_resp = (
                 supabase.table("nhl_odds")
@@ -623,8 +625,7 @@ def get_best_bets(
             )
             real_odds_raw = real_odds_resp.data or []
 
-            # Build player→best odds map (pick the highest odds across bookmakers = best value)
-            # and game context (home/away) for each player
+            # Build player→best odds map (highest odds across bookmakers = best value)
             player_odds_map: dict[str, dict] = {}
             for row in real_odds_raw:
                 name = row.get("player_name", "").strip()
@@ -646,46 +647,36 @@ def get_best_bets(
 
             has_real_odds = len(player_odds_map) > 0
 
-            # ── Step 2: Model probabilities from nhl_data_lake ────
-            # Note: python_prob stores GOAL probabilities (0.05-0.20), not point probabilities.
-            # The EV filter (ev > 0) is the real quality gate — no need for a high prob threshold.
-            model_resp = (
-                supabase.table("nhl_data_lake")
-                .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, date")
-                .eq("date", date)
-                .neq("player_id", "META_ANALYSIS")
-                .gte("python_prob", 0.05)   # goal prob range — EV filter handles quality
-                .order("python_prob", desc=True)
-                .limit(200)
+            # ── Step 2: Model probabilities from nhl_fixtures.stats_json ────
+            # prob_point from the pipeline (~20-60%) matches the Over 0.5 Points market.
+            # nhl_data_lake.python_prob = goal probability (~5-15%) — incompatible for EV vs point props.
+            fixtures_resp = (
+                supabase.table("nhl_fixtures")
+                .select("home_team, away_team, stats_json")
+                .gte("date", f"{date}T00:00:00Z")
+                .lt("date", f"{next_day}T00:00:00Z")
                 .execute()
             )
-            model_rows = model_resp.data or []
 
-            # If no data for today, try last 14 days
-            if not model_rows:
-                cutoff = (datetime.fromisoformat(date) - timedelta(days=14)).strftime("%Y-%m-%d")
-                model_resp = (
-                    supabase.table("nhl_data_lake")
-                    .select("player_id, player_name, team, opp, is_home, python_prob, algo_score_goal, date")
-                    .neq("player_id", "META_ANALYSIS")
-                    .gte("python_prob", 0.05)   # goal prob range
-                    .gte("date", cutoff)
-                    .order("python_prob", desc=True)  # best players first
-                    .limit(200)
-                    .execute()
-                )
-                model_rows = model_resp.data or []
-
-            # Build model map: player_name → {prob, team, ...}
-            # Keep only the most recent entry per player
+            # Build model map: player_name → {ppg, prob_goal, team, ...}
             model_map: dict[str, dict] = {}
-            seen_model = set()
-            for m in model_rows:
-                name = m.get("player_name", "").strip()
-                if name in seen_model:
-                    continue
-                seen_model.add(name)
-                model_map[name] = m
+            for fx in (fixtures_resp.data or []):
+                top_players = (fx.get("stats_json") or {}).get("top_players", [])
+                for p in top_players:
+                    name = (p.get("player_name") or "").strip()
+                    if not name or name in model_map:
+                        continue
+                    model_map[name] = {
+                        "ppg": float(p.get("points_per_game") or 0),     # for Poisson P(point)
+                        "prob_goal": float(p.get("prob_goal") or 0),
+                        "prob_assist": float(p.get("prob_assist") or 0),
+                        "team": p.get("team", ""),
+                        "opp": p.get("opp", ""),
+                        "is_home": p.get("is_home", 0),
+                        "algo_score_goal": p.get("algo_score_goal", 0),
+                        "home_team": fx.get("home_team", ""),
+                        "away_team": fx.get("away_team", ""),
+                    }
 
             # ── Step 3: Fuzzy name matching helper ────────────────
             def normalize_name(s: str) -> str:
@@ -704,13 +695,13 @@ def get_best_bets(
 
                 for player_name, odds_data in player_odds_map.items():
                     bookie_odds = odds_data["odds"]
-                    bookie_implied_prob = 100.0 / bookie_odds  # in %
+                    bookie_implied_prob = 100.0 / bookie_odds  # implied prob for Over 0.5 Points
 
                     # Match player to model via normalized name
                     norm_name = normalize_name(player_name)
                     model_data = norm_model_map.get(norm_name)
 
-                    # Try partial match if exact fails
+                    # Try partial (last name) match if exact fails
                     if model_data is None:
                         parts = norm_name.split()
                         if len(parts) >= 2:
@@ -723,20 +714,24 @@ def get_best_bets(
                     if model_data is None:
                         continue  # no model data → skip
 
-                    model_prob_raw = float(model_data.get("python_prob") or 0)
-                    model_prob = round(model_prob_raw * 100, 1)
-                    if model_prob <= 0:
+                    # P(Over 0.5 Points) = 1 - exp(-ppg)  [Poisson with seasonal avg]
+                    # This gives comparable probabilities to bookmaker's Over 0.5 Pts market (50-70% range)
+                    import math as _math
+                    ppg = float(model_data.get("ppg") or 0)
+                    if ppg <= 0:
                         continue
 
-                    # ── Value bet filter: model must be more optimistic ──
-                    # EV = model_prob/100 * bookie_odds - 1 (expected return per €1)
-                    ev = round(model_prob_raw * bookie_odds - 1, 3)
+                    point_prob_raw = 1.0 - _math.exp(-ppg)   # Poisson P(X >= 1)
+                    point_prob_pct = round(point_prob_raw * 100, 1)
+
+                    # EV = model_prob * bookie_odds - 1
+                    ev = round(point_prob_raw * bookie_odds - 1, 3)
                     if ev <= 0:
                         continue  # negative EV → not a value bet
 
-                    # Build label from odds data game context
-                    ht = odds_data.get("home_team", "")
-                    at = odds_data.get("away_team", "")
+                    # Build label
+                    ht = model_data.get("home_team") or odds_data.get("home_team", "")
+                    at = model_data.get("away_team") or odds_data.get("away_team", "")
                     team_abbrev = model_data.get("team", "")
                     NHL_ABBREV_TO_NAME_LOCAL = {
                         "ANA": "Anaheim Ducks", "BOS": "Boston Bruins", "BUF": "Buffalo Sabres",
@@ -760,20 +755,19 @@ def get_best_bets(
                         home_away = "vs" if is_home else "@"
                         label = f"{player_name} Over 0.5 Points — {team_name} {home_away} {opp}"
 
-                    # Sort key: EV first, then bookie_odds
                     nhl_bets.append({
                         "id": None,
                         "player_name": player_name,
                         "team": team_abbrev,
                         "label": label,
                         "market": "player_points_over_0.5",
-                        "odds": round(bookie_odds, 2),        # VRAIE cote bookmaker
+                        "odds": round(bookie_odds, 2),
                         "confidence": min(10, max(1, int(ev * 20))),
-                        "proba_model": model_prob,
+                        "proba_model": round(point_prob_pct, 1),
                         "proba_bookmaker": round(bookie_implied_prob, 1),
                         "ev": ev,
                         "bookmaker": odds_data.get("bookmaker", ""),
-                        "is_value": ev > 0.03,                # EV > 3% = bonne value
+                        "is_value": ev > 0.03,
                         "algo_score_goal": model_data.get("algo_score_goal") or 0,
                         "result": "PENDING",
                         "odds_source": "real",
@@ -785,7 +779,7 @@ def get_best_bets(
                 result["nhl_odds_source"] = "real"
 
             else:
-                # MODE B: No real odds yet — show model-only (clearly labeled, no fake cotes)
+                # MODE B: No real odds yet
                 result["nhl"] = []
                 result["nhl_note"] = (
                     f"Les cotes bookmaker NHL pour le {date} ne sont pas encore disponibles "
@@ -795,6 +789,7 @@ def get_best_bets(
 
         except Exception as e:
             result["nhl_error"] = str(e)
+
 
     # ── Enrich with saved tracking results ───────────────────────
     try:

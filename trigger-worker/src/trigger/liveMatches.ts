@@ -91,19 +91,31 @@ export const scheduleDailyMatches = schedules.task({
 // Updates live scores every minute during active match windows
 export const globalMinutelyScheduler = schedules.task({
     id: "global-minutely-scheduler",
-    cron: "* * * * *",   // Every minute, 24/7
+    cron: "*/2 * * * *",   // Every 2 minutes
     retry: standardRetry,
     run: async () => {
         const now = new Date();
         const hour = now.getUTCHours();
         const min = now.getUTCMinutes();
 
+        // 1. Gating: Check if we have any active or upcoming matches in the next 15 mins
+        const checkRes = await fetch(`${API_URL}/api/trigger/check-active-matches`, {
+            headers: { "Authorization": `Bearer ${CRON_SECRET}` }
+        });
+
+        if (checkRes.ok) {
+            const checkData = await checkRes.json();
+            if (!checkData.active && !checkData.upcoming_soon) {
+                return { status: "skipped", reason: "No active or upcoming matches" };
+            }
+        }
+
         const promises: Promise<Response>[] = [];
 
         // Football live scores (11h–23h UTC)
-        // detail=true every 5 min fetches events/stats; otherwise just score+elapsed
+        // detail=true every 10 min fetches events/stats; otherwise just score+elapsed
         if (hour >= 11 && hour <= 23) {
-            const needDetail = min % 5 === 0;
+            const needDetail = min % 10 === 0;
             const scoreUrl = needDetail
                 ? `${API_URL}/api/trigger/update-live-scores?detail=true`
                 : `${API_URL}/api/trigger/update-live-scores`;
@@ -113,8 +125,8 @@ export const globalMinutelyScheduler = schedules.task({
             }));
         }
 
-        // Football momentum every 5 min
-        if (min % 5 === 0) {
+        // Football momentum every 6 min
+        if (min % 6 === 0) {
             promises.push(fetch(`${API_URL}/api/trigger/football-momentum`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CRON_SECRET}` }

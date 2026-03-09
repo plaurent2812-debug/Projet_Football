@@ -475,6 +475,38 @@ Analyse ces anomalies et recommande le meilleur pari en direct. Retourne le JSON
     return {"status": "alert_created", "anomalies": anomalies, "alert": ai_result}
 
 
+@router.get("/check-active-matches")
+def check_active_matches():
+    """Lite check to see if we have any active or upcoming matches.
+    Used by Trigger.dev to skip useless runs and save compute costs.
+    """
+    from datetime import timedelta
+    now_utc = datetime.utcnow()
+    next_15m = (now_utc + timedelta(minutes=15)).isoformat()
+    today_start = now_utc.replace(hour=0, minute=0, second=0).isoformat()
+    today_end = now_utc.replace(hour=23, minute=59, second=59).isoformat()
+
+    # 1. Check for LIVE matches in DB
+    active_statuses = ["1H", "2H", "HT", "ET", "LIVE", "BT"]
+    res_active = supabase.table("fixtures").select("id", count="exact").in_("status", active_statuses).execute()
+    has_active = (res_active.count or 0) > 0
+
+    # 2. Check for matches starting in the next 15 mins
+    res_upcoming = supabase.table("fixtures").select("id", count="exact").eq("status", "NS").gte("date", now_utc.isoformat()).lte("date", next_15m).execute()
+    has_upcoming = (res_upcoming.count or 0) > 0
+
+    # 3. Quick NHL check (16h-08h UTC)
+    hour = now_utc.hour
+    nhl_active_window = (hour >= 16 or hour <= 8)
+
+    return {
+        "active": has_active,
+        "upcoming_soon": has_upcoming,
+        "nhl_window": nhl_active_window,
+        "summary": "Skip if not active and not upcoming and not in NHL window"
+    }
+
+
 # ─── Live Scores Update ─────────────────────────────────────────
 
 
@@ -490,134 +522,104 @@ def update_live_scores(detail: bool = Query(False, description="Fetch events & s
     resp = api_get("fixtures", {"live": "all"})
     live_fixtures = resp.get("response", []) if resp else []
 
-    updated = 0
+    if not live_fixtures:
+        logger.info("[Live Scores] No live matches found.")
+        return {"status": "ok", "updated": 0, "finished": 0, "errors": 0, "total_live": 0}
+
+    # Map API status to our status codes
+    status_map = {
+        "1H": "1H", "HT": "HT", "2H": "2H", "ET": "ET", "P": "PEN",
+        "FT": "FT", "AET": "FT", "PEN": "FT", "BT": "BT",
+        "SUSP": "SUSP", "INT": "INT", "LIVE": "LIVE",
+    }
+
+    batch_updates = []
     errors = 0
     live_api_ids = set()
 
+    # Optimization: Fetch existing fixtures in one go to get their internal IDs
+    api_ids = [str(lf.get("fixture", {}).get("id")) for lf in live_fixtures if lf.get("fixture", {}).get("id")]
+    existing_map = {}
+    if api_ids:
+        db_res = supabase.table("fixtures").select("id, api_fixture_id").in_("api_fixture_id", api_ids).execute()
+        existing_map = {str(item["api_fixture_id"]): item["id"] for item in db_res.data or []}
+
     for lf in live_fixtures:
         api_fixture_id = lf.get("fixture", {}).get("id")
+        if not api_fixture_id: continue
+        
+        live_api_ids.add(api_fixture_id)
+        internal_id = existing_map.get(str(api_fixture_id))
+        if not internal_id: continue # Match not in our DB, ignore
+
         goals = lf.get("goals", {})
-        home_goals = goals.get("home")
-        away_goals = goals.get("away")
         status_short = lf.get("fixture", {}).get("status", {}).get("short", "")
 
-        if not api_fixture_id:
-            continue
+        update_data = {
+            "id": internal_id, # Required for upsert to update
+            "api_fixture_id": api_fixture_id,
+            "home_goals": goals.get("home"),
+            "away_goals": goals.get("away"),
+            "status": status_map.get(status_short, status_short),
+            "elapsed": lf.get("fixture", {}).get("status", {}).get("elapsed"),
+        }
 
-        live_api_ids.add(api_fixture_id)
-
-        try:
-            # Map API status to our status codes
-            status_map = {
-                "1H": "1H",
-                "HT": "HT",
-                "2H": "2H",
-                "ET": "ET",
-                "P": "PEN",
-                "FT": "FT",
-                "AET": "FT",
-                "PEN": "FT",
-                "BT": "BT",
-                "SUSP": "SUSP",
-                "INT": "INT",
-                "LIVE": "LIVE",
-            }
-            our_status = status_map.get(status_short, status_short)
-
-            update_data = {
-                "home_goals": home_goals,
-                "away_goals": away_goals,
-                "status": our_status,
-                "elapsed": lf.get("fixture", {}).get("status", {}).get("elapsed"),
-            }
-
-            # Fetch goals & events only in detail mode (every 5 min) to save API quota
-            if detail:
-              try:
-                import time as _time
-
+        # Detailed fetch (every 10 min)
+        if detail:
+            # Events
+            try:
                 events_resp = api_get("fixtures/events", {"fixture": api_fixture_id})
                 if events_resp and events_resp.get("response"):
-                    raw_events = events_resp["response"]
                     goals_list = []
-                    for ev in raw_events:
+                    for ev in events_resp["response"]:
                         if ev.get("type") == "Goal" and ev.get("comments") != "Penalty Shootout":
-                            goal_info = {
+                            goals_list.append({
                                 "team": ev.get("team", {}).get("name", ""),
                                 "player": ev.get("player", {}).get("name", ""),
                                 "player_id": ev.get("player", {}).get("id"),
-                                "assist": ev.get("assist", {}).get("name", "")
-                                if ev.get("assist")
-                                else "",
-                                "assist_id": ev.get("assist", {}).get("id")
-                                if ev.get("assist")
-                                else None,
                                 "time": ev.get("time", {}).get("elapsed", ""),
-                                "extra_time": ev.get("time", {}).get("extra"),
                                 "detail": ev.get("detail", ""),
-                                "comments": ev.get("comments", ""),
-                                "half": "1H"
-                                if (ev.get("time", {}).get("elapsed", 0) or 0) <= 45
-                                else "2H",
-                            }
-                            goals_list.append(goal_info)
+                                "half": "1H" if (ev.get("time", {}).get("elapsed", 0) or 0) <= 45 else "2H",
+                            })
                     update_data["events_json"] = goals_list
-              except Exception as ev_err:
-                logger.warning(f"[Live Scores] Events fetch error for {api_fixture_id}: {ev_err}")
+            except Exception: pass
 
-              # Fetch live stats (possession, shots, etc.)
-              try:
+            # Stats
+            try:
                 stats_resp = api_get("fixtures/statistics", {"fixture": api_fixture_id})
                 if stats_resp and stats_resp.get("response"):
-                    raw_stats = stats_resp["response"]
                     live_stats = {}
-                    for team_stats in raw_stats:
+                    for team_stats in stats_resp["response"]:
                         team_name = team_stats.get("team", {}).get("name", "")
-                        side = (
-                            "home"
-                            if team_name == lf.get("teams", {}).get("home", {}).get("name")
-                            else "away"
-                        )
-                        stats_dict = {
-                            s.get("type", ""): s.get("value")
-                            for s in team_stats.get("statistics", [])
-                        }
+                        side = "home" if team_name == lf.get("teams", {}).get("home", {}).get("name") else "away"
+                        stats_dict = {s.get("type", ""): s.get("value") for s in team_stats.get("statistics", [])}
                         live_stats[side] = {
                             "team": team_name,
                             "shots_total": stats_dict.get("Total Shots"),
                             "shots_on": stats_dict.get("Shots on Goal"),
                             "possession": stats_dict.get("Ball Possession"),
                             "corners": stats_dict.get("Corner Kicks"),
-                            "fouls": stats_dict.get("Fouls"),
-                            "offsides": stats_dict.get("Offsides"),
-                            "yellow": stats_dict.get("Yellow Cards"),
-                            "red": stats_dict.get("Red Cards"),
                             "xg": stats_dict.get("expected_goals"),
                         }
                     update_data["live_stats_json"] = live_stats
-              except Exception as stats_err:
-                logger.debug(
-                    f"[Live Scores] Stats not yet available for {api_fixture_id}: {stats_err}"
-                )
+            except Exception: pass
 
-            result = (
-                supabase.table("fixtures")
-                .update(update_data)
-                .eq("api_fixture_id", api_fixture_id)
-                .execute()
-            )
-            if result.data:
-                updated += 1
+        batch_updates.append(update_data)
+
+    # Perform batch update
+    updated_count = 0
+    if batch_updates:
+        try:
+            supabase.table("fixtures").upsert(batch_updates).execute()
+            updated_count = len(batch_updates)
         except Exception as e:
-            logger.error(f"[Live Scores] Error updating fixture {api_fixture_id}: {e}")
-            errors += 1
+            logger.error(f"[Live Scores] Batch update error: {e}")
+            errors = len(batch_updates)
 
     # ── 2nd pass: detect recently finished matches (only in detail mode) ──
     if not detail:
-        logger.info(
-            f"[Live Scores] ✅ Quick update: {updated} live mis à jour, {errors} erreurs (detail=False, skipping stale check)"
-        )
-        return {"status": "ok", "updated": updated, "finished": 0, "errors": errors, "total_live": len(live_fixtures)}
+        logger.info(f"[Live Scores] ✅ Quick update: {updated_count} fixtures synchronized.")
+        return {"status": "ok", "updated": updated_count, "finished": 0, "errors": errors, "total_live": len(live_fixtures)}
 
     # Fixtures in our DB marked as live/NS but no longer in the API live response
     today = datetime.now().strftime("%Y-%m-%d")

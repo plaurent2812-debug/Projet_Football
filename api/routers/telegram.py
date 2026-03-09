@@ -24,7 +24,7 @@ logger = logging.getLogger("telegram_router")
 
 router = APIRouter(prefix="/api/telegram", tags=["Telegram"])
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_EXPERT_BOT_TOKEN", "")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 
 # In-memory store: chat_id → pending pick dict

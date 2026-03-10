@@ -51,6 +51,34 @@ Réponds UNIQUEMENT avec le JSON, sans markdown, sans explication.
 """
 
 
+def _extract_json_robust(text: str) -> dict | None:
+    """Extrait un objet JSON depuis une réponse Gemini (3 stratégies).
+
+    1. json.loads direct sur le texte complet.
+    2. Extraction depuis un bloc ```json ... ```.
+    3. Extraction du premier bloc { ... } trouvé.
+    """
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(1).strip())
+        except (json.JSONDecodeError, ValueError):
+            pass
+    m = re.search(r"\{[\s\S]*\}", text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return None
+
+
 def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
     """
     Analyse une image de pari Winamax et retourne les champs extraits.
@@ -98,6 +126,7 @@ def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
                 system_instruction=SYSTEM_PROMPT,
                 temperature=0.1,
                 max_output_tokens=1024,
+                response_mime_type="application/json",
             ),
         )
 
@@ -111,12 +140,10 @@ def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
 
         # Clean JSON (remove markdown fences if any)
         raw_text = raw_text.strip()
-        if raw_text.startswith("```"):
-            raw_text = re.sub(r"```[a-z]*\n?", "", raw_text).strip()
-        if raw_text.endswith("```"):
-            raw_text = raw_text[:-3].strip()
 
-        parsed = json.loads(raw_text)
+        parsed = _extract_json_robust(raw_text)
+        if parsed is None:
+            raise json.JSONDecodeError(f"Aucun JSON valide trouvé dans la réponse", raw_text, 0)
 
         # Ensure date fallback to today
         if not parsed.get("date"):

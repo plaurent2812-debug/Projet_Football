@@ -52,12 +52,10 @@ from src.constants import (
 from scipy.stats import poisson
 
 # Import calibration (optionnel — n'échoue pas si pas encore de données)
-try:
-    from src.models.calibrate import apply_calibration
-
-    CALIBRATION_AVAILABLE = True
-except ImportError:
-    CALIBRATION_AVAILABLE = False
+# ⚠️ DÉSACTIVÉ : la calibration actuelle (entraînée sur peu de données) crée une
+# "fonction en escalier" qui écrase les différences entre matchs proches.
+# → Réactiver quand on aura 500+ prédictions historiques pour un isotonic smooth.
+CALIBRATION_AVAILABLE = False
 
 # Import modèles ML entraînés (optionnel)
 try:

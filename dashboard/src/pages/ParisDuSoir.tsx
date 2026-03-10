@@ -292,21 +292,20 @@ function StatsDashboard({ stats, isAdmin }) {
             </div>
         )
         return (
-            <div className={cn("rounded-xl border p-4", color)}>
-                <p className="text-xs text-muted-foreground mb-2">{label}</p>
-                <div className="flex items-end gap-2">
-                    <span className="text-2xl font-black">{data.win_rate}%</span>
-                    <span className="text-xs text-muted-foreground mb-0.5">réussite</span>
+            <div className={cn("rounded-xl border p-3 overflow-hidden", color)}>
+                <p className="text-[10px] text-muted-foreground mb-1.5 truncate">{label}</p>
+                <div className="flex items-end gap-1">
+                    <span className="text-xl font-black leading-tight">{data.win_rate}%</span>
+                    <span className="text-[9px] text-muted-foreground mb-0.5">réussite</span>
                 </div>
-                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground flex-wrap">
                     <span className="text-emerald-400 font-semibold">{data.wins}W</span>
                     <span className="text-red-400 font-semibold">{data.losses}L</span>
-                    {data.voids > 0 && <span className="text-slate-400">{data.voids} nul</span>}
-                    <span className={cn("font-bold ml-auto", data.roi_pct >= 0 ? "text-emerald-400" : "text-red-400")}>
-                        ROI {data.roi_pct >= 0 ? "+" : ""}{data.roi_pct}%
-                    </span>
                 </div>
-                <div className="mt-2 h-1.5 rounded-full bg-border/40 overflow-hidden">
+                <div className={cn("text-[10px] font-bold mt-1", data.roi_pct >= 0 ? "text-emerald-400" : "text-red-400")}>
+                    ROI {data.roi_pct >= 0 ? "+" : ""}{data.roi_pct}%
+                </div>
+                <div className="mt-1.5 h-1.5 rounded-full bg-border/40 overflow-hidden">
                     <div
                         className="h-full bg-emerald-500 rounded-full transition-all duration-700"
                         style={{ width: `${data.win_rate}%` }}
@@ -716,22 +715,13 @@ export default function ParisDuSoir() {
                 </div>
             )}
 
-            {/* View toggle: Aujourd'hui / Historique */}
-            <div className="flex gap-1 mb-5 p-0.5 rounded-lg bg-muted/50">
+            {/* View toggle: Historique */}
+            <div className="flex gap-1 mb-5">
                 <button
-                    onClick={() => setShowHistory(false)}
+                    onClick={() => setShowHistory(!showHistory)}
                     className={cn(
-                        "flex-1 py-2 rounded-md text-xs font-bold transition-all",
-                        !showHistory ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                >
-                    📋 Picks du Jour
-                </button>
-                <button
-                    onClick={() => setShowHistory(true)}
-                    className={cn(
-                        "flex-1 py-2 rounded-md text-xs font-bold transition-all",
-                        showHistory ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                        "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
+                        showHistory ? "bg-card shadow-sm text-foreground border border-border/60" : "bg-muted/50 text-muted-foreground hover:text-foreground"
                     )}
                 >
                     📊 Historique complet

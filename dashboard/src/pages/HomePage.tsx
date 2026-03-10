@@ -239,29 +239,37 @@ export default function HomePage() {
                         <span className="text-sm font-bold">Notre Méthode</span>
                     </div>
                 </div>
-                <div className="grid grid-cols-3 divide-x divide-border/20">
+                <div className="grid grid-cols-4 divide-x divide-border/20">
                     {/* Pillar 1 */}
-                    <div className="p-3 text-center">
+                    <div className="p-2.5 text-center">
                         <div className="text-lg mb-1">🧠</div>
                         <div className="text-[10px] font-bold text-foreground mb-0.5">Experts + IA</div>
                         <div className="text-[9px] text-muted-foreground leading-tight">
-                            Nos experts sélectionnent les pronos grâce aux probas IA
+                            Nos experts sélectionnent grâce aux probas IA
                         </div>
                     </div>
                     {/* Pillar 2 */}
-                    <div className="p-3 text-center">
+                    <div className="p-2.5 text-center">
                         <div className="text-lg mb-1">📊</div>
                         <div className="text-[10px] font-bold text-foreground mb-0.5">Cotes 1.75 – 2.20</div>
                         <div className="text-[9px] text-muted-foreground leading-tight">
-                            Zone optimale entre rendement et sécurité
+                            Zone optimale rendement / sécurité
                         </div>
                     </div>
                     {/* Pillar 3 */}
-                    <div className="p-3 text-center">
+                    <div className="p-2.5 text-center">
+                        <div className="text-lg mb-1">🛡️</div>
+                        <div className="text-[10px] font-bold text-foreground mb-0.5">5 Safe / jour</div>
+                        <div className="text-[9px] text-muted-foreground leading-tight">
+                            Maximum 5 paris sécurisés par soir
+                        </div>
+                    </div>
+                    {/* Pillar 4 */}
+                    <div className="p-2.5 text-center">
                         <div className="text-lg mb-1">🎲</div>
                         <div className="text-[10px] font-bold text-foreground mb-0.5">1 Fun / jour</div>
                         <div className="text-[9px] text-muted-foreground leading-tight">
-                            Un pari fun quotidien si opportunité intéressante
+                            Pari fun si opportunité intéressante
                         </div>
                     </div>
                 </div>

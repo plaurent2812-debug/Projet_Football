@@ -1182,10 +1182,10 @@ def resolve_best_bets(body: dict, authorization: str = Header(None)):
 
 @app.get("/api/best-bets/stats")
 def get_best_bets_stats():
-    """Return win rate and ROI stats for the performance dashboard, including market breakdown."""
+    """Return win rate and ROI stats from expert_picks for the performance dashboard."""
     try:
         resp = (
-            supabase.table("best_bets")
+            supabase.table("expert_picks")
             .select("sport, result, date, odds, market")
             .neq("result", "PENDING")
             .order("date", desc=True)
@@ -1297,8 +1297,8 @@ def get_best_bets_history(
         cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
         query = (
-            supabase.table("best_bets")
-            .select("id, date, sport, bet_label, market, odds, confidence, proba_model, result, player_name")
+            supabase.table("expert_picks")
+            .select("id, date, sport, market, match_label, odds, confidence, result, player_name, expert_note, notes")
             .gte("date", cutoff)
             .order("date", desc=True)
             .limit(300)
@@ -1308,6 +1308,10 @@ def get_best_bets_history(
 
         resp = query.execute()
         rows = resp.data or []
+
+        # Map field names for frontend compatibility
+        for r in rows:
+            r["bet_label"] = r.get("match_label") or r.get("market") or "Pick Expert"
 
         # Calculate running P&L
         resolved = [r for r in rows if r["result"] in ("WIN", "LOSS")]
@@ -1359,6 +1363,235 @@ def delete_expert_pick(pick_id: int):
         return {"deleted": True, "id": pick_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/expert-picks/resolve")
+def resolve_expert_picks(body: dict, authorization: str = Header(None)):
+    """
+    Auto-resolve PENDING expert picks by matching to finished fixtures
+    and using Gemini to evaluate WIN/LOSS from free-text bet descriptions.
+    Called by Trigger.dev cron each morning.
+    """
+    expected = f"Bearer {os.getenv('CRON_SECRET', 'super_secret_probalab_2026')}"
+    if authorization != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    date = body.get("date")
+    if not date:
+        raise HTTPException(status_code=400, detail="date required (YYYY-MM-DD)")
+
+    resolved = []
+    errors = []
+
+    # ── 1. Load pending expert picks ──────────────────────────────
+    pending = (
+        supabase.table("expert_picks")
+        .select("*")
+        .eq("date", date)
+        .eq("result", "PENDING")
+        .execute()
+    )
+    picks = pending.data or []
+
+    if not picks:
+        return {"ok": True, "date": date, "resolved": 0, "message": "No pending picks"}
+
+    # ── 2. Load finished fixtures for that date ───────────────────
+    next_day = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
+    fx_resp = (
+        supabase.table("fixtures")
+        .select("id, home_team, away_team, home_goals, away_goals, status")
+        .gte("date", f"{date}T00:00:00Z")
+        .lt("date", f"{next_day}T23:59:59Z")
+        .in_("status", ["FT", "AET", "PEN"])
+        .execute()
+    )
+    finished_fixtures = fx_resp.data or []
+
+    if not finished_fixtures:
+        return {"ok": True, "date": date, "resolved": 0, "message": "No finished fixtures"}
+
+    # Build lookup by team names (lowercased for fuzzy matching)
+    fx_list_for_search = []
+    for f in finished_fixtures:
+        fx_list_for_search.append({
+            "home": f["home_team"],
+            "away": f["away_team"],
+            "home_goals": f.get("home_goals") or 0,
+            "away_goals": f.get("away_goals") or 0,
+            "status": f["status"],
+        })
+
+    # ── 3. Setup Gemini for evaluation ────────────────────────────
+    import json as _json
+    from google import genai
+    from google.genai import types as gtypes
+
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "error": "GEMINI_API_KEY missing"}
+    gemini_client = genai.Client(api_key=api_key)
+
+    def _evaluate_bet(bet_description: str, match_label: str, score_home: int, score_away: int, home_team: str, away_team: str) -> str | None:
+        """Use Gemini to evaluate if a bet is WIN or LOSS given the final score."""
+        prompt = f"""Tu es un expert en paris sportifs. Un pari a été placé et le match est terminé.
+Détermine si le pari est GAGNÉ (WIN) ou PERDU (LOSS).
+
+Match : {home_team} vs {away_team}
+Score final : {home_team} {score_home} - {score_away} {away_team}
+
+Pari : {bet_description}
+
+Réponds UNIQUEMENT par un JSON: {{"result": "WIN"}} ou {{"result": "LOSS"}}
+"""
+        try:
+            response = gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=gtypes.GenerateContentConfig(
+                    temperature=0.0,
+                    max_output_tokens=50,
+                ),
+            )
+            text = (response.text or "").strip()
+            # Extract result
+            if "WIN" in text.upper():
+                return "WIN"
+            elif "LOSS" in text.upper():
+                return "LOSS"
+            return None
+        except Exception as e:
+            print(f"[Expert Resolve] Gemini error: {e}")
+            return None
+
+    def _fuzzy_match_fixture(match_label: str, fixtures_list: list) -> dict | None:
+        """Try to find a fixture that matches the match_label string."""
+        if not match_label:
+            return None
+        label_lower = match_label.lower().strip()
+        for fx in fixtures_list:
+            home_l = fx["home"].lower()
+            away_l = fx["away"].lower()
+            # Check if both team names appear in the label
+            if home_l in label_lower and away_l in label_lower:
+                return fx
+            # Also check partial matches (first word of team name)
+            home_first = home_l.split()[0] if home_l else ""
+            away_first = away_l.split()[0] if away_l else ""
+            if len(home_first) > 3 and len(away_first) > 3:
+                if home_first in label_lower and away_first in label_lower:
+                    return fx
+        return None
+
+    # ── 4. Process each pick ──────────────────────────────────────
+    import time as _time
+
+    for pick in picks:
+        try:
+            match_label = pick.get("match_label", "")
+            market = pick.get("market", "")
+            expert_note = pick.get("expert_note", "")
+
+            # Parse selections for combinés
+            selections = []
+            try:
+                if expert_note and expert_note.startswith("["):
+                    selections = _json.loads(expert_note)
+            except Exception:
+                pass
+
+            is_combine = len(selections) > 1
+
+            if is_combine:
+                # ── Combiné: ALL selections must WIN ──────────────
+                all_win = True
+                details = []
+                for sel in selections:
+                    sel_bet = sel.get("bet", "")
+                    sel_match = sel.get("match", "")
+                    fx = _fuzzy_match_fixture(sel_match, fx_list_for_search)
+                    if not fx:
+                        # Match not found/finished yet → can't resolve
+                        all_win = None
+                        details.append(f"⏳ {sel_match}: match non trouvé")
+                        break
+                    result = _evaluate_bet(
+                        sel_bet, sel_match,
+                        fx["home_goals"], fx["away_goals"],
+                        fx["home"], fx["away"]
+                    )
+                    _time.sleep(0.5)  # Rate limit
+                    if result == "WIN":
+                        details.append(f"✅ {sel_bet} ({fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']})")
+                    elif result == "LOSS":
+                        all_win = False
+                        details.append(f"❌ {sel_bet} ({fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']})")
+                    else:
+                        all_win = None
+                        details.append(f"❓ {sel_bet}: évaluation impossible")
+                        break
+
+                if all_win is None:
+                    errors.append({"pick_id": pick["id"], "error": "Incomplete evaluation", "details": details})
+                    continue
+
+                final_result = "WIN" if all_win else "LOSS"
+                note = " | ".join(details)
+
+            else:
+                # ── Pari simple ───────────────────────────────────
+                fx = _fuzzy_match_fixture(match_label, fx_list_for_search)
+                if not fx:
+                    # Try with selections[0].match if available
+                    if selections and selections[0].get("match"):
+                        fx = _fuzzy_match_fixture(selections[0]["match"], fx_list_for_search)
+                if not fx:
+                    continue  # Match not finished yet
+
+                bet_desc = market
+                if selections and selections[0].get("bet"):
+                    bet_desc = selections[0]["bet"]
+
+                final_result = _evaluate_bet(
+                    bet_desc, match_label,
+                    fx["home_goals"], fx["away_goals"],
+                    fx["home"], fx["away"]
+                )
+                _time.sleep(0.5)
+                if not final_result:
+                    errors.append({"pick_id": pick["id"], "error": "Gemini evaluation failed"})
+                    continue
+
+                note = f"Auto-résolu: {fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']} ({fx['status']})"
+
+            # ── Update in DB ──────────────────────────────────────
+            (
+                supabase.table("expert_picks")
+                .update({
+                    "result": final_result,
+                    "notes": note,
+                })
+                .eq("id", pick["id"])
+                .execute()
+            )
+            resolved.append({
+                "id": pick["id"],
+                "market": market,
+                "match": match_label,
+                "result": final_result,
+                "note": note,
+            })
+
+        except Exception as e:
+            errors.append({"pick_id": pick.get("id"), "error": str(e)})
+
+    return {
+        "ok": True,
+        "date": date,
+        "resolved_count": len(resolved),
+        "resolved": resolved,
+        "errors": errors,
+    }
 
 
 @app.get("/api/predictions")

@@ -110,3 +110,39 @@ export const resolveNHLBets = schedules.task({
         return { fetchResult, resolveResult };
     },
 });
+
+/**
+ * ── Resolve Expert Picks (Telegram) ────────────────────────────────
+ * Runs at 07:00 UTC (08:00 Paris). Matches expert picks to finished
+ * fixtures and uses Gemini to evaluate WIN/LOSS from free-text bets.
+ */
+export const resolveExpertPicks = schedules.task({
+    id: "resolve-expert-picks",
+    cron: "0 7 * * *",   // 07:00 UTC = 08:00 Paris
+    retry: standardRetry,
+    run: async (payload) => {
+        const yesterday = new Date(payload.timestamp);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const date = yesterday.toISOString().slice(0, 10);
+
+        console.log(`[Expert Resolve] Checking picks for ${date}`);
+
+        const res = await fetch(`${API_URL}/api/expert-picks/resolve`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${CRON_SECRET}`,
+            },
+            body: JSON.stringify({ date }),
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Expert resolve failed (${res.status}): ${text}`);
+        }
+
+        const result = await res.json();
+        console.log(`[Expert Resolve] Done:`, result);
+        return result;
+    },
+});

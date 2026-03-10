@@ -1295,18 +1295,78 @@ def get_best_bets_stats():
             s = calc_stats(bets)
             if s["total"] > 0:
                 model_market_breakdown[market] = s
+        # ── 3. Combined stats (expert + model merged) ────────────
+        all_rows = expert_rows + model_rows
+        all_football = [b for b in all_rows if b["sport"] == "football"]
+        all_nhl = [b for b in all_rows if b["sport"] == "nhl"]
+
+        # Combined market breakdown
+        combined_market_stats = defaultdict(list)
+        for b in all_rows:
+            combined_market_stats[b.get("market", "unknown")].append(b)
+        combined_market_breakdown = {}
+        for market, bets in combined_market_stats.items():
+            s = calc_stats(bets)
+            if s["total"] > 0:
+                combined_market_breakdown[market] = s
+
+        # Combined timeline
+        combined_timeline = defaultdict(lambda: {"wins": 0, "losses": 0})
+        for b in all_rows:
+            if b["result"] in ("WIN", "LOSS"):
+                d = b["date"]
+                if b["result"] == "WIN":
+                    combined_timeline[d]["wins"] += 1
+                else:
+                    combined_timeline[d]["losses"] += 1
+
+        # Combined streak (last 10)
+        all_resolved = [b for b in all_rows if b["result"] in ("WIN", "LOSS")]
+        all_resolved.sort(key=lambda b: b.get("date", ""), reverse=True)
+        combined_last_10 = [b["result"] for b in all_resolved[:10]]
+
+        # Combined cumulative P&L
+        combined_pl = {}
+        for b in all_rows:
+            if b["result"] not in ("WIN", "LOSS"):
+                continue
+            d = b["date"]
+            if d not in combined_pl:
+                combined_pl[d] = 0
+            if b["result"] == "WIN":
+                combined_pl[d] += (float(b.get("odds") or 1.85) - 1)
+            else:
+                combined_pl[d] -= 1
+        combined_cumulative = []
+        running = 0
+        for d in sorted(combined_pl.keys()):
+            running += combined_pl[d]
+            combined_cumulative.append({"date": d, "pl": round(running, 2)})
+
+        # Combined best pick
+        combined_wins = [b for b in all_resolved if b["result"] == "WIN"]
+        combined_best_pick = None
+        if combined_wins:
+            best = max(combined_wins, key=lambda b: float(b.get("odds") or 0))
+            combined_best_pick = {
+                "label": best.get("bet_label", best.get("market", "")),
+                "odds": float(best.get("odds") or 0),
+                "date": best.get("date", ""),
+                "market": best.get("market", ""),
+                "sport": best.get("sport", ""),
+            }
 
         return {
-            # Expert picks (Paris de l'Expert)
-            "global": calc_stats(expert_rows),
-            "football": calc_stats(expert_football),
-            "nhl": calc_stats(expert_nhl),
-            "by_market": expert_market_breakdown,
-            "timeline": [{"date": k, **v} for k, v in sorted(expert_timeline.items())[-30:]],
-            "last_10": expert_last_10,
-            "best_pick": expert_best_pick,
-            "cumulative_pl": expert_cumulative[-60:],
-            # Model predictions (ProbaLab IA accuracy)
+            # Combined stats (all sources)
+            "global": calc_stats(all_rows),
+            "football": calc_stats(all_football),
+            "nhl": calc_stats(all_nhl),
+            "by_market": combined_market_breakdown,
+            "timeline": [{"date": k, **v} for k, v in sorted(combined_timeline.items())[-30:]],
+            "last_10": combined_last_10,
+            "best_pick": combined_best_pick,
+            "cumulative_pl": combined_cumulative[-60:],
+            # Model predictions only (ProbaLab IA accuracy)
             "model_global": calc_stats(model_rows),
             "model_football": calc_stats(model_football),
             "model_nhl": calc_stats(model_nhl),
@@ -1321,11 +1381,28 @@ def get_best_bets_history(
     days: int = Query(30, description="Number of days to look back"),
     sport: str | None = Query(None, description="'football' | 'nhl' | None = both"),
 ):
-    """Return all resolved picks for the history table."""
+    """Return all resolved picks from both best_bets and expert_picks for the history table."""
     try:
         cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-        query = (
+        # ── 1. Fetch from best_bets (model predictions) ──────────
+        bb_query = (
+            supabase.table("best_bets")
+            .select("id, date, sport, bet_label, market, odds, confidence, result, player_name")
+            .gte("date", cutoff)
+            .order("date", desc=True)
+            .limit(300)
+        )
+        if sport:
+            bb_query = bb_query.eq("sport", sport)
+        bb_rows = bb_query.execute().data or []
+
+        # Tag source
+        for r in bb_rows:
+            r["source"] = "model"
+
+        # ── 2. Fetch from expert_picks (Telegram expert bets) ────
+        ep_query = (
             supabase.table("expert_picks")
             .select("id, date, sport, market, match_label, odds, confidence, result, player_name, expert_note, notes")
             .gte("date", cutoff)
@@ -1333,17 +1410,20 @@ def get_best_bets_history(
             .limit(300)
         )
         if sport:
-            query = query.eq("sport", sport)
-
-        resp = query.execute()
-        rows = resp.data or []
+            ep_query = ep_query.eq("sport", sport)
+        ep_rows = ep_query.execute().data or []
 
         # Map field names for frontend compatibility
-        for r in rows:
+        for r in ep_rows:
             r["bet_label"] = r.get("match_label") or r.get("market") or "Pick Expert"
+            r["source"] = "expert"
+
+        # ── 3. Merge and sort by date descending ─────────────────
+        all_rows = bb_rows + ep_rows
+        all_rows.sort(key=lambda r: r.get("date", ""), reverse=True)
 
         # Calculate running P&L
-        resolved = [r for r in rows if r["result"] in ("WIN", "LOSS")]
+        resolved = [r for r in all_rows if r["result"] in ("WIN", "LOSS")]
         total_pl = 0
         for r in resolved:
             if r["result"] == "WIN":
@@ -1352,8 +1432,8 @@ def get_best_bets_history(
                 total_pl -= 1
 
         return {
-            "picks": rows,
-            "total": len(rows),
+            "picks": all_rows[:300],
+            "total": len(all_rows),
             "resolved": len(resolved),
             "total_pl": round(total_pl, 2),
         }

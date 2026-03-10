@@ -225,7 +225,7 @@ export default function HomePage() {
                     Proba<span className="text-primary">Lab</span>
                 </h1>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                    L'intelligence artificielle au service de vos analyses sportives. Prédictions, Live Tracking et Value Bets en un coup d'œil.
+                    Des experts s'appuient sur nos algorithmes et notre IA pour sélectionner les meilleurs pronos chaque jour. Prédictions, Live Tracking et Value Bets en un coup d'œil.
                 </p>
             </div>
 
@@ -242,10 +242,10 @@ export default function HomePage() {
                 <div className="grid grid-cols-3 divide-x divide-border/20">
                     {/* Pillar 1 */}
                     <div className="p-3 text-center">
-                        <div className="text-lg mb-1">🤖</div>
-                        <div className="text-[10px] font-bold text-foreground mb-0.5">Sélection IA</div>
+                        <div className="text-lg mb-1">🧠</div>
+                        <div className="text-[10px] font-bold text-foreground mb-0.5">Experts + IA</div>
                         <div className="text-[9px] text-muted-foreground leading-tight">
-                            Pronos quotidiens analysés par intelligence artificielle
+                            Nos experts sélectionnent les pronos grâce aux probas IA
                         </div>
                     </div>
                     {/* Pillar 2 */}
@@ -258,10 +258,10 @@ export default function HomePage() {
                     </div>
                     {/* Pillar 3 */}
                     <div className="p-3 text-center">
-                        <div className="text-lg mb-1">🏦</div>
-                        <div className="text-[10px] font-bold text-foreground mb-0.5">1% Bankroll</div>
+                        <div className="text-lg mb-1">🎲</div>
+                        <div className="text-[10px] font-bold text-foreground mb-0.5">1 Fun / jour</div>
                         <div className="text-[9px] text-muted-foreground leading-tight">
-                            Gestion de capital prudente pour des gains durables
+                            Un pari fun quotidien si opportunité intéressante
                         </div>
                     </div>
                 </div>
@@ -275,7 +275,7 @@ export default function HomePage() {
                 <div className="fs-summary-bar border-b border-border/50 bg-muted/20">
                     <TrendingUp className="w-4 h-4 text-emerald-500" />
                     <span className="text-xs font-bold uppercase tracking-wider">Track Record</span>
-                    <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">Picks IA</span>
+                    <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">Picks Expert</span>
                 </div>
 
                 {/* Main metrics */}

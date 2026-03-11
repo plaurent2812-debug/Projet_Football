@@ -117,7 +117,7 @@ def _format_injuries(side: str, details: list[dict]) -> str:
 
 
 def get_active_learnings(
-    sport: str, limit: int = 5, match_context: str | None = None
+    sport: str, limit: int = 5, match_context: str = None
 ) -> list[str]:
     """Fetch learnings from AI memory, using semantic search when possible.
 

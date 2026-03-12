@@ -12,7 +12,27 @@ from __future__ import annotations
 # ═══════════════════════════════════════════════════════════════════
 
 MAX_GOALS_GRID: int = 7
-DIXON_COLES_RHO: float = -0.13  # Corrélation Dixon-Coles (typiquement -0.03 à -0.20)
+DIXON_COLES_RHO: float = -0.13  # Corrélation Dixon-Coles globale (fallback)
+
+# Rho per-ligue : calibré empiriquement selon le style de jeu et le taux de nuls.
+# Plus négatif = correction plus forte sur les scores à faible buts (0-0, 1-1...).
+# Méthode : ajuster jusqu'à ce que la proba de nul Poisson ≃ taux historique.
+DIXON_COLES_RHO_BY_LEAGUE: dict[int, float] = {
+    61: -0.14,   # Ligue 1 — défensif, taux de nuls élevé
+    62: -0.13,   # Ligue 2 — similaire à Ligue 1
+    39: -0.11,   # Premier League — jeu ouvert, peu de 0-0
+    140: -0.12,  # La Liga — équilibré
+    135: -0.16,  # Serie A — taux de nuls le plus élevé d'Europe
+    78: -0.09,   # Bundesliga — jeu rapide, peu de nuls
+    2: -0.17,    # Champions League — très tactique, nuls fréquents
+    3: -0.15,    # Europa League — défensif
+    848: -0.14,  # Conference League
+    66: -0.12,   # Coupe de France
+    45: -0.11,   # FA Cup
+    143: -0.12,  # Copa del Rey
+    137: -0.15,  # Coppa Italia
+    81: -0.10,   # DFB-Pokal
+}
 
 
 # ═══════════════════════════════════════════════════════════════════

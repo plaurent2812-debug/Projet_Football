@@ -729,9 +729,19 @@ def build_features_fast(fixture: dict, data: dict, league_cache: dict) -> dict |
     features["away_elo"] = round(a_elo, 1)
     features["elo_diff"] = round(h_elo - a_elo, 1)
 
-    # 3. Forme
+    # 3. Forme court terme (6 matchs) et long terme (12 matchs)
     features["home_form"] = round(_form_from_mem(data, home_team, match_date, home_only=True), 3)
     features["away_form"] = round(_form_from_mem(data, away_team, match_date, home_only=False), 3)
+    features["form_diff"] = round(features["home_form"] - features["away_form"], 3)
+
+    # Momentum long terme : tendance de fond sur 12 matchs (decay plus lent)
+    features["home_form_long"] = round(
+        _form_from_mem(data, home_team, match_date, home_only=True, n=12, decay=0.90), 3
+    )
+    features["away_form_long"] = round(
+        _form_from_mem(data, away_team, match_date, home_only=False, n=12, decay=0.90), 3
+    )
+    features["form_long_diff"] = round(features["home_form_long"] - features["away_form_long"], 3)
 
     # 4. Repos
     rest_h, cong_h = _rest_from_mem(data, home_team, match_date)

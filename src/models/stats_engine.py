@@ -31,6 +31,7 @@ from src.constants import (
     CROSS_LEAGUE_IDS,
     DEFAULT_ELO,
     DIXON_COLES_RHO,
+    DIXON_COLES_RHO_BY_LEAGUE,
     DRAW_FACTOR,
     DRAW_FACTOR_BY_LEAGUE,
     ELO_DECAY_RATE,
@@ -134,7 +135,7 @@ def dixon_coles_correction(
 
 
 def poisson_grid(
-    xg_home: float, xg_away: float, max_goals: int = 7
+    xg_home: float, xg_away: float, max_goals: int = 7, league_id: int | None = None
 ) -> dict[str, int | float | str]:
     """Build the Dixon-Coles adjusted Poisson probability grid.
 
@@ -142,19 +143,29 @@ def poisson_grid(
     chance) from Poisson distributions for each team's goals, corrected
     with the Dixon-Coles correlation factor for low-scoring outcomes.
 
+    Improvements vs. independent Poisson:
+    - Per-league rho (DIXON_COLES_RHO_BY_LEAGUE): accounts for each league's
+      specific defensive style and draw rate rather than a global -0.13.
+    - Draw calibration: after building the grid, gently scales the diagonal
+      to match the league's historical draw rate (DRAW_FACTOR_BY_LEAGUE).
+      This corrects the known tendency of Poisson to under-predict draws
+      in tight, tactical leagues (Serie A, CL).
+
     Args:
         xg_home: Expected goals for the home team.
         xg_away: Expected goals for the away team.
         max_goals: Upper bound (exclusive) on goals per team in the grid.
+        league_id: Optional league identifier for per-league rho and draw
+            calibration.  Falls back to global defaults when ``None``.
 
     Returns:
         Dictionary containing rounded percentage probabilities for every
         market (home/draw/away, BTTS, over lines, double chance), the most
         likely correct score, and the adjusted xG values used.
     """
-    # B1: Dynamic rho — stronger negative correlation for lower-scoring matches
-    # This captures the bivariate dependency between home/away goals
-    base_rho = -0.13  # Empirical baseline for top European leagues
+    # Per-league base rho (Dixon-Coles correlation parameter)
+    # More negative = stronger correction for low-scoring cells (0-0, 1-1…)
+    base_rho = DIXON_COLES_RHO_BY_LEAGUE.get(league_id, DIXON_COLES_RHO) if league_id else DIXON_COLES_RHO
     xg_total = xg_home + xg_away
     if xg_total < 2.0:
         rho = base_rho * 1.3  # Stronger correlation for defensive matches
@@ -179,6 +190,20 @@ def poisson_grid(
     grid_sum = grid.sum()
     if grid_sum > 0:
         grid /= grid_sum
+
+    # ── Draw calibration (per-league) ─────────────────────────────
+    # Poisson tends to under-predict draws in tactical leagues (Serie A, CL).
+    # If the predicted draw rate deviates >2% from the league's historical
+    # rate, we apply a gentle diagonal correction (capped at ±10%).
+    if league_id is not None:
+        target_draw = DRAW_FACTOR_BY_LEAGUE.get(league_id)
+        if target_draw is not None:
+            predicted_draw = float(np.trace(grid))
+            if predicted_draw > 0.01:
+                correction = target_draw / predicted_draw
+                correction = max(0.90, min(1.10, correction))  # ±10% max
+                np.fill_diagonal(grid, np.diag(grid) * correction)
+                grid /= grid.sum()  # Renormalise after diagonal shift
 
     # ── Vectorized market extraction (replaces 3 double-loops) ─
     # 1X2
@@ -1966,8 +1991,8 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
             except (ValueError, TypeError):
                 pass
 
-    # ── 4. Grille Poisson ────────────────────────────────────────
-    poisson_probs = poisson_grid(xg_home_adj, xg_away_adj)
+    # ── 4. Grille Poisson (rho per-ligue + calibration nuls) ─────
+    poisson_probs = poisson_grid(xg_home_adj, xg_away_adj, league_id=league_id)
 
     # ── 5. ELO ───────────────────────────────────────────────────
 

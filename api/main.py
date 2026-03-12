@@ -657,28 +657,45 @@ def get_best_bets(
     date: str | None = Query(None, description="ISO date YYYY-MM-DD"),
     sport: str | None = Query(None, description="'football' | 'nhl' | None = both"),
 ):
-    """Return the 5 best football + 5 best NHL bets for a given date."""
+    """Return SAFE and FUN bets for football + NHL.
+
+    SAFE: single bet, real odds between 1.9–2.3
+    FUN: combined bets, target total odds ~20
+    Legacy: football[] and nhl[] arrays preserved for backward compat.
+    """
+    import math as _math
+
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
 
-    result = {"date": date, "football": [], "nhl": []}
+    result = {
+        "date": date,
+        "football": [],
+        "nhl": [],
+        "football_safe": None,
+        "football_fun": None,
+        "nhl_safe": None,
+        "nhl_fun": None,
+    }
 
-    # ── Football best bets ────────────────────────────────────────
+    # ── Football ──────────────────────────────────────────────────
     if sport in (None, "football"):
         try:
             next_day = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
 
-            # Get fixtures for that date (all statuses — include not-started AND live/finished for tracking)
             fx_resp = (
                 supabase.table("fixtures")
-                .select("id, home_team, away_team, date, status")
+                .select("id, api_fixture_id, home_team, away_team, date, status")
                 .gte("date", f"{date}T00:00:00Z")
                 .lt("date", f"{next_day}T00:00:00Z")
                 .execute()
             )
-            fx_map = {f["id"]: f for f in (fx_resp.data or [])}
+            fixtures = fx_resp.data or []
+            fx_map = {f["id"]: f for f in fixtures}
+            api_to_fix = {f["api_fixture_id"]: f["id"] for f in fixtures}
 
             if fx_map:
+                # Fetch predictions
                 pred_resp = (
                     supabase.table("predictions")
                     .select(
@@ -688,112 +705,195 @@ def get_best_bets(
                         "analysis_text, proba_over_35"
                     )
                     .in_("fixture_id", list(fx_map.keys()))
-                    .gte("confidence_score", 6)
                     .order("confidence_score", desc=True)
                     .execute()
                 )
+                preds = pred_resp.data or []
 
-                football_bets = []
-                for p in (pred_resp.data or []):
+                # Fetch real bookmaker odds
+                api_fids = [f["api_fixture_id"] for f in fixtures]
+                odds_resp = (
+                    supabase.table("fixture_odds")
+                    .select("*")
+                    .in_("fixture_api_id", api_fids)
+                    .execute()
+                )
+                odds_map = {}
+                if odds_resp and odds_resp.data:
+                    for o in odds_resp.data:
+                        fid = api_to_fix.get(o["fixture_api_id"])
+                        if fid:
+                            odds_map[fid] = o
+
+                # ── Build all football bet candidates ─────────────
+                all_candidates = []
+                for p in preds:
                     fix = fx_map.get(p["fixture_id"])
                     if not fix:
                         continue
+                    real_odds = odds_map.get(p["fixture_id"])
+                    match_label = f"{fix['home_team']} vs {fix['away_team']}"
 
-                    # Build candidate bets from all markets
-                    probas = {
-                        "Victoire domicile": p.get("proba_home") or 0,
-                        "Match nul": p.get("proba_draw") or 0,
-                        "Victoire extérieur": p.get("proba_away") or 0,
-                        "BTTS — Les deux équipes marquent": p.get("proba_btts") or 0,
-                        "Over 2.5 buts": p.get("proba_over_2_5") or 0,
-                        "Over 1.5 buts": p.get("proba_over_15") or 0,
-                        "Over 3.5 buts": p.get("proba_over_35") or 0,
-                    }
+                    # All markets with their real odds and model probas
+                    markets = [
+                        ("Victoire domicile", real_odds.get("home_win_odds") if real_odds else None, p.get("proba_home") or 0),
+                        ("Match nul", real_odds.get("draw_odds") if real_odds else None, p.get("proba_draw") or 0),
+                        ("Victoire extérieur", real_odds.get("away_win_odds") if real_odds else None, p.get("proba_away") or 0),
+                        ("BTTS Oui", real_odds.get("btts_yes_odds") if real_odds else None, p.get("proba_btts") or 0),
+                        ("Over 1.5 buts", real_odds.get("over_15_odds") if real_odds else None, p.get("proba_over_15") or 0),
+                        ("Over 2.5 buts", real_odds.get("over_25_odds") if real_odds else None, p.get("proba_over_2_5") or 0),
+                        ("Over 3.5 buts", real_odds.get("over_35_odds") if real_odds else None, p.get("proba_over_35") or 0),
+                        ("Double Chance 1X", real_odds.get("dc_1x_odds") if real_odds else None, (p.get("proba_home") or 0) + (p.get("proba_draw") or 0)),
+                        ("Double Chance X2", real_odds.get("dc_x2_odds") if real_odds else None, (p.get("proba_draw") or 0) + (p.get("proba_away") or 0)),
+                    ]
 
-                    for market, proba in probas.items():
-                        if proba < 55:
+                    for market_name, bookmaker_odds, model_proba in markets:
+                        if model_proba < 30:
                             continue
-                        implied_odds = round(100 / proba, 2) if proba > 0 else 0
-                        # Target window: 1.65 – 2.30
-                        if not (1.65 <= implied_odds <= 2.30):
+                        # Use real odds if available, else estimate
+                        if bookmaker_odds and bookmaker_odds > 1.0:
+                            odds_val = float(bookmaker_odds)
+                            odds_source = "real"
+                        else:
+                            odds_val = round((1 / (model_proba / 100)) * 0.95, 2) if model_proba > 0 else 0
+                            odds_source = "estimated"
+
+                        if odds_val < 1.05:
                             continue
 
-                        ev_score = (proba / 100) * implied_odds - 1
-                        composite = (p.get("confidence_score") or 0) * 10 + ev_score * 50 + proba * 0.3
+                        # EV = prob * odds - 1
+                        ev = round((model_proba / 100) * odds_val - 1, 3)
 
-                        football_bets.append({
-                            "id": None,
+                        all_candidates.append({
                             "fixture_id": p["fixture_id"],
-                            "label": f"{fix['home_team']} vs {fix['away_team']} — {market}",
-                            "market": market,
-                            "odds": implied_odds,
+                            "label": f"{match_label} — {market_name}",
+                            "match": match_label,
+                            "market": market_name,
+                            "odds": odds_val,
+                            "proba_model": model_proba,
                             "confidence": p.get("confidence_score") or 0,
-                            "proba_model": proba,
-                            "is_value": bool(p.get("is_value_bet")),
-                            "ev_score": round(ev_score, 3),
-                            "composite": composite,
+                            "ev": ev,
+                            "is_value": ev > 0.03,
+                            "odds_source": odds_source,
                             "result": "PENDING",
+                            "time": fix["date"][11:16] if fix.get("date") else "",
                         })
 
-                # Sort by composite score, dedupe by fixture
-                football_bets.sort(key=lambda x: -x["composite"])
-                seen_fixtures = set()
+                # ── Football SAFE: single bet, real odds 1.9–2.3 ──
+                safe_candidates = [
+                    c for c in all_candidates
+                    if 1.90 <= c["odds"] <= 2.30 and c["odds_source"] == "real"
+                ]
+                if safe_candidates:
+                    safe_candidates.sort(key=lambda x: -x["ev"])
+                    best = safe_candidates[0]
+                    result["football_safe"] = {
+                        "type": "SAFE",
+                        "bet": best,
+                        "odds": best["odds"],
+                    }
+
+                # ── Football FUN: combined ~20, max success rate ───
+                fun_candidates = [
+                    c for c in all_candidates
+                    if c["odds"] >= 1.50 and c["proba_model"] >= 40
+                ]
+                # Dedupe by fixture (1 pick per match)
+                seen_fx = set()
+                fun_deduped = []
+                fun_candidates.sort(key=lambda x: -x["ev"])
+                for c in fun_candidates:
+                    if c["fixture_id"] not in seen_fx:
+                        fun_deduped.append(c)
+                        seen_fx.add(c["fixture_id"])
+
+                if len(fun_deduped) >= 3:
+                    # Greedy: pick bets to get total odds closest to 20
+                    TARGET = 20.0
+                    fun_deduped.sort(key=lambda x: -x["proba_model"])
+
+                    selected = []
+                    current_odds = 1.0
+                    for c in fun_deduped:
+                        new_odds = current_odds * c["odds"]
+                        if new_odds > TARGET * 1.5 and len(selected) >= 3:
+                            break
+                        selected.append(c)
+                        current_odds = new_odds
+                        if current_odds >= TARGET * 0.7 and len(selected) >= 3:
+                            break
+                        if len(selected) >= 6:
+                            break
+
+                    if len(selected) >= 3:
+                        total_odds = 1.0
+                        for s in selected:
+                            total_odds *= s["odds"]
+                        result["football_fun"] = {
+                            "type": "FUN",
+                            "bets": selected,
+                            "total_odds": round(total_odds, 2),
+                            "count": len(selected),
+                        }
+
+                # Legacy: top 5 with confidence >= 6
+                legacy = [c for c in all_candidates if c.get("confidence", 0) >= 6 and 1.65 <= c["odds"] <= 2.30]
+                legacy.sort(key=lambda x: -(x.get("confidence", 0) * 10 + x["ev"] * 50 + x["proba_model"] * 0.3))
+                seen = set()
                 top5 = []
-                for bet in football_bets:
-                    if bet["fixture_id"] not in seen_fixtures:
-                        top5.append(bet)
-                        seen_fixtures.add(bet["fixture_id"])
+                for b in legacy:
+                    if b["fixture_id"] not in seen:
+                        top5.append(b)
+                        seen.add(b["fixture_id"])
                     if len(top5) >= 5:
                         break
-
                 result["football"] = top5
 
         except Exception as e:
             result["football_error"] = str(e)
 
-
-    # ── NHL best bets ─────────────────────────────────────────────
+    # ── NHL ───────────────────────────────────────────────────────
     if sport in (None, "nhl"):
         try:
             next_day = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")
 
-            # ── Step 1: Real bookmaker odds from nhl_odds ─────────
+            # Step 1: Real bookmaker odds
             real_odds_resp = (
                 supabase.table("nhl_odds")
-                .select("player_name, bookmaker, over_odds, home_team, away_team, game_id, line")
+                .select("player_name, bookmaker, over_odds, home_team, away_team, game_id, line, market")
                 .eq("game_date", date)
-                .gte("over_odds", 1.40)    # cotes >= 1.40 uniquement
+                .gte("over_odds", 1.30)
                 .order("over_odds", desc=True)
-                .limit(200)
+                .limit(300)
                 .execute()
             )
             real_odds_raw = real_odds_resp.data or []
 
-            # Build player→best odds map (highest odds across bookmakers = best value)
+            # Build player→best odds map
             player_odds_map: dict[str, dict] = {}
             for row in real_odds_raw:
-                name = row.get("player_name", "").strip()
+                name = (row.get("player_name") or "").strip()
                 if not name:
                     continue
                 odds_val = float(row.get("over_odds") or 0)
                 if odds_val <= 1.0:
                     continue
-                existing = player_odds_map.get(name)
+                market = row.get("market", "player_points")
+                key = f"{name}_{market}"
+                existing = player_odds_map.get(key)
                 if existing is None or odds_val > existing["odds"]:
-                    player_odds_map[name] = {
+                    player_odds_map[key] = {
                         "odds": odds_val,
+                        "player_name": name,
                         "bookmaker": row.get("bookmaker", ""),
                         "home_team": row.get("home_team", ""),
                         "away_team": row.get("away_team", ""),
                         "game_id": row.get("game_id", ""),
+                        "market": market,
                         "line": float(row.get("line") or 0.5),
                     }
 
-            has_real_odds = len(player_odds_map) > 0
-
-            # ── Step 2: Model probabilities from nhl_fixtures.stats_json ────
-            # prob_point from the pipeline (~20-60%) matches the Over 0.5 Points market.
-            # nhl_data_lake.python_prob = goal probability (~5-15%) — incompatible for EV vs point props.
+            # Step 2: Model probabilities
             fixtures_resp = (
                 supabase.table("nhl_fixtures")
                 .select("home_team, away_team, stats_json")
@@ -802,125 +902,195 @@ def get_best_bets(
                 .execute()
             )
 
-            # Build model map: player_name → {ppg, prob_goal, team, ...}
             model_map: dict[str, dict] = {}
             for fx in (fixtures_resp.data or []):
-                top_players = (fx.get("stats_json") or {}).get("top_players", [])
-                for p in top_players:
+                for p in ((fx.get("stats_json") or {}).get("top_players") or []):
                     name = (p.get("player_name") or "").strip()
                     if not name or name in model_map:
                         continue
                     model_map[name] = {
-                        "ppg": float(p.get("points_per_game") or 0),     # for Poisson P(point)
+                        "ppg": float(p.get("points_per_game") or 0),
                         "prob_goal": float(p.get("prob_goal") or 0),
                         "prob_assist": float(p.get("prob_assist") or 0),
                         "team": p.get("team", ""),
                         "opp": p.get("opp", ""),
                         "is_home": p.get("is_home", 0),
-                        "algo_score_goal": p.get("algo_score_goal", 0),
                         "home_team": fx.get("home_team", ""),
                         "away_team": fx.get("away_team", ""),
                     }
 
-            # ── Step 3: Fuzzy name matching helper ────────────────
-            def normalize_name(s: str) -> str:
-                """Lowercase, remove accents & punctuation for matching."""
-                import unicodedata
+            # Step 3: Fuzzy matching
+            import unicodedata
+            def norm(s: str) -> str:
                 s = unicodedata.normalize("NFD", s.lower())
                 s = "".join(c for c in s if unicodedata.category(c) != "Mn")
                 return s.replace("-", " ").replace("'", "").strip()
 
-            # ── Step 4: Join odds + model → value bets ────────────
-            nhl_bets = []
+            norm_model = {norm(k): v for k, v in model_map.items()}
 
-            if has_real_odds:
-                # MODE A: Real odds available — only show genuine value bets
-                norm_model_map = {normalize_name(k): v for k, v in model_map.items()}
+            def find_model(player_name):
+                n = norm(player_name)
+                m = norm_model.get(n)
+                if m:
+                    return m
+                parts = n.split()
+                if len(parts) >= 2:
+                    last = parts[-1]
+                    for k, v in norm_model.items():
+                        if last in k:
+                            return v
+                return None
 
-                for player_name, odds_data in player_odds_map.items():
-                    bookie_odds = odds_data["odds"]
-                    bookie_implied_prob = 100.0 / bookie_odds  # implied prob for Over 0.5 Points
+            # ── NHL SAFE: player_points, real odds 1.9–2.3 ────────
+            nhl_safe_candidates = []
+            for key, od in player_odds_map.items():
+                if od["market"] != "player_points":
+                    continue
+                if not (1.90 <= od["odds"] <= 2.30):
+                    continue
+                md = find_model(od["player_name"])
+                if not md or md.get("ppg", 0) <= 0:
+                    continue
 
-                    # Match player to model via normalized name
-                    norm_name = normalize_name(player_name)
-                    model_data = norm_model_map.get(norm_name)
+                ppg = md["ppg"]
+                prob = round((1.0 - _math.exp(-ppg)) * 100, 1)
+                ev = round((prob / 100) * od["odds"] - 1, 3)
+                if ev <= 0:
+                    continue
 
-                    # Try partial (last name) match if exact fails
-                    if model_data is None:
-                        parts = norm_name.split()
-                        if len(parts) >= 2:
-                            last = parts[-1]
-                            for k, v in norm_model_map.items():
-                                if last in k:
-                                    model_data = v
-                                    break
+                ht = md.get("home_team") or od.get("home_team", "")
+                at = md.get("away_team") or od.get("away_team", "")
 
-                    if model_data is None:
-                        continue  # no model data → skip
+                nhl_safe_candidates.append({
+                    "label": f"{od['player_name']} Over 0.5 Points — {ht} vs {at}",
+                    "player_name": od["player_name"],
+                    "team": md.get("team", ""),
+                    "market": "player_points_over_0.5",
+                    "odds": round(od["odds"], 2),
+                    "proba_model": prob,
+                    "ev": ev,
+                    "bookmaker": od.get("bookmaker", ""),
+                    "odds_source": "real",
+                    "result": "PENDING",
+                })
 
-                    # P(Over 0.5 Points) = 1 - exp(-ppg)  [Poisson with seasonal avg]
-                    # This gives comparable probabilities to bookmaker's Over 0.5 Pts market (50-70% range)
-                    import math as _math
-                    ppg = float(model_data.get("ppg") or 0)
-                    if ppg <= 0:
+            if nhl_safe_candidates:
+                nhl_safe_candidates.sort(key=lambda x: -x["ev"])
+                result["nhl_safe"] = {
+                    "type": "SAFE",
+                    "bet": nhl_safe_candidates[0],
+                    "odds": nhl_safe_candidates[0]["odds"],
+                }
+
+            # ── NHL FUN: goals + assists combined ~20 ─────────────
+            nhl_fun_candidates = []
+            for name, md in model_map.items():
+                prob_goal = md.get("prob_goal", 0)
+                prob_assist = md.get("prob_assist", 0)
+                ht = md.get("home_team", "")
+                at = md.get("away_team", "")
+
+                # Goal prop
+                if prob_goal > 5:
+                    odds_goal = round((1 / (prob_goal / 100)) * 0.92, 2)
+                    if odds_goal >= 2.0:
+                        nhl_fun_candidates.append({
+                            "label": f"{name} Marquer un but — {ht} vs {at}",
+                            "player_name": name,
+                            "team": md.get("team", ""),
+                            "market": "player_goals_over_0.5",
+                            "odds": odds_goal,
+                            "proba_model": round(prob_goal, 1),
+                            "ev": round((prob_goal / 100) * odds_goal - 1, 3),
+                            "odds_source": "estimated",
+                            "result": "PENDING",
+                        })
+
+                # Assist prop
+                if prob_assist > 8:
+                    odds_assist = round((1 / (prob_assist / 100)) * 0.92, 2)
+                    if odds_assist >= 2.0:
+                        nhl_fun_candidates.append({
+                            "label": f"{name} Faire une passe — {ht} vs {at}",
+                            "player_name": name,
+                            "team": md.get("team", ""),
+                            "market": "player_assists_over_0.5",
+                            "odds": odds_assist,
+                            "proba_model": round(prob_assist, 1),
+                            "ev": round((prob_assist / 100) * odds_assist - 1, 3),
+                            "odds_source": "estimated",
+                            "result": "PENDING",
+                        })
+
+            if len(nhl_fun_candidates) >= 3:
+                # Sort by proba (highest success rate)
+                nhl_fun_candidates.sort(key=lambda x: -x["proba_model"])
+
+                # Greedy selection to reach ~20 odds
+                TARGET = 20.0
+                selected = []
+                current = 1.0
+                seen_players = set()
+                for c in nhl_fun_candidates:
+                    if c["player_name"] in seen_players:
                         continue
+                    new_odds = current * c["odds"]
+                    if new_odds > TARGET * 1.5 and len(selected) >= 3:
+                        break
+                    selected.append(c)
+                    current = new_odds
+                    seen_players.add(c["player_name"])
+                    if current >= TARGET * 0.7 and len(selected) >= 3:
+                        break
+                    if len(selected) >= 5:
+                        break
 
-                    point_prob_raw = 1.0 - _math.exp(-ppg)   # Poisson P(X >= 1)
-                    point_prob_pct = round(point_prob_raw * 100, 1)
+                if len(selected) >= 3:
+                    total = 1.0
+                    for s in selected:
+                        total *= s["odds"]
+                    result["nhl_fun"] = {
+                        "type": "FUN",
+                        "bets": selected,
+                        "total_odds": round(total, 2),
+                        "count": len(selected),
+                    }
 
-                    # EV = model_prob * bookie_odds - 1
-                    ev = round(point_prob_raw * bookie_odds - 1, 3)
-                    if ev <= 0:
-                        continue  # negative EV → not a value bet
-
-                    # Build label
-                    ht = model_data.get("home_team") or odds_data.get("home_team", "")
-                    at = model_data.get("away_team") or odds_data.get("away_team", "")
-                    team_abbrev = model_data.get("team", "")
-                    team_name = NHL_TEAM_NAMES.get(team_abbrev, team_abbrev)
-                    is_home = model_data.get("is_home", False)
-                    if ht and at:
-                        label = f"{player_name} Over 0.5 Points — {ht} vs {at}"
-                    else:
-                        opp = model_data.get("opp", "")
-                        home_away = "vs" if is_home else "@"
-                        label = f"{player_name} Over 0.5 Points — {team_name} {home_away} {opp}"
-
-                    nhl_bets.append({
-                        "id": None,
-                        "player_name": player_name,
-                        "team": team_abbrev,
-                        "label": label,
-                        "market": "player_points_over_0.5",
-                        "odds": round(bookie_odds, 2),
-                        "confidence": min(10, max(1, int(ev * 20))),
-                        "proba_model": round(point_prob_pct, 1),
-                        "proba_bookmaker": round(bookie_implied_prob, 1),
-                        "ev": ev,
-                        "bookmaker": odds_data.get("bookmaker", ""),
-                        "is_value": ev > 0.03,
-                        "algo_score_goal": model_data.get("algo_score_goal") or 0,
-                        "result": "PENDING",
-                        "odds_source": "real",
-                    })
-
-                # Sort by EV descending, take top 5
-                nhl_bets.sort(key=lambda x: -x["ev"])
-                result["nhl"] = nhl_bets[:5]
-                result["nhl_odds_source"] = "real"
-
-            else:
-                # MODE B: No real odds yet
-                result["nhl"] = []
-                result["nhl_note"] = (
-                    f"Les cotes bookmaker NHL pour le {date} ne sont pas encore disponibles "
-                    f"(fetch planifié à 21h). Revenez plus tard pour voir les vraies cotes."
-                )
-                result["nhl_odds_source"] = "pending"
+            # Legacy top 5
+            nhl_legacy = []
+            for key, od in player_odds_map.items():
+                if od["market"] != "player_points":
+                    continue
+                md = find_model(od["player_name"])
+                if not md or md.get("ppg", 0) <= 0:
+                    continue
+                ppg = md["ppg"]
+                prob = round((1.0 - _math.exp(-ppg)) * 100, 1)
+                ev = round((prob / 100) * od["odds"] - 1, 3)
+                if ev <= 0:
+                    continue
+                ht = md.get("home_team") or od.get("home_team", "")
+                at = md.get("away_team") or od.get("away_team", "")
+                nhl_legacy.append({
+                    "id": None,
+                    "player_name": od["player_name"],
+                    "team": md.get("team", ""),
+                    "label": f"{od['player_name']} Over 0.5 Points — {ht} vs {at}",
+                    "market": "player_points_over_0.5",
+                    "odds": round(od["odds"], 2),
+                    "proba_model": prob,
+                    "ev": ev,
+                    "bookmaker": od.get("bookmaker", ""),
+                    "is_value": ev > 0.03,
+                    "odds_source": "real",
+                    "result": "PENDING",
+                })
+            nhl_legacy.sort(key=lambda x: -x["ev"])
+            result["nhl"] = nhl_legacy[:5]
+            result["nhl_odds_source"] = "real" if player_odds_map else "pending"
 
         except Exception as e:
             result["nhl_error"] = str(e)
-
 
     # ── Enrich with saved tracking results ───────────────────────
     try:

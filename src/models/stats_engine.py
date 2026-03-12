@@ -1519,6 +1519,172 @@ def kelly_criterion(
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  11. ADVANCED ML FEATURES — Compute all missing inputs
+# ═══════════════════════════════════════════════════════════════════
+
+
+def compute_advanced_features(team_name: str, n_short: int = 5, n_long: int = 10) -> dict[str, float]:
+    """Compute advanced match features for a team from historical fixtures.
+
+    Queries the last *n_long* completed matches and derives:
+    ppg_last5, btts_rate_last10, over25_rate_last10, clean_sheet_rate,
+    goal_diff_avg, result_variance, and momentum.
+
+    Returns:
+        Dictionary with all computed features, empty dict if insufficient data.
+    """
+    results = (
+        supabase.table("fixtures")
+        .select("home_team, away_team, home_goals, away_goals")
+        .eq("status", "FT")
+        .or_(f"home_team.eq.{team_name},away_team.eq.{team_name}")
+        .order("date", desc=True)
+        .limit(n_long)
+        .execute()
+        .data
+    )
+
+    if not results or len(results) < 3:
+        return {}
+
+    points: list[int] = []
+    goal_diffs: list[int] = []
+    btts_count = 0
+    over25_count = 0
+    cs_count = 0
+
+    for r in results:
+        is_home = r["home_team"] == team_name
+        gf = r["home_goals"] if is_home else r["away_goals"]
+        ga = r["away_goals"] if is_home else r["home_goals"]
+        if gf is None or ga is None:
+            continue
+
+        if gf > ga:
+            points.append(3)
+        elif gf == ga:
+            points.append(1)
+        else:
+            points.append(0)
+
+        goal_diffs.append(gf - ga)
+        if gf > 0 and ga > 0:
+            btts_count += 1
+        if gf + ga > 2:
+            over25_count += 1
+        if ga == 0:
+            cs_count += 1
+
+    n = len(points)
+    if n == 0:
+        return {}
+
+    ppg_last5 = sum(points[: min(n_short, n)]) / min(n_short, n)
+    btts_rate = btts_count / n
+    over25_rate = over25_count / n
+    cs_rate = cs_count / n
+    gd_avg = sum(goal_diffs) / n
+
+    # Result variance (higher = more unpredictable)
+    mean_pts = sum(points) / n
+    variance = sum((p - mean_pts) ** 2 for p in points) / max(n - 1, 1) if n > 1 else 0.0
+
+    # Momentum: compare last 3 vs overall average
+    momentum = (sum(points[:3]) / 3 - mean_pts) if n >= 4 else 0.0
+
+    return {
+        "ppg_last5": round(ppg_last5, 2),
+        "btts_rate_last10": round(btts_rate, 3),
+        "over25_rate_last10": round(over25_rate, 3),
+        "clean_sheet_rate": round(cs_rate, 3),
+        "goal_diff_avg": round(gd_avg, 2),
+        "result_variance": round(variance, 3),
+        "momentum": round(momentum, 2),
+    }
+
+
+def compute_team_shot_stats(team_api_id: int, league_id: int) -> dict[str, float | None]:
+    """Compute xG-per-shot from match_team_stats for a given team/league.
+
+    Returns:
+        Dictionary with ``xg_per_shot``, or empty if no data.
+    """
+    fix_resp = (
+        supabase.table("fixtures")
+        .select("api_fixture_id")
+        .eq("league_id", league_id)
+        .in_("status", ["FT", "AET", "PEN"])
+        .execute()
+    )
+    if not fix_resp.data:
+        return {}
+
+    fixture_ids = [f["api_fixture_id"] for f in fix_resp.data]
+    all_stats: list[dict] = []
+    CHUNK = 100
+    for i in range(0, len(fixture_ids), CHUNK):
+        chunk = fixture_ids[i : i + CHUNK]
+        resp = (
+            supabase.table("match_team_stats")
+            .select("expected_goals, shots_total")
+            .eq("team_api_id", team_api_id)
+            .in_("fixture_api_id", chunk)
+            .execute()
+        )
+        if resp.data:
+            all_stats.extend(resp.data)
+
+    if not all_stats:
+        return {}
+
+    total_xg = 0.0
+    total_shots = 0
+    for s in all_stats:
+        xg = s.get("expected_goals")
+        shots = s.get("shots_total")
+        if xg is not None and shots is not None and shots > 0:
+            total_xg += xg
+            total_shots += shots
+
+    return {"xg_per_shot": round(total_xg / total_shots, 4)} if total_shots > 0 else {}
+
+
+def compute_league_rates(league_id: int) -> dict[str, float]:
+    """Compute league-level BTTS and Over 2.5 historical rates.
+
+    Returns:
+        Dictionary with ``league_avg_btts_rate`` and ``league_avg_over25_rate``.
+    """
+    results = (
+        supabase.table("fixtures")
+        .select("home_goals, away_goals")
+        .eq("league_id", league_id)
+        .in_("status", ["FT", "AET", "PEN"])
+        .execute()
+        .data
+    )
+
+    if not results or len(results) < 10:
+        return {"league_avg_btts_rate": 0.50, "league_avg_over25_rate": 0.48}
+
+    btts = over25 = total = 0
+    for r in results:
+        hg, ag = r.get("home_goals"), r.get("away_goals")
+        if hg is None or ag is None:
+            continue
+        total += 1
+        if hg > 0 and ag > 0:
+            btts += 1
+        if hg + ag > 2:
+            over25 += 1
+
+    return {
+        "league_avg_btts_rate": round(btts / max(total, 1), 3),
+        "league_avg_over25_rate": round(over25 / max(total, 1), 3),
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  MOTEUR PRINCIPAL : ANALYSER UN MATCH
 # ═══════════════════════════════════════════════════════════════════
 
@@ -1924,19 +2090,53 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
                 "xg_away": xg_away_adj,
                 "league_avg_home_goals": league_data["league_avg_home"] if league_data else None,
                 "league_avg_away_goals": league_data["league_avg_away"] if league_data else None,
-                # Phase 5 — Features avancées (values will be NaN if unavailable,
-                # handled by the imputer in ml_predictor)
-                "home_momentum": None,
-                "away_momentum": None,
+            }
+
+            # ── Compute advanced features (replace NaN-filled Phase 5/A2) ──
+            try:
+                adv_home = compute_advanced_features(home_team)
+                adv_away = compute_advanced_features(away_team)
+            except Exception:
+                adv_home, adv_away = {}, {}
+
+            ml_context.update({
+                # Phase 5 features
+                "home_momentum": adv_home.get("momentum", 0),
+                "away_momentum": adv_away.get("momentum", 0),
                 "home_fatigue_index": context.get("congestion_home", 0),
                 "away_fatigue_index": context.get("congestion_away", 0),
-                "home_goal_diff_avg": None,
-                "away_goal_diff_avg": None,
-                "home_result_variance": None,
-                "away_result_variance": None,
-                "home_clean_sheet_rate": None,
-                "away_clean_sheet_rate": None,
-            }
+                "home_goal_diff_avg": adv_home.get("goal_diff_avg", 0),
+                "away_goal_diff_avg": adv_away.get("goal_diff_avg", 0),
+                "home_result_variance": adv_home.get("result_variance", 0),
+                "away_result_variance": adv_away.get("result_variance", 0),
+                "home_clean_sheet_rate": adv_home.get("clean_sheet_rate", 0),
+                "away_clean_sheet_rate": adv_away.get("clean_sheet_rate", 0),
+            })
+
+            # Phase A2 features
+            try:
+                # xG per shot (from match_team_stats — uses 14 unused columns)
+                shot_home = compute_team_shot_stats(home_id, league_id) if home_id else {}
+                shot_away = compute_team_shot_stats(away_id, league_id) if away_id else {}
+                # League-level rates
+                league_rates = compute_league_rates(league_id)
+            except Exception:
+                shot_home, shot_away, league_rates = {}, {}, {}
+
+            ml_context.update({
+                "home_ppg_last5": adv_home.get("ppg_last5", 1.5),
+                "away_ppg_last5": adv_away.get("ppg_last5", 1.5),
+                "home_btts_rate_last10": adv_home.get("btts_rate_last10", 0.5),
+                "away_btts_rate_last10": adv_away.get("btts_rate_last10", 0.5),
+                "home_over25_rate_last10": adv_home.get("over25_rate_last10", 0.5),
+                "away_over25_rate_last10": adv_away.get("over25_rate_last10", 0.5),
+                "home_xg_per_shot": shot_home.get("xg_per_shot"),
+                "away_xg_per_shot": shot_away.get("xg_per_shot"),
+                "league_avg_btts_rate": league_rates.get("league_avg_btts_rate", 0.5),
+                "league_avg_over25_rate": league_rates.get("league_avg_over25_rate", 0.48),
+                "elo_diff_squared": (home_elo - away_elo) ** 2,
+                "form_diff": form_home - form_away,
+            })
 
             ml_preds = get_ml_predictions(ml_context)
             context["ml_predictions"] = ml_preds

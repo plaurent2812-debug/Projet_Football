@@ -132,13 +132,26 @@ def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
         raw_text = ""
         if response and response.candidates:
             for part in response.candidates[0].content.parts:
+                # Skip 'thought' parts from thinking models (2.5-flash)
+                if getattr(part, "thought", False):
+                    continue
                 if hasattr(part, "text") and part.text:
                     raw_text += part.text
+
+        # Fallback: try response.text property
         if not raw_text:
-            raw_text = getattr(response, "text", "") or ""
+            try:
+                raw_text = response.text or ""
+            except Exception:
+                raw_text = ""
+
+        if not raw_text:
+            logger.error("Gemini returned empty text. Candidates: %s", response.candidates if response else "None")
+            return {"error": "Gemini a retourné une réponse vide. Réessaie avec un screenshot plus net."}
 
         # Clean JSON (remove markdown fences if any)
         raw_text = raw_text.strip()
+        logger.info("Gemini raw response: %s", raw_text[:300])
 
         parsed = _extract_json_robust(raw_text)
         if parsed is None:
@@ -160,10 +173,10 @@ def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
         return parsed
 
     except json.JSONDecodeError as e:
-        logger.error("JSON parse error: %s | raw: %s", e, raw_text[:200])
+        logger.error("JSON parse error: %s | raw: %s", e, raw_text[:500] if raw_text else "(empty)")
         return {"error": f"Impossible de parser la réponse Gemini: {e}"}
     except Exception as e:
-        logger.error("Gemini Vision error: %s", e)
+        logger.error("Gemini Vision error: %s", e, exc_info=True)
         return {"error": str(e)}
 
 

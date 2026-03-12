@@ -120,9 +120,9 @@ def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
         if caption:
             user_text += f"\n\nNote de l'expert : {caption}"
 
-        # Use gemini-2.0-flash (non-thinking, fast, reliable for JSON)
-        # NOT 2.5-flash which has thinking mode that causes empty responses
-        models_to_try = ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
+        # gemini-2.5-flash-lite: non-thinking, fast, returns clean JSON
+        # gemini-2.5-flash: fallback (thinking model, response needs JSON extraction)
+        models_to_try = ["gemini-2.5-flash-lite", "gemini-2.5-flash"]
 
         for model_name in models_to_try:
             try:
@@ -144,7 +144,6 @@ def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
                         system_instruction=SYSTEM_PROMPT,
                         temperature=0.1,
                         max_output_tokens=2048,
-                        response_mime_type="application/json",
                     ),
                 )
 

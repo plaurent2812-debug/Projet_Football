@@ -113,8 +113,11 @@ def train_stacking_ensemble(
             X_scaled = scaler.fit_transform(X_train)
             model.fit(X_scaled, y_train)
             fitted_base[name] = {"model": model, "scaler": scaler}
-        else:
+        elif name == "xgboost":
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
+            fitted_base[name] = {"model": model}
+        else:
+            model.fit(X_train, y_train)
             fitted_base[name] = {"model": model}
 
     # ── Couche 2 : Meta-Learner ──────────────────────────────────
@@ -280,7 +283,7 @@ def _generate_oof_predictions(
                 fold_model.fit(X_fold_train_s, y_fold_train)
                 oof_probas[fold_val] = fold_model.predict_proba(X_fold_val_s)
             else:
-                fold_model.fit(X_fold_train, y_fold_train, verbose=False)
+                fold_model.fit(X_fold_train, y_fold_train)
                 oof_probas[fold_val] = fold_model.predict_proba(X_fold_val)
 
         oof[name] = oof_probas

@@ -779,18 +779,74 @@ def get_best_bets(
                             "time": fix["date"][11:16] if fix.get("date") else "",
                         })
 
-                # ── Football SAFE: single bet, real odds 1.9–2.3 ──
-                safe_candidates = [
-                    c for c in all_candidates
-                    if 1.90 <= c["odds"] <= 2.30 and c["odds_source"] == "real"
-                ]
-                if safe_candidates:
-                    safe_candidates.sort(key=lambda x: -x["ev"])
-                    best = safe_candidates[0]
+                # ── Football SAFE: 1 match, 1-2 markets, odds 1.9–2.5 ──
+                SAFE_MIN, SAFE_MAX = 1.90, 2.50
+
+                # Group candidates by fixture for combo building
+                by_fixture: dict[str, list] = {}
+                for c in all_candidates:
+                    by_fixture.setdefault(c["fixture_id"], []).append(c)
+
+                safe_options = []
+
+                for fid, cands in by_fixture.items():
+                    real_cands = [c for c in cands if c["odds_source"] == "real"]
+
+                    # Option A: Single market in range
+                    for c in real_cands:
+                        if SAFE_MIN <= c["odds"] <= SAFE_MAX:
+                            safe_options.append({
+                                "fixture_id": fid,
+                                "match": c["match"],
+                                "time": c.get("time", ""),
+                                "picks": [c["market"]],
+                                "label": f"{c['match']} — {c['market']}",
+                                "odds": c["odds"],
+                                "proba_model": c["proba_model"],
+                                "ev": c["ev"],
+                                "odds_source": "real",
+                                "category": "safe_football",
+                                "result": "PENDING",
+                            })
+
+                    # Option B: Combine 2 markets on same match
+                    # Compatible pairs: (1X2/DC) + (BTTS/Over)
+                    outcome_markets = [c for c in real_cands if c["market"] in (
+                        "Victoire domicile", "Victoire extérieur", "Match nul",
+                        "Double Chance 1X", "Double Chance X2")]
+                    goal_markets = [c for c in real_cands if c["market"] in (
+                        "BTTS Oui", "Over 1.5 buts", "Over 2.5 buts")]
+
+                    for om in outcome_markets:
+                        for gm in goal_markets:
+                            combo_odds = round(om["odds"] * gm["odds"], 2)
+                            if SAFE_MIN <= combo_odds <= SAFE_MAX:
+                                # Combined proba ≈ P(A) × P(B) × correlation factor
+                                combo_proba = round(
+                                    (om["proba_model"] / 100) * (gm["proba_model"] / 100) * 1.08 * 100, 1
+                                )
+                                combo_ev = round((combo_proba / 100) * combo_odds - 1, 3)
+                                safe_options.append({
+                                    "fixture_id": fid,
+                                    "match": om["match"],
+                                    "time": om.get("time", ""),
+                                    "picks": [om["market"], gm["market"]],
+                                    "label": f"{om['match']} — {om['market']} + {gm['market']}",
+                                    "odds": combo_odds,
+                                    "proba_model": combo_proba,
+                                    "ev": combo_ev,
+                                    "odds_source": "real",
+                                    "category": "safe_football",
+                                    "result": "PENDING",
+                                })
+
+                if safe_options:
+                    safe_options.sort(key=lambda x: -x["ev"])
+                    best_safe = safe_options[0]
                     result["football_safe"] = {
                         "type": "SAFE",
-                        "bet": best,
-                        "odds": best["odds"],
+                        "bet": best_safe,
+                        "odds": best_safe["odds"],
                     }
 
                 # ── Football FUN: combined ~20, max success rate ───
@@ -941,12 +997,13 @@ def get_best_bets(
                             return v
                 return None
 
-            # ── NHL SAFE: player_points, real odds 1.9–2.3 ────────
-            nhl_safe_candidates = []
+            # ── NHL SAFE: 1-2 players, real odds 1.9–2.5 ─────────
+            NHL_SAFE_MIN, NHL_SAFE_MAX = 1.90, 2.50
+
+            # Build individual player point bets with positive EV
+            point_bets = []
             for key, od in player_odds_map.items():
                 if od["market"] != "player_points":
-                    continue
-                if not (1.90 <= od["odds"] <= 2.30):
                     continue
                 md = find_model(od["player_name"])
                 if not md or md.get("ppg", 0) <= 0:
@@ -961,25 +1018,56 @@ def get_best_bets(
                 ht = md.get("home_team") or od.get("home_team", "")
                 at = md.get("away_team") or od.get("away_team", "")
 
-                nhl_safe_candidates.append({
-                    "label": f"{od['player_name']} Over 0.5 Points — {ht} vs {at}",
+                point_bets.append({
                     "player_name": od["player_name"],
                     "team": md.get("team", ""),
+                    "label": f"{od['player_name']} Over 0.5 Points — {ht} vs {at}",
                     "market": "player_points_over_0.5",
                     "odds": round(od["odds"], 2),
                     "proba_model": prob,
                     "ev": ev,
                     "bookmaker": od.get("bookmaker", ""),
                     "odds_source": "real",
-                    "result": "PENDING",
+                    "game_label": f"{ht} vs {at}",
                 })
 
-            if nhl_safe_candidates:
-                nhl_safe_candidates.sort(key=lambda x: -x["ev"])
+            nhl_safe_options = []
+
+            # Option A: Single player in range
+            for b in point_bets:
+                if NHL_SAFE_MIN <= b["odds"] <= NHL_SAFE_MAX:
+                    nhl_safe_options.append({
+                        "bets": [b],
+                        "label": b["label"],
+                        "odds": b["odds"],
+                        "ev": b["ev"],
+                        "category": "safe_nhl",
+                    })
+
+            # Option B: Combine 2 players (different games preferred)
+            for i in range(len(point_bets)):
+                for j in range(i + 1, len(point_bets)):
+                    b1, b2 = point_bets[i], point_bets[j]
+                    combo_odds = round(b1["odds"] * b2["odds"], 2)
+                    if NHL_SAFE_MIN <= combo_odds <= NHL_SAFE_MAX:
+                        combo_ev = round(
+                            (b1["proba_model"] / 100) * (b2["proba_model"] / 100) * combo_odds - 1, 3
+                        )
+                        nhl_safe_options.append({
+                            "bets": [b1, b2],
+                            "label": f"{b1['player_name']} + {b2['player_name']} Over 0.5 Points",
+                            "odds": combo_odds,
+                            "ev": combo_ev,
+                            "category": "safe_nhl",
+                        })
+
+            if nhl_safe_options:
+                nhl_safe_options.sort(key=lambda x: -x["ev"])
+                best_nhl_safe = nhl_safe_options[0]
                 result["nhl_safe"] = {
                     "type": "SAFE",
-                    "bet": nhl_safe_candidates[0],
-                    "odds": nhl_safe_candidates[0]["odds"],
+                    "bet": best_nhl_safe,
+                    "odds": best_nhl_safe["odds"],
                 }
 
             # ── NHL FUN: goals + assists combined ~20 ─────────────
@@ -1092,7 +1180,7 @@ def get_best_bets(
         except Exception as e:
             result["nhl_error"] = str(e)
 
-    # ── Enrich with saved tracking results ───────────────────────
+    # ── Auto-save SAFE/FUN bets to best_bets for tracking ─────────
     try:
         saved = (
             supabase.table("best_bets")
@@ -1100,23 +1188,96 @@ def get_best_bets(
             .eq("date", date)
             .execute()
         )
-        saved_map = {}
-        for s in (saved.data or []):
-            saved_map[s["bet_label"]] = s
+        saved_labels = {s["bet_label"]: s for s in (saved.data or [])}
 
-        for bet in result["football"]:
-            if bet["label"] in saved_map:
-                s = saved_map[bet["label"]]
+        def _auto_save(label, sport_name, category, odds, proba, fid=None, pname=None):
+            """Save bet if not already tracked."""
+            if label in saved_labels:
+                return saved_labels[label]
+            try:
+                row = {
+                    "date": date,
+                    "sport": sport_name,
+                    "bet_label": label,
+                    "market": category,
+                    "odds": odds,
+                    "proba_model": proba,
+                    "confidence": 7,
+                    "result": "PENDING",
+                }
+                if fid:
+                    row["fixture_id"] = fid
+                if pname:
+                    row["player_name"] = pname
+                resp = supabase.table("best_bets").insert(row).execute()
+                if resp.data:
+                    saved_labels[label] = resp.data[0]
+                    return resp.data[0]
+            except Exception:
+                pass
+            return None
+
+        # Auto-save football SAFE
+        if result.get("football_safe"):
+            bet = result["football_safe"]["bet"]
+            s = _auto_save(
+                bet["label"], "football", "safe_football",
+                bet["odds"], bet.get("proba_model", 0),
+                fid=bet.get("fixture_id")
+            )
+            if s:
+                bet["id"] = s.get("id")
+                bet["result"] = s.get("result", "PENDING")
+
+        # Auto-save football FUN
+        if result.get("football_fun"):
+            for bet in result["football_fun"]["bets"]:
+                s = _auto_save(
+                    bet["label"], "football", "fun_football",
+                    bet["odds"], bet.get("proba_model", 0),
+                    fid=bet.get("fixture_id")
+                )
+                if s:
+                    bet["id"] = s.get("id")
+                    bet["result"] = s.get("result", "PENDING")
+
+        # Auto-save NHL SAFE
+        if result.get("nhl_safe"):
+            nhl_safe_data = result["nhl_safe"]["bet"]
+            for bet in nhl_safe_data.get("bets", []):
+                s = _auto_save(
+                    bet["label"], "nhl", "safe_nhl",
+                    bet["odds"], bet.get("proba_model", 0),
+                    pname=bet.get("player_name")
+                )
+                if s:
+                    bet["id"] = s.get("id")
+                    bet["result"] = s.get("result", "PENDING")
+
+        # Auto-save NHL FUN
+        if result.get("nhl_fun"):
+            for bet in result["nhl_fun"]["bets"]:
+                s = _auto_save(
+                    bet["label"], "nhl", "fun_nhl",
+                    bet["odds"], bet.get("proba_model", 0),
+                    pname=bet.get("player_name")
+                )
+                if s:
+                    bet["id"] = s.get("id")
+                    bet["result"] = s.get("result", "PENDING")
+
+        # Enrich legacy arrays
+        for bet in result.get("football", []):
+            if bet.get("label") in saved_labels:
+                s = saved_labels[bet["label"]]
                 bet["id"] = s["id"]
                 bet["result"] = s.get("result", "PENDING")
-                bet["notes"] = s.get("notes", "")
 
-        for bet in result["nhl"]:
-            if bet["label"] in saved_map:
-                s = saved_map[bet["label"]]
+        for bet in result.get("nhl", []):
+            if bet.get("label") in saved_labels:
+                s = saved_labels[bet["label"]]
                 bet["id"] = s["id"]
                 bet["result"] = s.get("result", "PENDING")
-                bet["notes"] = s.get("notes", "")
 
     except Exception:
         pass

@@ -1904,6 +1904,8 @@ def get_expert_picks(
     sport: str | None = Query(None, description="'nhl' | 'football' | None = all"),
 ):
     """Return expert picks (submitted via Telegram bot) for a given date."""
+    import json as _json
+
     if not date:
         date = datetime.now().strftime("%Y-%m-%d")
     try:
@@ -1916,7 +1918,95 @@ def get_expert_picks(
         if sport:
             query = query.eq("sport", sport)
         resp = query.execute()
-        return {"date": date, "picks": resp.data or []}
+
+        picks = resp.data or []
+
+        # Enrich each pick with structured data for frontend display
+        for pick in picks:
+            # Parse selections from expert_note (combinés store JSON here)
+            selections = []
+            expert_note = pick.get("expert_note", "") or ""
+            try:
+                parsed_note = _json.loads(expert_note)
+                if isinstance(parsed_note, list):
+                    selections = parsed_note
+            except (ValueError, TypeError):
+                pass
+
+            # If no selections from expert_note, build from market/match_label
+            if not selections:
+                bet_text = pick.get("market", "")
+                match_text = pick.get("match_label", "")
+                if bet_text or match_text:
+                    selections = [{"bet": bet_text, "match": match_text}]
+
+            # Enrich each selection with structured fields
+            enriched_selections = []
+            for sel in selections:
+                bet_raw = sel.get("bet", "")
+                match_raw = sel.get("match", "")
+
+                # Detect player name (last capitalized word before "Over" or entire bet)
+                player_name = None
+                if "Over" in bet_raw:
+                    player_name = bet_raw.split(" Over")[0].strip()
+                elif "Buteur" in bet_raw:
+                    player_name = bet_raw.split(" Buteur")[0].strip()
+
+                # Detect market type
+                market_type = bet_raw
+                if player_name:
+                    market_type = bet_raw.replace(player_name, "").strip()
+                    if market_type.startswith("Over 0.5 Points"):
+                        market_type = "Points du joueur : 1 ou plus"
+                    elif market_type.startswith("Over 0.5 Assists"):
+                        market_type = "Passes décisives du joueur : 1 ou plus"
+                    elif market_type.startswith("Over 0.5 Goals") or "Buteur" in market_type:
+                        market_type = "Buts du joueur : 1 ou plus"
+
+                # Detect if MyMatch (2+ bets from same match)
+                is_mymatch = sel.get("is_mymatch", False)
+
+                enriched_selections.append({
+                    "match": match_raw,
+                    "market": market_type,
+                    "player_name": player_name,
+                    "bet_raw": bet_raw,
+                    "is_mymatch": is_mymatch,
+                })
+
+            pick["selections"] = enriched_selections
+            pick["is_combine"] = len(enriched_selections) > 1
+
+            # Determine bet type (Safe / Fun / Expert)
+            odds_val = float(pick.get("odds") or 0)
+            market = (pick.get("market") or "").lower()
+            if "safe" in market:
+                pick["bet_type"] = "SAFE"
+            elif "fun" in market:
+                pick["bet_type"] = "FUN"
+            elif 1.5 <= odds_val <= 2.5:
+                pick["bet_type"] = "SAFE"
+            elif odds_val >= 10:
+                pick["bet_type"] = "FUN"
+            else:
+                pick["bet_type"] = "EXPERT"
+
+            # Detect MyMatch at pick level (multiple selections from same match)
+            match_names = [s["match"] for s in enriched_selections if s.get("match")]
+            unique_matches = set(match_names)
+            has_mymatch = False
+            if len(match_names) > len(unique_matches):
+                has_mymatch = True
+                # Mark selections that share a match
+                for m in unique_matches:
+                    same_match = [s for s in enriched_selections if s.get("match") == m]
+                    if len(same_match) > 1:
+                        for s in same_match:
+                            s["is_mymatch"] = True
+            pick["has_mymatch"] = has_mymatch
+
+        return {"date": date, "picks": picks}
     except Exception as e:
         return {"date": date, "picks": [], "error": str(e)}
 

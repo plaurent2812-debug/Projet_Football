@@ -2265,6 +2265,22 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             context["ml_calibrated"] = False  # Non-critical: predictions work without calibration
 
+    # ── 10b. Soft cap — probas 1X2 plafonnées à 80% ──────────────
+    # In professional football, even heavy mismatches rarely exceed 80%.
+    # Capping prevents compounding factors (form + injury + ELO + ML)
+    # from producing unrealistic extremes, then renormalize to 100%.
+    MAX_WIN_PROB = 80
+    if final_home > MAX_WIN_PROB:
+        excess = final_home - MAX_WIN_PROB
+        final_home = MAX_WIN_PROB
+        final_draw = round(final_draw + excess * 0.4)
+        final_away = 100 - final_home - final_draw
+    elif final_away > MAX_WIN_PROB:
+        excess = final_away - MAX_WIN_PROB
+        final_away = MAX_WIN_PROB
+        final_draw = round(final_draw + excess * 0.4)
+        final_home = 100 - final_draw - final_away
+
     # ── 10. Résultat final ────────────────────────────────────────
     result = {
         "proba_home": final_home,

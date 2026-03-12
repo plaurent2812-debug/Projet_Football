@@ -525,6 +525,19 @@ def blend_predictions(stats_result: dict, ai_result: AIFeatures | None) -> dict:
         # Indiquer la version (features_v1 = Phase 1 de la refonte sans ML finalisé)
         final["model_version"] = "features_v1"
 
+    # Soft cap : 80% max on any 1X2 outcome (professional football realistic ceiling)
+    _MAX_WIN = 80
+    if final.get("proba_home", 0) > _MAX_WIN:
+        _excess = final["proba_home"] - _MAX_WIN
+        final["proba_home"] = _MAX_WIN
+        final["proba_draw"] = round(final.get("proba_draw", 10) + _excess * 0.4)
+        final["proba_away"] = 100 - final["proba_home"] - final["proba_draw"]
+    elif final.get("proba_away", 0) > _MAX_WIN:
+        _excess = final["proba_away"] - _MAX_WIN
+        final["proba_away"] = _MAX_WIN
+        final["proba_draw"] = round(final.get("proba_draw", 10) + _excess * 0.4)
+        final["proba_home"] = 100 - final["proba_draw"] - final["proba_away"]
+
     # Pour l'instant on reprend la recommandation 100% issue des stats (Phase 1)
     final["recommended_bet"] = stats_result.get("recommended_bet", "")
     final["confidence_score"] = stats_result.get("confidence_score", 5)
@@ -759,7 +772,7 @@ def run_brain() -> None:
                 "confidence_score": final.get("confidence_score", 5),
                 "likely_scorer": final.get("likely_scorer"),
                 "likely_scorer_proba": final.get("likely_scorer_proba"),
-                "model_version": "v1",  # Reset à v1 en DB d'après la phase 0
+                "model_version": final.get("model_version", "hybrid_v3"),
                 "stats_json": final.get("stats_json"),
                 "ai_features": final.get("ai_features", {}),  # Nouveau champ
             }

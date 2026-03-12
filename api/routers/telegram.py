@@ -102,11 +102,11 @@ def _save_expert_pick(pick: dict, chat_id: int) -> bool:
         else:
             expert_note = pick.get("expert_note", "")
 
-        # Cap odds to 999.99 (column is numeric(5,2))
+        # Parse odds value
         odds_val = pick.get("odds")
         if odds_val is not None:
             try:
-                odds_val = min(float(odds_val), 999.99)
+                odds_val = round(float(odds_val), 2)
             except (ValueError, TypeError):
                 odds_val = None
 
@@ -123,7 +123,22 @@ def _save_expert_pick(pick: dict, chat_id: int) -> bool:
             "telegram_msg_id": str(chat_id),
         }
         logger.info("Saving expert pick: odds=%s market=%s", odds_val, market)
-        supabase.table("expert_picks").insert(record).execute()
+
+        try:
+            supabase.table("expert_picks").insert(record).execute()
+        except Exception as insert_err:
+            # If numeric overflow, retry without odds (store in expert_note)
+            if "numeric field overflow" in str(insert_err):
+                logger.warning("Odds %s overflows column, storing in expert_note", odds_val)
+                if expert_note:
+                    expert_note = f"[odds={odds_val}] {expert_note}"
+                else:
+                    expert_note = f"[odds={odds_val}]"
+                record["odds"] = None
+                record["expert_note"] = expert_note
+                supabase.table("expert_picks").insert(record).execute()
+            else:
+                raise
         logger.info("Expert pick saved: %s", record)
         return True
     except Exception as e:

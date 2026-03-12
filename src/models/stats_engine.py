@@ -36,9 +36,14 @@ from src.constants import (
     ELO_DECAY_RATE,
     ELO_DRAW_DECAY_RATE,
     EURO_COMP_DRAW_BOOST,
+    FORM_DECAY_LONG,
+    FORM_LOOKBACK_LONG,
+    FORM_WEIGHT_LONG,
+    FORM_WEIGHT_SHORT,
     HOME_ELO_ADVANTAGE,
     HOME_XG_BONUS,
     K_FACTOR,
+    K_FACTOR_BY_LEAGUE,
     KELLY_FRACTION,
     KELLY_MAX_BET_FRACTION,
     MIN_VALUE_EDGE,
@@ -61,11 +66,26 @@ from src.constants import (
 )
 from scipy.stats import poisson
 
-# Import calibration (optionnel — n'échoue pas si pas encore de données)
-# ⚠️ DÉSACTIVÉ : la calibration actuelle (entraînée sur peu de données) crée une
-# "fonction en escalier" qui écrase les différences entre matchs proches.
-# → Réactiver quand on aura 500+ prédictions historiques pour un isotonic smooth.
-CALIBRATION_AVAILABLE = False
+# Import calibration — activée dynamiquement selon le volume de données disponibles.
+# Platt scaling : actif dès 100 prédictions évaluées.
+# Isotonic regression : actif dès 500 prédictions (évite la "fonction en escalier").
+def _check_calibration_available() -> bool:
+    """Return True if enough evaluated predictions exist to apply calibration."""
+    try:
+        resp = supabase.table("prediction_results").select("id").limit(100).execute()
+        return len(resp.data) >= 100
+    except Exception:
+        return False
+
+
+CALIBRATION_AVAILABLE = _check_calibration_available()
+
+# Import calibration (optionnel)
+if CALIBRATION_AVAILABLE:
+    try:
+        from src.models.calibrate import apply_calibration
+    except ImportError:
+        CALIBRATION_AVAILABLE = False
 
 # Import modèles ML entraînés (optionnel)
 try:
@@ -653,8 +673,10 @@ def update_elo_from_results() -> dict[int, float]:
         else:
             h_act, a_act = 0.0, 1.0
 
-        elos[hid] = elo_update(elos[hid], h_exp, h_act, goal_diff=gd)
-        elos[aid] = elo_update(elos[aid], a_exp, a_act, goal_diff=gd)
+        # K-factor dynamique : CL/EL comptent plus, coupes nationales moins
+        k = K_FACTOR_BY_LEAGUE.get(fix.get("league_id"), K_FACTOR)
+        elos[hid] = elo_update(elos[hid], h_exp, h_act, k=k, goal_diff=gd)
+        elos[aid] = elo_update(elos[aid], a_exp, a_act, k=k, goal_diff=gd)
 
     # Sauvegarder
     batch = [{"team_api_id": tid, "elo_rating": round(r, 1)} for tid, r in elos.items()]
@@ -1824,10 +1846,22 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     # Forme (récente pondérée avec Strength of Schedule)
     form_home, form_letters_h = calculate_form(home_team, home_only=True, name_to_elo=name_to_elo)
     form_away, form_letters_a = calculate_form(away_team, home_only=False, name_to_elo=name_to_elo)
-    form_factor_h = 0.85 + form_home * 0.30  # Range: 0.85 - 1.15
-    form_factor_a = 0.85 + form_away * 0.30
     context["form_home"] = "".join(form_letters_h)
     context["form_away"] = "".join(form_letters_a)
+
+    # Momentum long terme (12 matchs, decay lent) — capture la tendance de fond
+    form_long_home, _ = calculate_form(
+        home_team, n=FORM_LOOKBACK_LONG, decay=FORM_DECAY_LONG, home_only=True, name_to_elo=name_to_elo
+    )
+    form_long_away, _ = calculate_form(
+        away_team, n=FORM_LOOKBACK_LONG, decay=FORM_DECAY_LONG, home_only=False, name_to_elo=name_to_elo
+    )
+    context["form_long_home"] = round(form_long_home, 3)
+    context["form_long_away"] = round(form_long_away, 3)
+
+    # form_factor = 70% forme courte (6 matchs) + 30% tendance longue (12 matchs)
+    form_factor_h = FORM_WEIGHT_SHORT * (0.85 + form_home * 0.30) + FORM_WEIGHT_LONG * (0.85 + form_long_home * 0.30)
+    form_factor_a = FORM_WEIGHT_SHORT * (0.85 + form_away * 0.30) + FORM_WEIGHT_LONG * (0.85 + form_long_away * 0.30)
 
     # Repos
     rest_h, rest_days_h, congestion_h, severe_h = calculate_rest_factor(home_team, match_date)
@@ -2136,6 +2170,10 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
                 "league_avg_over25_rate": league_rates.get("league_avg_over25_rate", 0.48),
                 "elo_diff_squared": (home_elo - away_elo) ** 2,
                 "form_diff": form_home - form_away,
+                # Momentum long terme (12 matchs)
+                "home_form_long": form_long_home,
+                "away_form_long": form_long_away,
+                "form_long_diff": form_long_home - form_long_away,
             })
 
             ml_preds = get_ml_predictions(ml_context)

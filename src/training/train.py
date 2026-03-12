@@ -37,6 +37,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.metrics import accuracy_score, brier_score_loss, f1_score, log_loss
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from sklearn.preprocessing import LabelEncoder
+from sklearn.utils.class_weight import compute_sample_weight
 
 # Silence Optuna's verbose output
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -299,12 +300,24 @@ def train_classifier(
 
     model = xgb.XGBClassifier(**params)
 
+    # Pondération des classes pour corriger le déséquilibre naturel
+    # 1X2 : ~40% Home / ~25% Draw / ~35% Away → sans correction, le modèle sur-prédit Home
+    sample_weight_train = compute_sample_weight(class_weight="balanced", y=y_train)
+
     # Cross-validation temporelle (5 folds)
-    cv_scores = cross_val_score(model, X_train, y_train, cv=tscv, scoring="accuracy")
+    cv_scores = cross_val_score(
+        model, X_train, y_train, cv=tscv, scoring="accuracy",
+        fit_params={"sample_weight": sample_weight_train},
+    )
     logger.info(f"  CV Accuracy (temporal) : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
     # Entraînement final
-    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
+    model.fit(
+        X_train, y_train,
+        sample_weight=sample_weight_train,
+        eval_set=[(X_test, y_test)],
+        verbose=False,
+    )
 
     # Évaluation
     y_pred = model.predict(X_test)

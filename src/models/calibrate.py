@@ -6,10 +6,11 @@ calibrate.py — Calibration ML des probabilités.
 Utilise les résultats passés pour ajuster les prédictions futures.
 
 Techniques :
-  1. Platt Scaling (régression logistique) par type de pari
+  1. Platt Scaling (régression logistique) par type de pari — actif dès 100 échantillons
   2. Analyse de biais par ligue
   3. Pondération par confiance
-  4. Isotonic Regression si assez de données
+  4. Isotonic Regression si assez de données — actif dès 500 échantillons
+     (évite la "fonction en escalier" avec peu de données)
 
 Le modèle est recalculé à chaque appel et les paramètres sont
 sauvegardés dans la table `calibration` de Supabase.
@@ -18,12 +19,20 @@ from collections.abc import Callable
 
 import numpy as np
 from src.config import logger, supabase
+from src.constants import MIN_CALIBRATION_SAMPLES, MIN_ISOTONIC_SAMPLES
 from numpy.typing import NDArray
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss
 
-MIN_SAMPLES: int = 20  # Minimum de matchs pour calibrer
+# Seuil minimum pour que les algorithmes de fitting fonctionnent correctement
+MIN_SAMPLES: int = 20  # Seuil bas pour fit_platt_scaling / fit_isotonic_calibration
+# Seuils de confiance pour apply_calibration (importés de constants) :
+#   MIN_CALIBRATION_SAMPLES = 100  → Platt scaling fiable
+#   MIN_ISOTONIC_SAMPLES    = 500  → Isotonic sans "fonction en escalier"
+
+# Cache en mémoire des modèles isotonic (évite de refitter à chaque prédiction)
+_isotonic_cache: dict[str, IsotonicRegression | None] = {}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -278,12 +287,14 @@ def calibrate_all(results: list[dict], league_id: int | None = None) -> list[dic
 
 
 def apply_calibration(raw_prob: int, bet_type: str, league_id: int | None = None) -> int:
-    """Apply Platt scaling to a raw probability.
+    """Apply calibration to a raw probability.
 
-    Retrieves stored calibration parameters and transforms *raw_prob*
-    through ``sigmoid(a * x + b)``.  If no calibration data is available
-    or the sample size is below :data:`MIN_SAMPLES`, returns the input
-    unchanged.
+    Strategy:
+      - ``sample_size >= MIN_ISOTONIC_SAMPLES`` (500) : Isotonic Regression
+        (non-parametric, captures non-linearities, smooth with enough data).
+      - ``sample_size >= MIN_SAMPLES`` (100) : Platt Scaling (logistic regression,
+        parametric and robust with moderate data).
+      - Otherwise: returns *raw_prob* unchanged.
 
     Args:
         raw_prob: Raw probability in percent (0–100).
@@ -293,24 +304,30 @@ def apply_calibration(raw_prob: int, bet_type: str, league_id: int | None = None
     Returns:
         Calibrated probability in percent (0–100).
     """
-    # Chercher les paramètres de calibration
     calib: dict | None = _get_calibration_params(bet_type, league_id)
     if not calib:
         return raw_prob
 
-    a: float = calib.get("platt_a", 1.0)
-    b: float = calib.get("platt_b", 0.0)
+    sample_size: int = calib.get("sample_size", 0)
 
-    # Si pas assez d'échantillons, ne pas calibrer
-    if calib.get("sample_size", 0) < MIN_SAMPLES:
+    # ── Isotonic regression (500+ samples) ────────────────────────
+    if sample_size >= MIN_ISOTONIC_SAMPLES:
+        iso = _get_or_fit_isotonic(bet_type, league_id)
+        if iso is not None:
+            x: float = raw_prob / 100.0
+            calibrated: float = float(iso.predict([x])[0])
+            return round(calibrated * 100)
+
+    # ── Platt scaling (100+ samples) ──────────────────────────────
+    if sample_size < MIN_SAMPLES:
         return raw_prob
 
-    # Sigmoid(a * x + b)
-    x: float = raw_prob / 100.0
+    a: float = calib.get("platt_a", 1.0)
+    b: float = calib.get("platt_b", 0.0)
+    x = raw_prob / 100.0
     z: float = a * x + b
-    # Protection overflow
-    z = max(-10, min(10, z))
-    calibrated: float = 1.0 / (1.0 + np.exp(-z))
+    z = max(-10, min(10, z))  # Protection overflow
+    calibrated = 1.0 / (1.0 + np.exp(-z))
 
     return round(calibrated * 100)
 
@@ -374,8 +391,73 @@ def clear_cache() -> None:
     Returns:
         None.
     """
-    global _calibration_cache
+    global _calibration_cache, _isotonic_cache
     _calibration_cache = {}
+    _isotonic_cache = {}
+
+
+def _get_or_fit_isotonic(bet_type: str, league_id: int | None = None) -> IsotonicRegression | None:
+    """Return a cached isotonic regression model, fitting it on first call.
+
+    Loads all evaluated prediction results, filters to the given bet type
+    and league, and fits an :class:`IsotonicRegression` when at least
+    :data:`MIN_ISOTONIC_SAMPLES` samples are available.  The model is cached
+    in :data:`_isotonic_cache` for the lifetime of the process.
+
+    Args:
+        bet_type: Bet category key (e.g. ``"1x2_home"``, ``"btts"``).
+        league_id: Optional league filter.
+
+    Returns:
+        Fitted :class:`IsotonicRegression`, or ``None`` when insufficient data.
+    """
+    cache_key: str = f"iso_{bet_type}_{league_id}"
+    if cache_key in _isotonic_cache:
+        return _isotonic_cache[cache_key]
+
+    # Correspondance bet_type → champs de probabilité et d'outcome
+    _BET_PRED_FIELDS: dict[str, tuple[str, Callable[[dict], bool | None]]] = {
+        "1x2_home": ("pred_home", lambda r: r.get("actual_result") == "H"),
+        "1x2_draw": ("pred_draw", lambda r: r.get("actual_result") == "D"),
+        "1x2_away": ("pred_away", lambda r: r.get("actual_result") == "A"),
+        "btts": ("pred_btts", lambda r: r.get("actual_btts")),
+        "over_05": ("pred_over_05", lambda r: r.get("actual_over_05")),
+        "over_15": ("pred_over_15", lambda r: r.get("actual_over_15")),
+        "over_25": ("pred_over_25", lambda r: r.get("actual_over_25")),
+    }
+    if bet_type not in _BET_PRED_FIELDS:
+        _isotonic_cache[cache_key] = None
+        return None
+
+    pred_field, actual_fn = _BET_PRED_FIELDS[bet_type]
+
+    try:
+        results: list[dict] = load_results()
+        if league_id:
+            results = [r for r in results if r.get("league_id") == league_id]
+
+        X_list: list[float] = []
+        y_list: list[float] = []
+        for r in results:
+            p = r.get(pred_field)
+            a = actual_fn(r)
+            if p is not None and a is not None:
+                X_list.append(p / 100.0)
+                y_list.append(1.0 if a else 0.0)
+
+        if len(X_list) < MIN_ISOTONIC_SAMPLES:
+            _isotonic_cache[cache_key] = None
+            return None
+
+        x_arr = np.array(X_list)
+        y_arr = np.array(y_list)
+        iso = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
+        iso.fit(x_arr, y_arr)
+        _isotonic_cache[cache_key] = iso
+        return iso
+    except Exception:
+        _isotonic_cache[cache_key] = None
+        return None
 
 
 # ═══════════════════════════════════════════════════════════════════

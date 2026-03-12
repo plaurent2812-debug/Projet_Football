@@ -19,10 +19,30 @@ DIXON_COLES_RHO: float = -0.13  # Corrélation Dixon-Coles (typiquement -0.03 à
 #  ELO
 # ═══════════════════════════════════════════════════════════════════
 
-K_FACTOR: int = 32
+K_FACTOR: int = 32  # Valeur par défaut (ligue inconnue)
 HOME_ELO_ADVANTAGE: int = 65
 DEFAULT_ELO: int = 1500
 ELO_DECAY_RATE: float = 0.001  # Decay ELO temporel (régression vers 1500)
+
+# K-factor dynamique par ligue : compétitions européennes comptent plus,
+# coupes nationales (knockout, small sample) comptent moins.
+K_FACTOR_BY_LEAGUE: dict[int, int] = {
+    2: 40,   # Champions League — résultats très informatifs
+    3: 36,   # Europa League
+    848: 34, # Conference League
+    39: 32,  # Premier League
+    61: 32,  # Ligue 1
+    140: 32, # La Liga
+    135: 32, # Serie A
+    78: 32,  # Bundesliga
+    62: 30,  # Ligue 2 (niveau inférieur)
+    # Coupes nationales (matchs knockout, signal plus faible)
+    66: 24,  # Coupe de France
+    45: 24,  # FA Cup
+    143: 24, # Copa del Rey
+    137: 24, # Coppa Italia
+    81: 24,  # DFB-Pokal
+}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -33,6 +53,13 @@ FORM_DECAY: float = 0.82
 FORM_LOOKBACK: int = 6
 FORM_RANGE_LOW: float = 0.85  # Score plancher (0.85 + 0 * 0.30)
 FORM_RANGE_HIGH: float = 0.30  # Amplitude (0.85 + 1.0 * 0.30 = 1.15)
+
+# Forme long terme : tendance de fond sur 12 matchs (decay plus lent)
+FORM_LOOKBACK_LONG: int = 12
+FORM_DECAY_LONG: float = 0.90  # Décroissance plus lente → poids plus uniforme sur 12 matchs
+# Pondération court/long terme dans le form_factor final
+FORM_WEIGHT_SHORT: float = 0.70  # 70% forme 6 matchs
+FORM_WEIGHT_LONG: float = 0.30   # 30% tendance 12 matchs
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -245,7 +272,8 @@ PROB_OVER25_CEIL: int = 80
 #  CALIBRATION
 # ═══════════════════════════════════════════════════════════════════
 
-MIN_CALIBRATION_SAMPLES: int = 20
+MIN_CALIBRATION_SAMPLES: int = 100   # Minimum pour Platt scaling fiable
+MIN_ISOTONIC_SAMPLES: int = 500      # Minimum pour Isotonic regression (évite la "fonction en escalier")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -350,4 +378,8 @@ FEATURE_COLS: list[str] = [
     "league_avg_over25_rate",
     "elo_diff_squared",
     "form_diff",
+    # ── Momentum long terme (12 matchs) ──
+    "home_form_long",
+    "away_form_long",
+    "form_long_diff",
 ]

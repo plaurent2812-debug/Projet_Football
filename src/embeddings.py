@@ -18,7 +18,7 @@ from src.config import GEMINI_API_KEY, logger, supabase
 
 # ── Gemini Client (lazy init) ────────────────────────────────────
 _embed_client = None
-EMBEDDING_MODEL = "gemini-embedding-exp-03-07"
+EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIMS = 768
 
 

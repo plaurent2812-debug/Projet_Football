@@ -236,7 +236,7 @@ async def lifespan(app_instance):
                 name="Rattrapage scores au démarrage",
             )
             scheduler.start()
-            print("[scheduler] ✅ Démarré — scores auto (18h-23h45) + NHL (16h+22h) + rattrapage dans 10s")
+            print("[scheduler] ✅ Démarré — live */5min (12h-01h) + FT */15min + NHL (16h+22h) + rattrapage dans 10s")
         except Exception as e:
             print(f"[scheduler] ⚠️  Impossible de démarrer: {e}")
             scheduler = None

@@ -435,12 +435,6 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                         })()}
 
                         <div className="flex items-center gap-1 ml-0.5">
-                            {pred?.model_version === "meta_v2" && (
-                                <div className="flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded text-[10px] font-bold text-primary mr-1">
-                                    <BrainCircuit className="w-3 h-3" />
-                                    V2
-                                </div>
-                            )}
                             {isHot && (
                                 <Flame className="w-3 h-3 text-orange-500 flame-badge" />
                             )}

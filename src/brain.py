@@ -526,11 +526,24 @@ def blend_predictions(stats_result: dict, ai_result: AIFeatures | None) -> dict:
     final["recommended_bet"] = stats_result.get("recommended_bet", "")
     final["confidence_score"] = stats_result.get("confidence_score", 5)
 
-    # Stats JSON pour audit
+    # Stats JSON pour audit + frontend Top 5 Marchés
     final["stats_json"] = {
         "xg_home": stats_result.get("xg_home"),
         "xg_away": stats_result.get("xg_away"),
         "context": stats_result.get("context"),
+        # Probas marchés (utilisées par Dashboard TopMarketsCard)
+        "proba_home": final.get("proba_home"),
+        "proba_draw": final.get("proba_draw"),
+        "proba_away": final.get("proba_away"),
+        "proba_btts": final.get("proba_btts"),
+        "proba_over_05": final.get("proba_over_05"),
+        "proba_over_15": final.get("proba_over_15"),
+        "proba_over_25": final.get("proba_over_2_5") or stats_result.get("proba_over_25"),
+        "proba_over_35": final.get("proba_over_35"),
+        "proba_dc_1x": final.get("proba_dc_1x"),
+        "proba_dc_x2": final.get("proba_dc_x2"),
+        "correct_score": final.get("correct_score"),
+        "proba_correct_score": final.get("proba_correct_score"),
     }
 
     return final

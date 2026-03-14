@@ -5,6 +5,7 @@ import os
 import pickle
 
 import pandas as pd
+from typing import Any, Dict, List, Optional, Tuple, Union
 from src.config import supabase
 from fastapi import APIRouter, Depends, Header, HTTPException
 from src.nhl.calibration import probability_calibrator
@@ -58,7 +59,7 @@ def clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
 
 
-def verify_api_key(x_api_key: str | None = Header(None, alias="X-API-Key")):
+def verify_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
     """Vérifie la clé API. BLOQUE si invalide (sauf si non configurée)."""
     if not API_SECRET_KEY:
         return True
@@ -76,19 +77,32 @@ _game_win_features = []
 
 
 def _load_game_win_model():
-    """Charge le modèle de probabilité de match si disponible."""
+    """Charge le modèle de probabilité de match (pickle + ubj fallback)."""
     global _game_win_model, _game_win_features
-    model_path = "Projet_Football/models/best_game_win_predictor.pkl"
+    # Correct path: models/nhl/nhl_match_win.pkl
+    model_path = "models/nhl/nhl_match_win.pkl"
     if os.path.isfile(model_path):
         try:
             with open(model_path, "rb") as f:
                 data = pickle.load(f)
-            _game_win_model = data.get("model")
+            
             _game_win_features = data.get("feature_names", [])
+            
+            # Use UBJ if available
+            ubj_path = model_path.replace(".pkl", ".ubj")
+            if os.path.isfile(ubj_path):
+                from xgboost import XGBClassifier
+                _game_win_model = XGBClassifier()
+                _game_win_model.load_model(ubj_path)
+                print(f"   ✅ Game model UBJ chargé: {ubj_path}")
+            else:
+                _game_win_model = data.get("model")
+                print(f"   ✅ Game model Pickle chargé: {model_path}")
+
             metrics = data.get("metrics", {})
-            print(f"   ✅ Game model chargé: AUC={metrics.get('roc_auc', 0):.3f}")
+            print(f"      AUC={metrics.get('roc_auc', 0):.3f}")
         except Exception as e:
-            print(f"   ⚠️ Game model non chargé: {e}")
+            print(f"   ⚠️ Game model non chargé ({model_path}): {e}")
 
 
 # Note: We call this when the router is imported or manually?
@@ -102,7 +116,7 @@ if ENHANCED_ML_AVAILABLE and load_all_models:
     except Exception as e:
         print(f"Error loading models: {e}")
 else:
-    goal_predictor.load("Projet_Football/models/best_goal_predictor.pkl")
+    goal_predictor.load("src/models/nhl_best_goal_predictor.pkl")
 
 
 # =============================================================================
@@ -110,7 +124,7 @@ else:
 # =============================================================================
 
 
-def _load_calibration_from_supabase(silent: bool = False) -> tuple[bool, str, dict | None]:
+def _load_calibration_from_supabase(silent: bool = False) -> Tuple[bool, str, Optional[Dict]]:
     """Charge la calibration depuis Supabase."""
     try:
         response = (

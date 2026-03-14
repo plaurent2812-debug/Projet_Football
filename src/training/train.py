@@ -306,8 +306,7 @@ def train_classifier(
 
     # Cross-validation temporelle (5 folds)
     cv_scores = cross_val_score(
-        model, X_train, y_train, cv=tscv, scoring="accuracy",
-        fit_params={"sample_weight": sample_weight_train},
+        model, X_train, y_train, cv=tscv, scoring="accuracy"
     )
     logger.info(f"  CV Accuracy (temporal) : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
@@ -347,8 +346,14 @@ def train_classifier(
         if imp > 0.03:
             logger.info(f"    {fname:35s} {imp:.4f}")
 
-    # Sérialiser le modèle
-    model_bytes = pickle.dumps({"model": model, "imputer": None, "label_encoder": le})
+    # Sérialiser le modèle — XGBoost via save_raw(), sklearn via pickle
+    payload = {
+        "xgb_model_bytes": base64.b64encode(model.get_booster().save_raw("ubj")).decode("utf-8"),
+        "xgb_model_format": "ubj",
+        "imputer": None,
+        "label_encoder": le,
+    }
+    model_bytes = pickle.dumps(payload)
     model_b64 = base64.b64encode(model_bytes).decode("utf-8")
 
     # Sauvegarder
@@ -436,7 +441,13 @@ def train_regressor(
     for fname, imp in sorted(zip(FEATURE_COLS, importance), key=lambda x: -x[1]):
         feat_imp[fname] = round(float(imp), 4)
 
-    model_bytes = pickle.dumps({"model": model, "imputer": None})
+    payload = {
+        "xgb_model_bytes": base64.b64encode(model.get_booster().save_raw("ubj")).decode("utf-8"),
+        "xgb_model_format": "ubj",
+        "imputer": None,
+        "label_encoder": None,
+    }
+    model_bytes = pickle.dumps(payload)
     model_b64 = base64.b64encode(model_bytes).decode("utf-8")
 
     return {
@@ -454,6 +465,55 @@ def train_regressor(
         "feature_names": FEATURE_COLS,
         "is_active": True,
     }
+
+
+def _optuna_lgb_params(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    n_classes: int,
+    n_trials: int = 50,
+) -> dict:
+    """Find optimal LightGBM hyperparameters via Bayesian optimization."""
+    import lightgbm as lgb
+    tscv = TimeSeriesSplit(n_splits=3)
+
+    def objective(trial: optuna.Trial) -> float:
+        params: dict = {
+            "n_estimators": trial.suggest_int("n_estimators", 100, 500),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+            "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 10, log=True),
+            "reg_lambda": trial.suggest_float("reg_lambda", 1e-3, 10, log=True),
+            "random_state": 42,
+            "verbose": -1,
+        }
+
+        if n_classes > 2:
+            params["objective"] = "multiclass"
+            params["num_class"] = n_classes
+        else:
+            params["objective"] = "binary"
+
+        model = lgb.LGBMClassifier(**params)
+        scores = cross_val_score(model, X_train, y_train, cv=tscv, scoring="neg_log_loss")
+        return -scores.mean()
+
+    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=42))
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+
+    best = study.best_params
+    best["random_state"] = 42
+    best["verbose"] = -1
+    if n_classes > 2:
+        best["objective"] = "multiclass"
+        best["num_class"] = n_classes
+    else:
+        best["objective"] = "binary"
+
+    return best
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -518,14 +578,32 @@ def run() -> None:
     logger.info("  🏗️ STACKING ENSEMBLES")
     logger.info(f"{'=' * 60}")
 
+    # Tune LightGBM for the 1X2 ensemble
+    try:
+        logger.info("  🔍 LightGBM tuning for 1X2...")
+        lgb_tuned_1x2 = _optuna_lgb_params(X, y_1x2, n_classes=3)
+    except Exception:
+        lgb_tuned_1x2 = None
+
     result_ens_1x2 = train_stacking_ensemble(
-        X, y_1x2, "ensemble_1x2", "result", n_classes=3, imputer=imputer
+        X, y_1x2, "ensemble_1x2", "result", n_classes=3, imputer=imputer,
+        lgb_tuned_params=lgb_tuned_1x2
     )
+    
+    # Tune LightGBM for the binary ensembles
+    try:
+        logger.info("  🔍 LightGBM tuning for binary models...")
+        lgb_tuned_binary = _optuna_lgb_params(X, y_btts, n_classes=2)
+    except Exception:
+        lgb_tuned_binary = None
+
     result_ens_btts = train_stacking_ensemble(
-        X, y_btts, "ensemble_btts", "btts", n_classes=2, imputer=imputer
+        X, y_btts, "ensemble_btts", "btts", n_classes=2, imputer=imputer,
+        lgb_tuned_params=lgb_tuned_binary
     )
     result_ens_o25 = train_stacking_ensemble(
-        X, y_o25, "ensemble_over25", "over_25", n_classes=2, imputer=imputer
+        X, y_o25, "ensemble_over25", "over_25", n_classes=2, imputer=imputer,
+        lgb_tuned_params=lgb_tuned_binary
     )
 
     # ── Sauvegarder les modèles ───────────────────────────────────

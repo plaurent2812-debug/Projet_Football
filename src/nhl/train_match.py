@@ -21,8 +21,9 @@ try:
     from sklearn.metrics import accuracy_score, brier_score_loss, log_loss, roc_auc_score
     from sklearn.model_selection import TimeSeriesSplit
     from xgboost import XGBClassifier
+    import optuna
 except ImportError:
-    print("Install: pip install xgboost scikit-learn pandas")
+    print("Install: pip install xgboost scikit-learn pandas optuna")
     sys.exit(1)
 
 # ── Ajouter racine au path ──
@@ -157,40 +158,67 @@ def train_model(df: pd.DataFrame, target: str, model_name: str) -> dict | None:
 
     scale_pos_weight = (len(y) - positives) / max(1, positives)
 
-    params = {
-        "n_estimators": 100,
-        "max_depth": 3,
-        "learning_rate": 0.05,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "scale_pos_weight": scale_pos_weight,
-        "eval_metric": "logloss",
-        "random_state": 42,
-    }
+    def objective(trial):
+        param = {
+            "n_estimators": trial.suggest_int("n_estimators", 50, 200),
+            "max_depth": trial.suggest_int("max_depth", 3, 6),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.1, log=True),
+            "subsample": trial.suggest_float("subsample", 0.6, 0.9),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 0.9),
+            "gamma": trial.suggest_float("gamma", 0, 5),
+            "scale_pos_weight": scale_pos_weight,
+            "eval_metric": "logloss",
+            "random_state": 42,
+            "n_jobs": -1
+        }
+        
+        scores = []
+        for train_idx, val_idx in tscv.split(X):
+            X_t, X_v = X.iloc[train_idx], X.iloc[val_idx]
+            y_t, y_v = y.iloc[train_idx], y.iloc[val_idx]
+            
+            clf = XGBClassifier(**param)
+            clf.fit(X_t, y_t)
+            
+            preds = clf.predict_proba(X_v)[:, 1]
+            scores.append(brier_score_loss(y_v, preds))
+            
+        return np.mean(scores)
 
-    briers, accs, aucs = [], [], []
+    logger.info(f"🚀 Optimisation Optuna pour {model_name}...")
+    study = optuna.create_study(direction="minimize")
+    study.optimize(objective, n_trials=20)
+    
+    best_params = study.best_params
+    best_params["scale_pos_weight"] = scale_pos_weight
+    best_params["eval_metric"] = "logloss"
+    best_params["random_state"] = 42
+    
+    logger.info(f"✅ Meilleurs paramètres: {best_params}")
 
+    # FIXED: Honest evaluation on held-out last fold (model trained on train only)
     for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
-        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+        pass
 
-        model = XGBClassifier(**params)
-        model.fit(X_train, y_train, verbose=False)
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-        preds = model.predict_proba(X_test)[:, 1]
-        briers.append(brier_score_loss(y_test, preds))
-        accs.append(accuracy_score(y_test, (preds >= 0.5).astype(int)))
-        try:
-            aucs.append(roc_auc_score(y_test, preds))
-        except Exception:
-            aucs.append(0.5)
+    model = XGBClassifier(**best_params)
+    model.fit(X_train, y_train)
 
-        logger.info(f"  Fold {fold + 1}: Brier={briers[-1]:.4f} Acc={accs[-1]:.1%} AUC={aucs[-1]:.3f}")
+    preds = model.predict_proba(X_test)[:, 1]
+    brier = brier_score_loss(y_test, preds)
+    acc = accuracy_score(y_test, (preds >= 0.5).astype(int))
+    try:
+        auc = roc_auc_score(y_test, preds)
+    except Exception:
+        auc = 0.5
 
-    logger.info(f"  📊 Mean Brier: {np.mean(briers):.4f} | Mean Acc: {np.mean(accs):.1%} | Mean AUC: {np.mean(aucs):.3f}")
+    logger.info(f"  Honest Test (fold {fold}, {len(y_test)} samples): "
+                f"Brier={brier:.4f} Acc={acc:.1%} AUC={auc:.3f}")
 
-    # Final training on all data
-    final_model = XGBClassifier(**params)
+    # Retrain on ALL data for production deployment
+    final_model = XGBClassifier(**best_params)
     final_model.fit(X, y, verbose=False)
 
     # Save
@@ -198,29 +226,33 @@ def train_model(df: pd.DataFrame, target: str, model_name: str) -> dict | None:
     output_path = MODEL_DIR / f"nhl_match_{model_name}.pkl"
 
     metadata = {
-        "model": final_model,
         "feature_names": MATCH_FEATURES,
         "metrics": {
-            "brier_score": float(np.mean(briers)),
-            "accuracy": float(np.mean(accs)),
-            "roc_auc": float(np.mean(aucs)),
+            "brier_score": float(brier),
+            "accuracy": float(acc),
+            "roc_auc": float(auc),
             "n_samples": len(df),
         },
         "training_date": datetime.now().isoformat(),
+        "serialization": "ubj"
     }
 
-    # Save as "latest" (backward compatible)
+    # Save metadata as pickle
     with open(output_path, "wb") as f:
         pickle.dump(metadata, f)
 
-    # Timestamped snapshot for versioning / rollback
+    # Save model binary as UBJ
+    model_ubj_path = str(output_path).replace(".pkl", ".ubj")
+    final_model.save_model(model_ubj_path)
+
+    # Timestamped snapshot
     date_tag = datetime.now().strftime("%Y%m%d")
     versioned_path = str(output_path).replace(".pkl", f"_{date_tag}.pkl")
     with open(versioned_path, "wb") as f:
         pickle.dump(metadata, f)
 
     logger.info(f"  💾 Modèle sauvegardé: {output_path}")
-    logger.info(f"  📦 Snapshot: {versioned_path}")
+    logger.info(f"  📦 Model binary (UBJ): {model_ubj_path}")
     return metadata["metrics"]
 
 

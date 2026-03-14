@@ -63,7 +63,7 @@ def parse_players_from_boxscore(boxscore: dict, home_team_abbrev: str, away_team
                     "goals": int(skater.get("goals") or 0),
                     "assists": int(skater.get("assists") or 0),
                     "points": int(skater.get("points") or 0),
-                    "shots": int(skater.get("shots") or 0),
+                    "shots": int(skater.get("sog") or skater.get("shots") or 0),
                     "toi": skater.get("toi", ""),
                 })
     return results

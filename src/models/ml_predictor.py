@@ -7,6 +7,7 @@ Charge les modèles XGBoost depuis Supabase (table ml_models),
 les met en cache, et fournit des prédictions probabilistes.
 """
 import base64
+import io
 import pickle
 from typing import Any
 
@@ -55,6 +56,17 @@ def load_models() -> bool:
                 continue
             try:
                 payload: dict[str, Any] = pickle.loads(base64.b64decode(weights_b64))
+                # New format: XGBoost stored via save_model(), not pickle
+                if "xgb_model_bytes" in payload:
+                    import xgboost as xgb
+                    is_classifier = name != "xgb_total_goals"
+                    model_cls = xgb.XGBClassifier if is_classifier else xgb.XGBRegressor
+                    xgb_model = model_cls()
+                    xgb_model.load_model(base64.b64decode(payload["xgb_model_bytes"]))
+                    payload["model"] = xgb_model
+                if "model" not in payload:
+                    logger.warning(f"  ⚠️ Modèle {name}: pas de clé 'model' après désérialisation, ignoré")
+                    continue
                 _model_cache[name] = payload
             except Exception as e:
                 logger.warning(f"  ⚠️ Erreur chargement modèle {name}: {e}")
@@ -153,11 +165,10 @@ def predict_1x2(context: dict) -> dict[str, int] | None:
     else:
         proba_map = {"H": probas[0], "D": probas[1], "A": probas[2]}
 
-    return {
-        "ml_home": round(proba_map.get("H", 0.33) * 100),
-        "ml_draw": round(proba_map.get("D", 0.33) * 100),
-        "ml_away": round(proba_map.get("A", 0.33) * 100),
-    }
+    ml_home = round(proba_map.get("H", 0.33) * 100)
+    ml_draw = round(proba_map.get("D", 0.33) * 100)
+    ml_away = 100 - ml_home - ml_draw  # Ensure sum == 100
+    return {"ml_home": ml_home, "ml_draw": ml_draw, "ml_away": ml_away}
 
 
 def predict_binary(model_name: str, context: dict) -> int | None:

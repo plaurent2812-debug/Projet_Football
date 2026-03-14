@@ -189,6 +189,31 @@ def evaluate_recent_matches(days_back=7):
 
     print(f"[{datetime.now()}] ✅ Terminé. {updates_count} matchs évalués/mis à jour.")
 
+    # ─── Backtest Reminder Logic ──────────────────────────────────
+    # User requested a notification to run a backtest after 30-50 new matches.
+    # Baseline was 126 matches at the time of this implementation.
+    try:
+        total_res = supabase.table("prediction_results").select("id", count="exact").execute()
+        total_count = total_res.count or 0
+        
+        # We'll use 126 as the baseline (last big batch)
+        # We alert every 30 matches above that baseline
+        baseline = 126
+        diff = total_count - baseline
+        
+        if diff >= 30:
+            from src.notifications import send_telegram
+            msg = (
+                f"📊 *Rappel Backtest — ProbaLab*\n\n"
+                f"Il y a maintenant *{total_count}* matchs évalués (soit *+{diff}* nouveaux).\n\n"
+                f"C'est le moment idéal pour relancer un backtest et vérifier l'impact des dernières corrections !\n\n"
+                f"👉 `python3 -m src.training.backtest`"
+            )
+            send_telegram(msg, parse_mode="Markdown")
+            print(f"[Reminder] Notification envoyée (diff={diff})")
+    except Exception as e:
+        print(f"[Reminder] Erreur lors du calcul du rappel: {e}")
+
 
 if __name__ == "__main__":
     evaluate_recent_matches(days_back=7)

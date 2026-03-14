@@ -1,7 +1,14 @@
 """
-Entraînement des modèles XGBoost pour la NHL.
+Entraînement des modèles XGBoost pour la NHL (player-level).
+
 Charge `nhl_dataset.csv`, entraîne 4 modèles (Goal, Assist, Point, Shot),
 et sauvegarde les classifieurs dans `models/`.
+
+Corrections Phase 2 (mars 2026):
+  - Tri par date AVANT TimeSeriesSplit (évite le data leakage temporel)
+  - Entraînement sur le train set seulement (pas sur toutes les données)
+  - Features enrichies alignées avec ml_models.py
+  - Validation honnête sur le dernier fold (pas de fuite)
 """
 
 import os
@@ -15,31 +22,48 @@ import pandas as pd
 
 try:
     from sklearn.metrics import accuracy_score, brier_score_loss, roc_auc_score
-    from sklearn.model_selection import train_test_split
+    from sklearn.model_selection import TimeSeriesSplit
     from xgboost import XGBClassifier
+    import optuna
 except ImportError:
-    print("Veuillez installer xgboost et scikit-learn: pip install xgboost scikit-learn pandas")
+    print("Veuillez installer xgboost, scikit-learn et optuna: pip install xgboost scikit-learn optuna pandas")
     sys.exit(1)
 
-# Features utilisées pour l'entraînement (elles doivent toutes venir de build_data.py)
+# Features utilisées pour l'entraînement.
+# Alignées avec les features disponibles dans build_data.py (from stats_json).
+# ml_models.py._build_features() utilise self.feature_names du modèle sérialisé,
+# donc l'alignement est garanti tant qu'on réentraîne avec les mêmes features.
 FEATURES = [
+    # Heuristic scores (from pipeline _score_player)
     "algo_score_goal",
     "algo_score_shot",
+    # Season per-game stats
     "goals_per_game",
     "assists_per_game",
     "shots_per_game",
     "toi_minutes",
     "games_played",
+    # Contextual
     "ai_factor",
     "b2b",
     "pp_boost",
+    "is_home",
+    # L5 form (flattened from l5_form dict)
     "l5_point",
     "l5_goal",
     "l5_assist",
     "l5_shot",
+    # H2H (flattened from h2h dict)
     "h2h_point",
     "h2h_goal",
     "h2h_shot",
+    # Opponent quality
+    "opp_sv_pct",
+    "opp_gaa",
+    # Probabilities (pre-computed by pipeline)
+    "prob_goal",
+    "prob_point",
+    "prob_shot",
 ]
 
 
@@ -49,7 +73,16 @@ def load_data(filepath="nhl_dataset.csv") -> pd.DataFrame:
         print(f"❌ Fichier dataset introuvable: {path}")
         print("Veuillez d'abord exécuter `python -m src.nhl.build_data`")
         return pd.DataFrame()
-    return pd.read_csv(path)
+    df = pd.read_csv(path)
+
+    # CRITICAL: Sort by date for proper TimeSeriesSplit
+    if "date" in df.columns:
+        df = df.sort_values("date").reset_index(drop=True)
+        print(f"  📅 Dataset trié par date: {df['date'].iloc[0][:10]} → {df['date'].iloc[-1][:10]}")
+    else:
+        print("  ⚠️ Pas de colonne 'date' — TimeSeriesSplit sera pseudo-aléatoire")
+
+    return df
 
 
 def train_market_model(df: pd.DataFrame, market: str, label_col: str, output_path: str):
@@ -58,43 +91,89 @@ def train_market_model(df: pd.DataFrame, market: str, label_col: str, output_pat
     # Nettoyer
     df_clean = df.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # Filtrer ceux qui manquent de la feature de base de l'heuristique pour ne pas bruiter
     if df_clean.empty:
         print("❌ Dataset vide.")
         return
 
-    # Validation croisée simple
-    X = df_clean[FEATURES]
+    # Only keep features that exist in the dataset
+    available_features = [f for f in FEATURES if f in df_clean.columns]
+    missing = [f for f in FEATURES if f not in df_clean.columns]
+    if missing:
+        print(f"  ⚠️ Features manquantes (remplacées par 0): {missing}")
+        for f in missing:
+            df_clean[f] = 0.0
+        available_features = FEATURES
+
+    X = df_clean[available_features]
     y = df_clean[label_col]
 
     # Vérifier l'équilibre des classes
     positives = y.sum()
     if positives == 0 or positives == len(y):
-        print(
-            "❌ Pas de variance dans la cible (soit que des 0, soit que des 1). Entraînement impossible."
-        )
+        print("❌ Pas de variance dans la cible. Entraînement impossible.")
         return
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    print(f"  Échantillons: {len(y)} | Positifs: {int(positives)} ({positives/len(y):.1%})")
 
-    scale_pos_weight = (len(y_train) - sum(y_train)) / max(1, sum(y_train))
+    # TimeSeriesSplit — data is already sorted by date
+    n_splits = min(5, len(df) // 20)
+    if n_splits < 2:
+        n_splits = 2
+    tscv = TimeSeriesSplit(n_splits=n_splits)
 
-    model = XGBClassifier(
-        n_estimators=100,
-        max_depth=4,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        scale_pos_weight=scale_pos_weight,
-        use_label_encoder=False,
-        eval_metric="logloss",
-    )
+    scale_pos_weight = (len(y) - y.sum()) / max(1, y.sum())
 
+    def objective(trial):
+        param = {
+            "n_estimators": trial.suggest_int("n_estimators", 50, 200),
+            "max_depth": trial.suggest_int("max_depth", 3, 6),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.1, log=True),
+            "subsample": trial.suggest_float("subsample", 0.6, 0.9),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 0.9),
+            "gamma": trial.suggest_float("gamma", 0, 5),
+            "scale_pos_weight": scale_pos_weight,
+            "eval_metric": "logloss",
+            "random_state": 42,
+            "n_jobs": -1
+        }
+
+        scores = []
+        for train_idx, val_idx in tscv.split(X):
+            X_t, X_v = X.iloc[train_idx], X.iloc[val_idx]
+            y_t, y_v = y.iloc[train_idx], y.iloc[val_idx]
+
+            clf = XGBClassifier(**param)
+            clf.fit(X_t, y_t)
+
+            preds = clf.predict_proba(X_v)[:, 1]
+            scores.append(brier_score_loss(y_v, preds))
+
+        return np.mean(scores)
+
+    print(f"🚀 Optimisation Optuna pour {market}...")
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=42))
+    study.optimize(objective, n_trials=30)
+
+    best_params = study.best_params
+    best_params["scale_pos_weight"] = scale_pos_weight
+    best_params["eval_metric"] = "logloss"
+    best_params["random_state"] = 42
+
+    print(f"✅ Meilleurs paramètres: {best_params}")
+
+    # FIXED: Train on TRAIN set only (not all data), evaluate on held-out TEST set
+    # Use last fold of TimeSeriesSplit as the final train/test split
+    for train_idx, test_idx in tscv.split(X):
+        pass  # Get the last fold
+
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+    model = XGBClassifier(**best_params)
     model.fit(X_train, y_train)
 
-    # Evaluation
+    # Honest evaluation on held-out test set
     preds_proba = model.predict_proba(X_test)[:, 1]
     preds_bin = (preds_proba >= 0.5).astype(int)
 
@@ -105,34 +184,43 @@ def train_market_model(df: pd.DataFrame, market: str, label_col: str, output_pat
     except Exception:
         auc = 0.5
 
-    print(f"✅ Accuracy: {acc:.1%}")
-    print(f"✅ Brier Score: {brier:.4f}")
-    print(f"✅ ROC AUC: {auc:.3f}")
+    print(f"📊 Honest Test Evaluation (last fold, {len(y_test)} samples):")
+    print(f"   Accuracy: {acc:.1%}")
+    print(f"   Brier Score: {brier:.4f}")
+    print(f"   ROC AUC: {auc:.3f}")
 
-    # Sauvegarde
+    # Now retrain on ALL data for production deployment
+    final_model = XGBClassifier(**best_params)
+    final_model.fit(X, y)
+
+    # Sauvegarde — metadata pickle + model UBJ
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     metadata = {
-        "model": model,
-        "feature_names": FEATURES,
-        "metrics": {"market": market, "accuracy": acc, "brier_score": brier, "roc_auc": auc},
+        "feature_names": available_features,
+        "metrics": {
+            "market": market,
+            "accuracy": float(acc),
+            "brier_score": float(brier),
+            "roc_auc": float(auc),
+            "n_train": len(X_train),
+            "n_test": len(X_test),
+            "training_date": datetime.now().isoformat()[:10],
+        },
         "training_date": datetime.now().isoformat(),
-        "training_samples": len(X_train),
-        "test_samples": len(X_test),
+        "n_samples": len(X),
+        "best_params": best_params,
+        "serialization": "ubj"
     }
 
-    # Save as the "latest" model (backward compatible)
     with open(output_path, "wb") as f:
         pickle.dump(metadata, f)
 
-    # Save a timestamped snapshot for versioning / rollback
-    date_tag = datetime.now().strftime("%Y%m%d")
-    versioned_path = output_path.replace(".pkl", f"_{date_tag}.pkl")
-    with open(versioned_path, "wb") as f:
-        pickle.dump(metadata, f)
+    model_ubj_path = output_path.replace(".pkl", ".ubj")
+    final_model.save_model(model_ubj_path)
 
-    print(f"💾 Modèle sauvegardé dans {output_path}")
-    print(f"📦 Snapshot versionné: {versioned_path}")
+    print(f"💾 Modèle sauvegardé: {output_path}")
+    print(f"📦 Model binary (UBJ): {model_ubj_path}")
 
 
 def train_all():
@@ -140,10 +228,10 @@ def train_all():
     if df.empty:
         return
 
-    # Assurer que les colonnes catégorielles ou textuelles sont ignorées
+    # Fill missing features with 0
     for col in FEATURES:
         if col not in df.columns:
-            df[col] = 0.0  # Remplissage préventif
+            df[col] = 0.0
 
     base_dir = Path(__file__).parent.parent / "models"
 

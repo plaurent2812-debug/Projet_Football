@@ -424,7 +424,7 @@ def calculate_recent_form(game_log: list[dict]) -> dict:
     # If standard is decent, but recent is bad => positive regression
     m5_m10_regression = 1.0
     if l10_pg >= 0.5 and l5_pg < l10_pg:
-        m5_m10_regression = 1.15  # +15% boost
+        m5_m10_regression = 1.08  # +8% boost (was 15% — too aggressive per backtest)
 
     # 2. Max Gap Pattern (Pointless streaks)
     current_streak = 0
@@ -446,8 +446,9 @@ def calculate_recent_form(game_log: list[dict]) -> dict:
             break
     
     max_gap_surge = 1.0
-    if max_streak >= 3 and current_streak >= max_streak:
-        max_gap_surge = 1.30  # +30% Signal d'Achat Majeur
+    # Removed Gambler's Fallacy: a player being "due" for a goal has no statistical basis.
+    # Previous: +30% if current pointless streak matches max streak.
+    # Backtest showed this inflated probas for struggling players without improving accuracy.
 
     days_since_last_game = 999
     if all_games and "gameDate" in all_games[0]:
@@ -926,27 +927,37 @@ def _score_player(
         exp_assists *= 1.08
         exp_shots *= 1.15
 
+    # ─── Lambda clamping (prevents 15-multiplier stacking from producing extremes) ───
+    # A player scoring > 0.8 goals/game is unrealistic even for McDavid (~0.55).
+    # Similarly, no skater realistically has > 5 expected shots.
+    exp_goals = max(0.02, min(0.80, exp_goals))
+    exp_assists = max(0.02, min(1.0, exp_assists))
+    exp_points = max(0.05, min(1.5, exp_points))
+    exp_shots = max(0.5, min(6.0, exp_shots))
+
     # ─── Zero-Inflated Poisson (ZIP) Probabilities ───
     # Calculate theta_zero: the structural probability of producing a "zero"
     # regardless of talent (due to bottom-line assignments or defensive roles).
-    theta_zero = 0.05  # Base structural zero (injury mid-game, bad luck)
+    # Recalibrated march 2026: backtest showed avg predicted > actual hit rate,
+    # meaning theta_zero values were slightly too aggressive for middle tiers.
+    theta_zero = 0.04  # Base structural zero (injury mid-game, bad luck)
 
     if position_code == "D":
         if toi_minutes < 18.0:
-            theta_zero = 0.45  # Bottom pairing D-men
+            theta_zero = 0.40  # Bottom pairing D-men (was 0.45)
         elif toi_minutes < 22.0:
-            theta_zero = 0.20  # Top 4 D-men
+            theta_zero = 0.15  # Top 4 D-men (was 0.20)
         else:
-            theta_zero = 0.10  # Elite offensive D-men
+            theta_zero = 0.08  # Elite offensive D-men (was 0.10)
     else:  # Forwards
         if toi_minutes < 13.0:
-            theta_zero = 0.40  # 4th line scrubs
+            theta_zero = 0.35  # 4th line (was 0.40)
         elif toi_minutes < 15.5:
-            theta_zero = 0.20  # 3rd line
+            theta_zero = 0.15  # 3rd line (was 0.20)
         elif toi_minutes < 18.0:
-            theta_zero = 0.08  # 2nd line
+            theta_zero = 0.06  # 2nd line (was 0.08)
         else:
-            theta_zero = 0.04  # 1st line stars
+            theta_zero = 0.03  # 1st line stars (was 0.04)
 
     # ZIP formula for P(X >= 1) = (1 - theta_zero) * (1 - e^(-lambda))
     prob_goal = (1.0 - theta_zero) * (1 - math.exp(-max(0, exp_goals))) * 100

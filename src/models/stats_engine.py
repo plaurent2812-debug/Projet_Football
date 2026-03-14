@@ -18,6 +18,7 @@ Calcule des probabilités basées sur :
   12. Calibration via cotes bookmakers
 """
 import math
+from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -167,12 +168,16 @@ def poisson_grid(
     # More negative = stronger correction for low-scoring cells (0-0, 1-1…)
     base_rho = DIXON_COLES_RHO_BY_LEAGUE.get(league_id, DIXON_COLES_RHO) if league_id else DIXON_COLES_RHO
     xg_total = xg_home + xg_away
+    # Smooth rho scaling: linear interpolation between 2.0 and 3.5 xG total
+    # (avoids discontinuous jumps at the thresholds)
     if xg_total < 2.0:
-        rho = base_rho * 1.3  # Stronger correlation for defensive matches
+        rho = base_rho * 1.3
     elif xg_total > 3.5:
-        rho = base_rho * 0.7  # Weaker for high-scoring matches
+        rho = base_rho * 0.7
     else:
-        rho = base_rho
+        # Linear interpolation: 1.3 at 2.0 → 1.0 at 2.75 → 0.7 at 3.5
+        scale = 1.3 - 0.4 * (xg_total - 2.0) / 1.5
+        rho = base_rho * scale
 
     # ── Vectorized Poisson grid (replaces double-loop) ────────
     goals = np.arange(max_goals)
@@ -195,15 +200,15 @@ def poisson_grid(
     # Poisson tends to under-predict draws in tactical leagues (Serie A, CL).
     # If the predicted draw rate deviates >2% from the league's historical
     # rate, we apply a gentle diagonal correction (capped at ±10%).
-    if league_id is not None:
-        target_draw = DRAW_FACTOR_BY_LEAGUE.get(league_id)
-        if target_draw is not None:
-            predicted_draw = float(np.trace(grid))
-            if predicted_draw > 0.01:
-                correction = target_draw / predicted_draw
-                correction = max(0.90, min(1.10, correction))  # ±10% max
-                np.fill_diagonal(grid, np.diag(grid) * correction)
-                grid /= grid.sum()  # Renormalise after diagonal shift
+    # Falls back to global DRAW_FACTOR when league_id is not in the per-league dict.
+    target_draw = DRAW_FACTOR_BY_LEAGUE.get(league_id, DRAW_FACTOR) if league_id is not None else None
+    if target_draw is not None:
+        predicted_draw = float(np.trace(grid))
+        if predicted_draw > 0.01:
+            correction = target_draw / predicted_draw
+            correction = max(0.85, min(1.15, correction))  # ±15% max (was ±10%)
+            np.fill_diagonal(grid, np.diag(grid) * correction)
+            grid /= grid.sum()  # Renormalise after diagonal shift
 
     # ── Vectorized market extraction (replaces 3 double-loops) ─
     # 1X2
@@ -629,8 +634,9 @@ def get_elo_probs(home_elo: float, away_elo: float, league_id: int | None = None
     draw_decay = math.exp(-ELO_DRAW_DECAY_RATE * elo_gap)
     draw_prob = base_draw * draw_decay
     # Ensure draw stays in a reasonable football range
-    # Even the biggest mismatches still draw 12%+ of the time
-    draw_prob = max(0.12, min(0.35, draw_prob))
+    # Even the biggest mismatches still draw 15%+ of the time
+    # (backtest showed draws under-predicted; raised floor from 0.12 to 0.15)
+    draw_prob = max(0.15, min(0.35, draw_prob))
 
     # Redistribute: remove draw's share proportionally from home/away
     remaining = 1.0 - draw_prob
@@ -662,7 +668,7 @@ def update_elo_from_results() -> dict[int, float]:
     # Charger les fixtures terminées, triées par date
     fixtures = (
         supabase.table("fixtures")
-        .select("api_fixture_id, home_team, away_team, home_goals, away_goals, league_id")
+        .select("api_fixture_id, home_team, away_team, home_goals, away_goals, league_id, date")
         .eq("status", "FT")
         .order("date")
         .execute()
@@ -672,6 +678,9 @@ def update_elo_from_results() -> dict[int, float]:
     # Charger mapping nom -> api_id
     teams = supabase.table("teams").select("api_id, name").execute().data
     name_to_id = {t["name"]: t["api_id"] for t in teams}
+    
+    # Track last match date for each team to apply decay
+    last_match_dates: dict[int, datetime] = {}
 
     for fix in fixtures:
         hid = name_to_id.get(fix["home_team"])
@@ -680,6 +689,16 @@ def update_elo_from_results() -> dict[int, float]:
             continue
         if hid not in elos or aid not in elos:
             continue
+
+        match_dt = datetime.fromisoformat(fix["date"].replace("Z", "+00:00"))
+        
+        # Apply decay to both teams if they haven't played in >14 days
+        for tid in [hid, aid]:
+            if tid in last_match_dates:
+                days_inactive = (match_dt - last_match_dates[tid]).days
+                if days_inactive > 14:
+                    elos[tid] = elo_with_decay(elos[tid], days_inactive)
+            last_match_dates[tid] = match_dt
 
         hg = fix["home_goals"] or 0
         ag = fix["away_goals"] or 0
@@ -791,9 +810,13 @@ def calculate_form(
         else:
             form_letters.append("L")
 
-        total_weight += 3 * sos_multiplier * weight
+        # Denominator: max points per match (3) × weight, so form_score ∈ [0, 1]
+        # This is correct: a team winning every match gets 1.0, losing every match gets 0.0
+        total_weight += 3 * weight
 
-    return (form_score / total_weight if total_weight > 0 else 0.5), form_letters
+    raw = form_score / total_weight if total_weight > 0 else 0.5
+    # Clamp to [0, 1] — SOS multiplier can push score slightly above 1.0
+    return max(0.0, min(1.0, raw)), form_letters
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1992,6 +2015,9 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
                 pass
 
     # ── 4. Grille Poisson (rho per-ligue + calibration nuls) ─────
+    # Clamp xG to realistic range before Poisson to prevent extreme inputs
+    xg_home_adj = max(XG_FLOOR, min(XG_CEIL, xg_home_adj))
+    xg_away_adj = max(XG_FLOOR, min(XG_CEIL, xg_away_adj))
     poisson_probs = poisson_grid(xg_home_adj, xg_away_adj, league_id=league_id)
 
     # ── 5. ELO ───────────────────────────────────────────────────
@@ -2058,28 +2084,6 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         final_home = round(final_home / total * 100)
         final_draw = round(final_draw / total * 100)
         final_away = 100 - final_home - final_draw
-
-    # ── 7b. Stakes draw boost ──────────────────────────────────
-    # When both teams have high stakes (>1.0), boost draw prob
-    # and redistribute from home/away proportionally
-    if stakes_h > 1.0 and stakes_a > 1.0:
-        draw_boost = STAKES_DRAW_BOOST * 100  # e.g. 3%
-        final_draw = round(final_draw + draw_boost)
-        # Redistribute boost proportionally from home and away
-        home_share = final_home / max(final_home + final_away, 1)
-        final_home = round(final_home - draw_boost * home_share)
-        final_away = 100 - final_home - final_draw
-
-    # ── 7c. European competition draw boost ────────────────────
-    # CL/EL matches are higher stakes → more cautious → more draws
-    euro_boost = EURO_COMP_DRAW_BOOST.get(league_id, 0)
-    if euro_boost > 0:
-        boost_pts = euro_boost * 100
-        final_draw = round(final_draw + boost_pts)
-        home_share = final_home / max(final_home + final_away, 1)
-        final_home = round(final_home - boost_pts * home_share)
-        final_away = 100 - final_home - final_draw
-        context["euro_draw_boost"] = euro_boost
 
     # ── 8. Probabilité de penalty ────────────────────────────────
     try:
@@ -2234,6 +2238,27 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
             context["ml_active"] = False
             context["ml_error"] = str(e)
 
+    # ── 9b. Stakes draw boost (applied AFTER ML to avoid contradictions) ──
+    # When both teams have high stakes (>1.0), boost draw prob
+    # and redistribute from home/away proportionally
+    if stakes_h > 1.0 and stakes_a > 1.0:
+        draw_boost = STAKES_DRAW_BOOST * 100  # e.g. 3%
+        final_draw = round(final_draw + draw_boost)
+        home_share = final_home / max(final_home + final_away, 1)
+        final_home = round(final_home - draw_boost * home_share)
+        final_away = 100 - final_home - final_draw
+
+    # ── 9c. European competition draw boost ────────────────────
+    # CL/EL matches are higher stakes → more cautious → more draws
+    euro_boost = EURO_COMP_DRAW_BOOST.get(league_id, 0)
+    if euro_boost > 0:
+        boost_pts = euro_boost * 100
+        final_draw = round(final_draw + boost_pts)
+        home_share = final_home / max(final_home + final_away, 1)
+        final_home = round(final_home - boost_pts * home_share)
+        final_away = 100 - final_home - final_draw
+        context["euro_draw_boost"] = euro_boost
+
     # ── 10. Calibration fine (si disponible) ───────────────────────
     if CALIBRATION_AVAILABLE:
         try:
@@ -2359,27 +2384,59 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         result["value_bet"] = best_prob >= 65
 
     # Score de confiance redesigné (1–10)
-    # Combine : (a) accord inter-modèles, (b) qualité données, (c) spread 1X2
+    # Redesigned march 2026: old formula rewarded polarized predictions (high spread)
+    # which were often wrong (draws missed). New formula:
+    #   (a) model agreement (Poisson vs ML vs market)
+    #   (b) data quality
+    #   (c) prediction clarity — penalize close 3-way races AND extreme overconfidence
     sorted_probs = sorted([final_home, final_draw, final_away], reverse=True)
     spread = sorted_probs[0] - sorted_probs[1]
 
-    # 1. Accord inter-modèles (0–4 pts)
+    # 1. Accord inter-modèles (0–3 pts)
+    agreement_pts = 0
+    n_sources = 0
+    source_winners = []  # Which outcome each source picks
+
+    # Poisson winner
+    poisson_vals = [poisson_probs["proba_home"], poisson_probs["proba_draw"], poisson_probs["proba_away"]]
+    poisson_winner = ["H", "D", "A"][poisson_vals.index(max(poisson_vals))]
+    source_winners.append(poisson_winner)
+    n_sources += 1
+
+    # ML winner
     if context.get("ml_active") and context.get("ml_predictions"):
         ml_preds_ctx = context["ml_predictions"]
-        ml_home_val = ml_preds_ctx.get("ml_home", final_home)
-        spread_poisson_ml = abs(poisson_probs["proba_home"] - ml_home_val)
-        if spread_poisson_ml < 5:
-            agreement_pts = 4
-        elif spread_poisson_ml < 10:
-            agreement_pts = 3
-        elif spread_poisson_ml < 15:
-            agreement_pts = 2
-        else:
-            agreement_pts = 1
-    else:
-        agreement_pts = 2  # Default when ML unavailable
+        ml_h = ml_preds_ctx.get("ml_home", 0)
+        ml_d = ml_preds_ctx.get("ml_draw", 0)
+        ml_a = ml_preds_ctx.get("ml_away", 0)
+        if ml_h or ml_d or ml_a:
+            ml_vals = [ml_h, ml_d, ml_a]
+            ml_winner = ["H", "D", "A"][ml_vals.index(max(ml_vals))]
+            source_winners.append(ml_winner)
+            n_sources += 1
 
-    # 2. Qualité des données (0–4 pts)
+    # Market winner
+    if market:
+        mkt_vals = [market.get("market_home", 0), market.get("market_draw", 0), market.get("market_away", 0)]
+        if any(mkt_vals):
+            mkt_winner = ["H", "D", "A"][mkt_vals.index(max(mkt_vals))]
+            source_winners.append(mkt_winner)
+            n_sources += 1
+
+    # Count agreement: all sources pick the same winner
+    if n_sources >= 2:
+        winner_counts = Counter(source_winners)
+        most_common_count = winner_counts.most_common(1)[0][1]
+        if most_common_count == n_sources:
+            agreement_pts = 3  # Full agreement
+        elif most_common_count >= 2:
+            agreement_pts = 2  # Partial agreement
+        else:
+            agreement_pts = 0  # No agreement
+    else:
+        agreement_pts = 1  # Only one source
+
+    # 2. Qualité des données (0–3 pts)
     data_quality = 0
     if market:
         data_quality += 1
@@ -2387,13 +2444,27 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         data_quality += 1
     if league_data:
         data_quality += 1
-    if context.get("ml_calibrated"):
-        data_quality += 1
 
-    # 3. Spread 1X2 (0–2 pts)
-    spread_pts = min(2, spread // 10)
+    # 3. Prediction clarity (0–3 pts)
+    # Moderate spread = good. Too low (3-way toss-up) or too high (overconfident) = bad
+    # Sweet spot: spread 15-30 points
+    if spread < 8:
+        clarity_pts = 0  # 3-way toss-up, inherently unpredictable
+    elif spread < 15:
+        clarity_pts = 1  # Slight favorite, still uncertain
+    elif spread < 30:
+        clarity_pts = 3  # Clear favorite, most reliable zone
+    elif spread < 40:
+        clarity_pts = 2  # Strong favorite, but draw risk often missed
+    else:
+        clarity_pts = 1  # Extreme favorite, often overconfident
 
-    confidence = max(1, min(10, agreement_pts + data_quality + spread_pts))
+    # 4. Draw risk penalty (-1 pt if draw is close to the favorite)
+    draw_penalty = 0
+    if final_draw >= 28 and spread < 20:
+        draw_penalty = -1  # High draw probability + close match = unreliable
+
+    confidence = max(1, min(10, agreement_pts + data_quality + clarity_pts + draw_penalty))
     result["confidence_score"] = confidence
 
     # ── 11. Final probability clamping ─────────────────────────────

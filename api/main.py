@@ -106,7 +106,10 @@ def _startup_update_scores():
 
 
 def _scheduled_telegram_tickets():
-    """Called by APScheduler every day at 10h00 Paris timezone to send tickets to Telegram."""
+    """Called by APScheduler every day at 10h00 Paris — FOOTBALL tickets only.
+
+    NHL predictions aren't available yet (pipeline runs at 16h).
+    """
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
         from datetime import date
@@ -114,17 +117,42 @@ def _scheduled_telegram_tickets():
         from src.telegram_bot import send_telegram_message
         from src.ticket_generator import format_telegram_message, generate_daily_tickets
 
-        print(f"[scheduler] Création et envoi des tickets Telegram — {date.today()}")
+        print(f"[scheduler] ⚽ Tickets FOOT du jour — {date.today()}")
 
         safe, fun = generate_daily_tickets()
-        if safe or fun:
+        # Only send if we have football picks (NHL not ready yet)
+        has_foot = (safe and safe.get("football")) or (fun and fun.get("football"))
+        if has_foot:
             message = format_telegram_message(safe, fun)
             send_telegram_message(message)
-            print("[scheduler] ✅ Tickets envoyés sur Telegram.")
+            print("[scheduler] ✅ Tickets foot envoyés sur Telegram.")
         else:
-            print("[scheduler] ℹ️ Aucun ticket généré (pas de matchs ou probas faibles).")
+            print("[scheduler] ℹ️ Aucun ticket foot généré.")
     except Exception as e:
         print(f"[scheduler] Erreur Telegram: {e}")
+
+
+def _scheduled_nhl_tickets():
+    """Called at 16h30 Paris — NHL tickets (after 16h pipeline) + full recap."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from datetime import date
+
+        from src.telegram_bot import send_telegram_message
+        from src.ticket_generator import format_telegram_message, generate_daily_tickets
+
+        print(f"[scheduler] 🏒 Tickets NHL du soir — {date.today()}")
+
+        safe, fun = generate_daily_tickets()
+        has_nhl = (safe and safe.get("nhl")) or (fun and fun.get("nhl"))
+        if has_nhl:
+            message = format_telegram_message(safe, fun)
+            send_telegram_message(message)
+            print("[scheduler] ✅ Tickets NHL envoyés sur Telegram.")
+        else:
+            print("[scheduler] ℹ️ Aucun ticket NHL généré.")
+    except Exception as e:
+        print(f"[scheduler] Erreur Telegram NHL: {e}")
 
 
 def _scheduled_nhl_pipeline():
@@ -142,6 +170,47 @@ def _scheduled_nhl_pipeline():
         print(f"[scheduler] 🏒 ✅ NHL terminé: {n_matches} matchs, {n_players} joueurs")
     except Exception as e:
         print(f"[scheduler] 🏒 ❌ Erreur NHL pipeline: {e}")
+
+
+def _scheduled_nhl_evaluation():
+    """Called daily at 8h00 Paris — update NHL scores + evaluate + resolve bets.
+
+    NHL games from last night (18h-04h Paris) are now finished.
+    We update scores, evaluate predictions, and resolve best_bets picks.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from datetime import date, timedelta
+        from src.fetchers.fetch_nhl_results import evaluate_nhl_predictions
+
+        print("[scheduler] 🏒 Évaluation NHL automatique...")
+        result = evaluate_nhl_predictions(days_back=3)
+        total = result.get("total_evaluations", 0)
+        wins = result.get("total_wins", 0)
+        print(f"[scheduler] 🏒 ✅ NHL évaluation: {total} prédictions, {wins} hits")
+
+        # Also fetch game stats for last night (fixes shots data)
+        from src.nhl.fetch_game_stats import fetch_and_store_game_stats
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+        fetch_and_store_game_stats(yesterday)
+    except Exception as e:
+        print(f"[scheduler] 🏒 ❌ Erreur évaluation NHL: {e}")
+
+
+def _scheduled_football_evaluation():
+    """Called daily at 8h30 Paris — evaluate football predictions + recalibrate."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from src.training.evaluate import run_evaluation
+        from src.models.calibrate import run_calibration
+
+        print("[scheduler] ⚽ Évaluation football automatique...")
+        run_evaluation()
+        print("[scheduler] ⚽ Recalibration...")
+        run_calibration()
+        print("[scheduler] ⚽ ✅ Évaluation + calibration terminées")
+    except Exception as e:
+        print(f"[scheduler] ⚽ ❌ Erreur évaluation football: {e}")
 
 
 @asynccontextmanager
@@ -196,6 +265,20 @@ async def lifespan(app_instance):
                 misfire_grace_time=600,
             )
 
+            # 🏒 NHL Tickets — 16h30 Paris (after NHL pipeline at 16h)
+            scheduler.add_job(
+                _scheduled_nhl_tickets,
+                trigger=CronTrigger(
+                    hour="16",
+                    minute="30",
+                    timezone=paris_tz,
+                ),
+                id="nhl_tickets",
+                name="NHL Tickets Telegram (après pipeline)",
+                replace_existing=True,
+                misfire_grace_time=600,
+            )
+
             # 🏒 NHL Pipeline — 16h00 Paris (premier scan)
             scheduler.add_job(
                 _scheduled_nhl_pipeline,
@@ -224,6 +307,34 @@ async def lifespan(app_instance):
                 misfire_grace_time=900,
             )
 
+            # 🏒 NHL Results + Evaluation — 8h00 Paris (after US night games)
+            scheduler.add_job(
+                _scheduled_nhl_evaluation,
+                trigger=CronTrigger(
+                    hour="8",
+                    minute="0",
+                    timezone=paris_tz,
+                ),
+                id="nhl_evaluation",
+                name="NHL scores + évaluation complète",
+                replace_existing=True,
+                misfire_grace_time=900,
+            )
+
+            # ⚽ Football evaluation + calibration — 8h30 Paris
+            scheduler.add_job(
+                _scheduled_football_evaluation,
+                trigger=CronTrigger(
+                    hour="8",
+                    minute="30",
+                    timezone=paris_tz,
+                ),
+                id="football_evaluation",
+                name="Football évaluation + calibration",
+                replace_existing=True,
+                misfire_grace_time=900,
+            )
+
             # Rattrapage immédiat 10s après le démarrage
             from datetime import datetime as _dt
             from datetime import timedelta as _td
@@ -236,7 +347,7 @@ async def lifespan(app_instance):
                 name="Rattrapage scores au démarrage",
             )
             scheduler.start()
-            print("[scheduler] ✅ Démarré — live */5min (12h-01h) + FT */15min + NHL (16h+22h) + rattrapage dans 10s")
+            print("[scheduler] ✅ Démarré — live */5min + FT */15min + NHL (16h+22h) + eval (8h+8h30) + rattrapage 10s")
         except Exception as e:
             print(f"[scheduler] ⚠️  Impossible de démarrer: {e}")
             scheduler = None

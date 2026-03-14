@@ -31,35 +31,45 @@ class EnhancedGoalPredictor:
         self.model_metadata: dict[str, Any] = {}
 
     def load(self, path: str) -> bool:
-        """Charge le modèle depuis un fichier pickle."""
+        """Charge le modèle depuis un fichier (pickle pour metadata + ubj pour booster)."""
         if not os.path.isfile(path):
             print(f"   ⚠️ Modèle non trouvé: {path}")
             return False
         try:
+            # 1. Load metadata from pickle
             with open(path, "rb") as f:
                 data = pickle.load(f)
 
             if isinstance(data, dict):
-                self.model = data.get("model")
                 self.feature_names = data.get("feature_names", [])
                 self.model_metadata = data.get("metrics", {})
-                # Capturer la date d'entraînement (stockée au top-level)
                 if "training_date" in data:
                     self.model_metadata["training_date"] = data["training_date"]
+                
+                # Check for UBJ version
+                ubj_path = path.replace(".pkl", ".ubj")
+                if os.path.isfile(ubj_path):
+                    from xgboost import XGBClassifier
+                    self.model = XGBClassifier()
+                    self.model.load_model(ubj_path)
+                    print(f"   ✅ Modèle UBJ chargé: {ubj_path}")
+                else:
+                    self.model = data.get("model")
+                    print(f"   ✅ Modèle Pickle chargé (legacy): {path}")
             else:
                 # Ancien format (modèle seul)
                 self.model = data
                 self.feature_names = ["algo_score_goal", "python_vol", "is_home"]
+                print(f"   ✅ Modèle brut chargé (legacy): {path}")
 
             market = self.model_metadata.get("market", os.path.basename(path))
             acc = self.model_metadata.get("accuracy", 0)
             auc = self.model_metadata.get("roc_auc", 0)
-            print(f"   ✅ Modèle chargé: {path}")
             if acc > 0:
                 print(f"      Acc={acc:.2%}, AUC={auc:.3f}, Features={len(self.feature_names)}")
             return True
         except Exception as e:
-            print(f"   ❌ Erreur chargement: {e}")
+            print(f"   ❌ Erreur chargement {path}: {e}")
             self.model = None
             return False
 

@@ -205,25 +205,27 @@ WEIGHT_ML: float = 0.40
 #  NUL — ESTIMATION
 # ═══════════════════════════════════════════════════════════════════
 
-DRAW_FACTOR: float = 0.26  # ~26% de nuls en moyenne en football (fallback global)
+DRAW_FACTOR: float = 0.28  # ~28% de nuls en moyenne en football (fallback global, was 0.26)
 ELO_DRAW_DECAY_RATE: float = 0.002  # Decay du draw factor en fonction de l'écart ELO
 
 # Draw factor calibré par ligue (taux de nuls observé historiquement)
+# Recalibré mars 2026 : les valeurs précédentes sous-estimaient les nuls de 3-5%
+# (confirmé par backtest: bin 40-50% prédit → 55% réel, pattern = draws manqués)
 DRAW_FACTOR_BY_LEAGUE: dict[int, float] = {
-    61: 0.24,  # Ligue 1
-    62: 0.25,  # Ligue 2
-    39: 0.23,  # Premier League
-    140: 0.26,  # La Liga
-    135: 0.27,  # Serie A
-    78: 0.22,  # Bundesliga
-    2: 0.22,  # Champions League
-    3: 0.24,  # Europa League
+    61: 0.27,  # Ligue 1 — ~27% nuls observés (was 0.24)
+    62: 0.28,  # Ligue 2 — plus de nuls en L2 (was 0.25)
+    39: 0.26,  # Premier League — compétitif (was 0.23)
+    140: 0.29,  # La Liga — tactique, beaucoup de nuls (was 0.26)
+    135: 0.30,  # Serie A — le plus de nuls d'Europe (was 0.27)
+    78: 0.25,  # Bundesliga — jeu ouvert, moins de nuls (was 0.22)
+    2: 0.28,  # Champions League — très tactique (was 0.22)
+    3: 0.27,  # Europa League — défensif (was 0.24)
     # Coupes nationales (moins de nuls: prolongations/tirs au but)
-    66: 0.20,  # Coupe de France
-    45: 0.20,  # FA Cup
-    143: 0.21,  # Copa del Rey
-    137: 0.22,  # Coppa Italia
-    81: 0.19,  # DFB-Pokal
+    66: 0.22,  # Coupe de France (was 0.20)
+    45: 0.22,  # FA Cup (was 0.20)
+    143: 0.23,  # Copa del Rey (was 0.21)
+    137: 0.24,  # Coppa Italia (was 0.22)
+    81: 0.21,  # DFB-Pokal (was 0.19)
 }
 
 

@@ -59,6 +59,26 @@ def job_brain() -> None:
         logger.error(f"[job_brain] {e}")
 
 
+def job_nhl_evaluation() -> None:
+    """Tous les jours à 8h — scores NHL + évaluation complète."""
+    try:
+        from src.fetchers.fetch_nhl_results import evaluate_nhl_predictions
+        evaluate_nhl_predictions(days_back=3)
+    except Exception as e:
+        logger.error(f"[job_nhl_eval] {e}")
+
+
+def job_football_evaluation() -> None:
+    """Tous les jours à 8h30 — évaluation foot + recalibration."""
+    try:
+        from src.training.evaluate import run_evaluation
+        from src.models.calibrate import run_calibration
+        run_evaluation()
+        run_calibration()
+    except Exception as e:
+        logger.error(f"[job_football_eval] {e}")
+
+
 def main() -> None:
     scheduler = BlockingScheduler(timezone="Europe/Paris")
 
@@ -74,12 +94,20 @@ def main() -> None:
     # Tous les jours à 6h00
     scheduler.add_job(job_brain, CronTrigger(hour=6, minute=0), id="brain", max_instances=1, coalesce=True)
 
+    # Tous les jours à 8h00 — évaluation NHL (après matchs de nuit US)
+    scheduler.add_job(job_nhl_evaluation, CronTrigger(hour=8, minute=0), id="nhl_eval", max_instances=1, coalesce=True)
+
+    # Tous les jours à 8h30 — évaluation foot + recalibration
+    scheduler.add_job(job_football_evaluation, CronTrigger(hour=8, minute=30), id="football_eval", max_instances=1, coalesce=True)
+
     logger.info("=" * 50)
     logger.info("  ⚙️  Worker démarré")
     logger.info("  - Live scores    : */5 min")
     logger.info("  - Résultats FT   : */15 min")
     logger.info("  - Fixtures       : toutes les heures")
     logger.info("  - Pipeline brain : 6h00 quotidien")
+    logger.info("  - NHL évaluation : 8h00 quotidien")
+    logger.info("  - Foot éval+calib: 8h30 quotidien")
     logger.info("=" * 50)
 
     try:

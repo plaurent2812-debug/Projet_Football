@@ -81,9 +81,9 @@ def evaluate_match(fixture: dict, prediction: dict) -> dict:
                 break
 
     # ── Évaluation des paris ─────────────────────────────────────
-    p_h: int = prediction.get("proba_home", 33)
-    p_d: int = prediction.get("proba_draw", 33)
-    p_a: int = prediction.get("proba_away", 33)
+    p_h: int = prediction.get("proba_home") or 33
+    p_d: int = prediction.get("proba_draw") or 33
+    p_a: int = prediction.get("proba_away") or 33
 
     # 1X2 : la proba max correspond-elle au résultat ?
     max_pred: int = max(p_h, p_d, p_a)
@@ -95,20 +95,20 @@ def evaluate_match(fixture: dict, prediction: dict) -> dict:
         pred_result = "D"
     result_1x2_ok: bool = pred_result == actual_result
 
-    # BTTS
-    p_btts: int = prediction.get("proba_btts", 50)
+    # BTTS (None-safe)
+    p_btts: int = prediction.get("proba_btts") or 50
     btts_ok: bool = (p_btts >= 50) == actual_btts
 
     # Over 0.5
-    p_o05: int = prediction.get("proba_over_05", 90)
+    p_o05: int = prediction.get("proba_over_05") or 90
     over_05_ok: bool = (p_o05 >= 50) == actual_over_05
 
     # Over 1.5
-    p_o15: int = prediction.get("proba_over_15", 70)
+    p_o15: int = prediction.get("proba_over_15") or 70
     over_15_ok: bool = (p_o15 >= 50) == actual_over_15
 
     # Over 2.5
-    p_o25: int = prediction.get("proba_over_2_5", 50)
+    p_o25: int = prediction.get("proba_over_2_5") or 50
     over_25_ok: bool = (p_o25 >= 50) == actual_over_25
 
     # Penalty
@@ -173,8 +173,8 @@ def evaluate_match(fixture: dict, prediction: dict) -> dict:
         "pred_likely_scorer": pred_scorer,
         "pred_penalty": p_pen,
         "pred_recommended": prediction.get("recommended_bet", ""),
-        "pred_confidence": prediction.get("confidence_score"),
-        "model_version": "v1",
+        "pred_confidence": prediction.get("confidence_score") or prediction.get("confidence"),
+        "model_version": prediction.get("model_version", "v1"),
         "actual_home_goals": hg,
         "actual_away_goals": ag,
         "actual_result": actual_result,
@@ -409,11 +409,12 @@ def _generate_post_analysis(
 # ═══════════════════════════════════════════════════════════════════
 
 
-def run_evaluation() -> None:
-    """Evaluate all finished matches that have an unevaluated prediction.
+def run_evaluation(force_refresh: bool = False) -> None:
+    """Evaluate all finished matches that have a prediction.
 
-    Fetches finished fixtures joined with predictions, evaluates each
-    one, persists results, and prints global performance stats.
+    Args:
+        force_refresh: If ``True``, re-evaluate ALL matches (not just new ones).
+            Useful after fixing metadata fields (league_id, confidence, etc.).
 
     Returns:
         None.
@@ -428,8 +429,12 @@ def run_evaluation() -> None:
     pred_map: dict = {p["fixture_id"]: p for p in predictions}
 
     # 2. Déjà évalués ?
-    already = supabase.table("prediction_results").select("fixture_id").execute().data
-    already_ids: set = {r["fixture_id"] for r in already}
+    if force_refresh:
+        already_ids: set = set()
+        logger.info("  ♻️ Mode force_refresh : réévaluation de tous les matchs")
+    else:
+        already = supabase.table("prediction_results").select("fixture_id").execute().data
+        already_ids = {r["fixture_id"] for r in already}
 
     to_evaluate: list[tuple[dict, dict]] = []
     for f in finished:

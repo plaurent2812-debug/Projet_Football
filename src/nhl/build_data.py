@@ -150,8 +150,14 @@ def build_nhl_dataset(output_file="nhl_dataset.csv"):
 
     df = pd.DataFrame(dataset_rows)
     # Supprimer les colonnes techniques dont on n'a pas besoin pour s'entraîner
+    # KEEP: date (needed for temporal sort), player_id (for debugging)
     cols_to_drop = ["_skater", "player_name", "team", "opp"]
     df = df.drop(columns=[c for c in cols_to_drop if c in df.columns], errors="ignore")
+
+    # Ensure 'date' column is preserved for TimeSeriesSplit sorting
+    if "date" in df.columns:
+        df = df.sort_values("date").reset_index(drop=True)
+        logger.info(f"  📅 Dataset trié par date: {df['date'].iloc[0][:10]} → {df['date'].iloc[-1][:10]}")
 
     output_path = Path(__file__).parent.parent / output_file
     df.to_csv(output_path, index=False)

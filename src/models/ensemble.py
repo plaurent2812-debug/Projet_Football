@@ -49,6 +49,7 @@ def train_stacking_ensemble(
     target_name: str,
     n_classes: int = 2,
     imputer: Any = None,
+    lgb_tuned_params: dict | None = None,
 ) -> dict | None:
     """Train a 2-layer stacking ensemble with temporal cross-validation.
 
@@ -102,7 +103,7 @@ def train_stacking_ensemble(
     logger.info(f"  TimeSeriesSplit : train={len(X_train)}, test={len(X_test)}")
 
     # ── Couche 1 : Base Learners ─────────────────────────────────
-    base_models = _build_base_learners(n_classes)
+    base_models = _build_base_learners(n_classes, lgb_tuned_params=lgb_tuned_params)
     oof_probas = _generate_oof_predictions(base_models, X_train, y_train, n_classes)
 
     # Entraîner les base learners sur tout le train set
@@ -162,9 +163,20 @@ def train_stacking_ensemble(
         base_acc = accuracy_score(y_test, y_pred_base)
         logger.info(f"    vs {name:10s} seul : {base_acc:.4f}")
 
-    # ── Sérialiser ───────────────────────────────────────────────
+    # ── Sérialiser — XGBoost via save_model(), reste en pickle ───
+    serialized_base: dict[str, Any] = {}
+    for bname, bitem in fitted_base.items():
+        if bname == "xgboost":
+                serialized_base[bname] = {
+                **{k: v for k, v in bitem.items() if k != "model"},
+                "xgb_model_bytes": base64.b64encode(bitem["model"].get_booster().save_raw("ubj")).decode("utf-8"),
+                "xgb_model_format": "ubj",
+            }
+        else:
+            serialized_base[bname] = bitem
+
     payload: dict[str, Any] = {
-        "base_models": fitted_base,
+        "base_models": serialized_base,
         "meta_model": meta_model,
         "label_encoder": le,
         "imputer": imputer,
@@ -192,7 +204,7 @@ def train_stacking_ensemble(
     return result
 
 
-def _build_base_learners(n_classes: int) -> dict:
+def _build_base_learners(n_classes: int, lgb_tuned_params: dict | None = None) -> dict:
     """Create the three base learner instances."""
     xgb_params: dict = {
         "n_estimators": 200,
@@ -213,7 +225,7 @@ def _build_base_learners(n_classes: int) -> dict:
     else:
         xgb_params["objective"] = "binary:logistic"
 
-    lgb_params: dict = {
+    lgb_params: dict = lgb_tuned_params or {
         "n_estimators": 200,
         "max_depth": 5,
         "learning_rate": 0.08,
@@ -403,6 +415,17 @@ def load_ensemble(model_name: str = "ensemble_1x2") -> bool:
             return False
 
         payload = pickle.loads(base64.b64decode(weights_b64))
+        # Reconstruct XGBoost model from save_model() bytes if new format
+        base_models = payload.get("base_models", {})
+        if "xgboost" in base_models:
+            if "xgb_model_bytes" in base_models["xgboost"]:
+                xgb_model = xgb.XGBClassifier()
+                xgb_model.load_model(base64.b64decode(base_models["xgboost"]["xgb_model_bytes"]))
+                base_models["xgboost"]["model"] = xgb_model
+            if "model" not in base_models["xgboost"]:
+                logger.warning(f"  ⚠️ Ensemble {model_name}: XGBoost 'model' key missing after load")
+                return False
+            payload["base_models"] = base_models
         _ensemble_cache[model_name] = payload
         logger.info(f"  🏗️ Ensemble {model_name} chargé")
         return True
@@ -470,11 +493,10 @@ def predict_ensemble(
 
     # Return format depends on model type
     if n_classes == 3:
-        return {
-            "ml_home": round(proba_map.get("H", 0.33) * 100),
-            "ml_draw": round(proba_map.get("D", 0.33) * 100),
-            "ml_away": round(proba_map.get("A", 0.33) * 100),
-        }
+        ml_home = round(proba_map.get("H", 0.33) * 100)
+        ml_draw = round(proba_map.get("D", 0.33) * 100)
+        ml_away = 100 - ml_home - ml_draw  # Ensure sum == 100
+        return {"ml_home": ml_home, "ml_draw": ml_draw, "ml_away": ml_away}
     else:
         return {"ml_prob": round(float(final_probas[1]) * 100)}
 

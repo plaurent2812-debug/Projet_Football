@@ -502,28 +502,12 @@ def blend_predictions(stats_result: dict, ai_result: AIFeatures | None) -> dict:
         final["ai_features"] = {}
         final["analysis_text"] = _build_fallback_analysis(stats_result)
 
-    # Interroger les Meta-Modèles XGBoost (Phase 2)
-    meta_preds = predict_meta(stats_result, ai_features_dict)
-    if meta_preds:
-        # Override les probabilités avec celles de XGBoost
-        if "proba_home_meta" in meta_preds:
-            final["proba_home"] = meta_preds["proba_home_meta"]
-            final["proba_draw"] = meta_preds["proba_draw_meta"]
-            final["proba_away"] = meta_preds["proba_away_meta"]
-            
-        if "proba_btts_meta" in meta_preds:
-            final["proba_btts"] = meta_preds["proba_btts_meta"]
-            
-        if "proba_over_15_meta" in meta_preds:
-            final["proba_over_15"] = meta_preds["proba_over_15_meta"]
-            
-        if "proba_over_25_meta" in meta_preds:
-            final["proba_over_2_5"] = meta_preds["proba_over_25_meta"]
-            
-        final["model_version"] = "meta_v2"
-    else:
-        # Indiquer la version (features_v1 = Phase 1 de la refonte sans ML finalisé)
-        final["model_version"] = "features_v1"
+    # Meta-Learner XGBoost désactivé (mars 2026) :
+    # Le meta-learner n'utilise que 5 features IA Gemini (motivation, media_pressure, etc.)
+    # qui sont trop similaires d'un match à l'autre → probas quasi identiques pour tous les matchs.
+    # Les probas du stats_engine (Poisson + ELO + ML XGBoost + calibration) sont plus fiables.
+    # À réactiver après réentraînement du meta-learner avec plus de features.
+    final["model_version"] = "hybrid_v3"
 
     # Soft cap : 80% max on any 1X2 outcome (professional football realistic ceiling)
     _MAX_WIN = 80

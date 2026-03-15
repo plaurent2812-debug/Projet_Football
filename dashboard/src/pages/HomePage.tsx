@@ -219,13 +219,13 @@ export default function HomePage() {
     return (
         <div className="animate-fade-in-up pb-8 max-w-3xl mx-auto">
 
-            {/* ── Hero / Intro Section ──────────────────────────────── */}
+            {/* ── Hero / Intro Section (Compact) ────────────────────────── */}
             <div className="px-4 py-8 text-center bg-gradient-to-b from-primary/10 to-transparent border-b border-border/30">
-                <h1 className="text-2xl sm:text-3xl font-black text-foreground mb-2 tracking-tight">
+                <h1 className="text-3xl sm:text-4xl font-black text-foreground mb-3 tracking-tight">
                     Proba<span className="text-primary">Lab</span>
                 </h1>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                    Des experts s'appuient sur nos algorithmes et notre IA pour sélectionner les meilleurs pronos chaque jour. Prédictions, Live Tracking et Value Bets en un coup d'œil.
+                    Prédictions IA, Live Tracking et Value Bets en un coup d'œil.
                 </p>
             </div>
 
@@ -420,20 +420,23 @@ export default function HomePage() {
                 </div>
             </div>
 
-            {/* Quick Links Row */}
-            <div className="px-3 mb-6 grid grid-cols-2 gap-2">
-                <button
-                    onClick={() => navigate("/watchlist")}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border/50 bg-card text-foreground text-xs font-bold hover:bg-accent/50 hover:border-amber-500/50 transition-colors"
-                >
-                    <Star className="w-3.5 h-3.5 text-amber-500" /> Vos Favoris
-                </button>
-                <button
-                    onClick={() => navigate("/premium")}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-border/50 bg-card text-foreground text-xs font-bold hover:bg-accent/50 hover:border-emerald-500/50 transition-colors"
-                >
-                    <Trophy className="w-3.5 h-3.5 text-emerald-500" /> Stats Premium
-                </button>
+            {/* Quick Links (Segmented Style) */}
+            <div className="px-4 mb-6">
+                <div className="flex p-1 bg-muted/30 rounded-xl border border-border/50">
+                    <button
+                        onClick={() => navigate("/watchlist")}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-foreground text-xs font-bold hover:bg-background/80 transition-all active:scale-[0.98]"
+                    >
+                        <Star className="w-3.5 h-3.5 text-amber-500" /> Vos Favoris
+                    </button>
+                    <div className="w-[1px] bg-border/30 my-2" />
+                    <button
+                        onClick={() => navigate("/premium")}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-foreground text-xs font-bold hover:bg-background/80 transition-all active:scale-[0.98]"
+                    >
+                        <Trophy className="w-3.5 h-3.5 text-emerald-500" /> Stats Premium
+                    </button>
+                </div>
             </div>
 
             {/* ── VIP Spots (Quick preview) ────────────────────────── */}
@@ -444,7 +447,9 @@ export default function HomePage() {
                         <div className="fs-league-name font-black">🔥 Spots Premium du Jour</div>
                         <div className="fs-league-country">Haute confiance & Edge identifié</div>
                     </div>
-                    <span className="fs-league-count bg-amber-500/20 text-amber-600">{vipSpots.length}</span>
+                    {vipSpots.length > 0 && (
+                        <span className="fs-league-count bg-amber-500/20 text-amber-600">{vipSpots.length}</span>
+                    )}
                 </div>
 
                 {loading ? (
@@ -470,9 +475,14 @@ export default function HomePage() {
                         )}
                     </>
                 ) : (
-                    <div className="text-center py-6 text-xs text-muted-foreground flex flex-col items-center">
-                        <Activity className="w-6 h-6 text-muted-foreground/30 mb-2" />
-                        Aucun Spot VIP détecté pour l'instant.
+                    <div className="text-center py-8 text-xs text-muted-foreground flex flex-col items-center px-6">
+                        <div className="w-12 h-12 rounded-full bg-muted/20 flex items-center justify-center mb-3">
+                            <Activity className="w-6 h-6 text-muted-foreground/40 animate-pulse" />
+                        </div>
+                        <p className="font-bold text-foreground mb-1">Analyse en cours...</p>
+                        <p className="max-w-[200px] leading-relaxed mx-auto opacity-70">
+                            Notre algorithme scanne les derniers coefficients d'Efficacité. Revenez d'ici quelques minutes.
+                        </p>
                     </div>
                 )}
             </div>
@@ -490,8 +500,8 @@ export default function HomePage() {
                         {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-5 w-full" />)}
                     </div>
                 ) : news.length > 0 ? (
-                    <div className="divide-y divide-border/20">
-                        {news.slice(0, 10).map((item, i) => <NewsRow key={i} item={item} />)}
+                    <div className="divide-y divide-border/20 max-h-[320px] overflow-y-auto scrollbar-thin">
+                        {news.slice(0, 15).map((item, i) => <NewsRow key={i} item={item} />)}
                     </div>
                 ) : (
                     <div className="text-center py-6 text-xs text-muted-foreground">

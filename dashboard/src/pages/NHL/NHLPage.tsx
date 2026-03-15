@@ -216,12 +216,33 @@ function NHLMatchRow({ match, isStarred, onToggleStar }) {
     const conf = match.confidence_score
     const isHot = conf >= 7 && !isFinished
 
-    // Prediction
+    // Predictions
     const probaOver55 = match.proba_over_55
+    const homeWinProba = match.home_win_proba
+    const awayWinProba = match.away_win_proba
+
+    // Build mini prediction text
+    let miniPred = null
+    if (!isFinished && (homeWinProba || awayWinProba || probaOver55 != null)) {
+        const parts = []
+        if (homeWinProba && awayWinProba) {
+            const fav = homeWinProba >= awayWinProba
+                ? `${match.home_team?.split(' ').pop()} ${Math.round(homeWinProba * 100)}%`
+                : `${match.away_team?.split(' ').pop()} ${Math.round(awayWinProba * 100)}%`
+            parts.push(fav)
+        }
+        if (probaOver55 != null) {
+            parts.push(probaOver55 >= 50 ? `O5.5 ${Math.round(probaOver55)}%` : `U5.5 ${Math.round(100 - probaOver55)}%`)
+        }
+        if (parts.length > 0) miniPred = parts.join(' · ')
+    }
 
     return (
         <div
-            className="fs-match-row"
+            className={cn(
+                "fs-match-row",
+                isHot && "bg-amber-500/[0.03] hover:bg-amber-500/[0.07]"
+            )}
             onClick={() => navigate(`/nhl/match/${match.api_fixture_id || match.id}`)}
         >
             {/* Time */}
@@ -271,33 +292,41 @@ function NHLMatchRow({ match, isStarred, onToggleStar }) {
             </div>
 
             {/* Tags & Prediction */}
-            <div className="shrink-0 w-[110px] flex items-center gap-1.5 pl-2 justify-end">
-                {/* Match Style Tags */}
-                {probaOver55 != null && probaOver55 >= 57 && (
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 flex items-center gap-1">
-                        <Flame className="w-2.5 h-2.5" />
-                        Offensif
-                    </span>
-                )}
-                {probaOver55 != null && probaOver55 <= 47 && (
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400">
-                        Défensif
-                    </span>
-                )}
-
-                {/* Confidence Score */}
-                {(!isFinished && conf != null) && (
-                    <div className="flex items-center gap-1 ml-0.5">
-                        {isHot && <Flame className="w-3 h-3 text-orange-500 flame-badge" />}
-                        <span className={cn(
-                            "fs-pred-chip",
-                            conf >= 8 ? "bg-emerald-500/15 text-emerald-500" :
-                                conf >= 6 ? "bg-amber-500/15 text-amber-500" :
-                                    "bg-muted text-muted-foreground"
-                        )}>
-                            {conf}/10
+            <div className="shrink-0 flex flex-col items-end gap-0.5 pl-2 min-w-[100px]">
+                <div className="flex items-center gap-1.5">
+                    {/* Match Style Tags */}
+                    {probaOver55 != null && probaOver55 >= 57 && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 whitespace-nowrap">
+                            🔥 Offensif
                         </span>
-                    </div>
+                    )}
+                    {probaOver55 != null && probaOver55 <= 47 && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400 whitespace-nowrap">
+                            🛡️ Défensif
+                        </span>
+                    )}
+
+                    {/* Confidence Score */}
+                    {(!isFinished && conf != null) && (
+                        <div className="flex items-center gap-1 ml-0.5">
+                            {isHot && <Flame className="w-3 h-3 text-orange-500 flame-badge" />}
+                            <span className={cn(
+                                "fs-pred-chip",
+                                conf >= 8 ? "bg-emerald-500/15 text-emerald-500" :
+                                    conf >= 6 ? "bg-amber-500/15 text-amber-500" :
+                                        "bg-muted text-muted-foreground"
+                            )}>
+                                {conf}/10
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Mini prediction */}
+                {miniPred && (
+                    <span className="text-[9px] text-muted-foreground/70 font-medium">
+                        {miniPred}
+                    </span>
                 )}
             </div>
 
@@ -418,7 +447,7 @@ export default function NHLPage({ date, setDate }) {
                         <NHLMatchRow key={m.id} match={m} isStarred={isStarred(m.id)} onToggleStar={toggleMatch} />
                     ))
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
                         <span className="text-3xl mb-3">🏒</span>
                         <h3 className="font-bold text-sm mb-1">Aucun match NHL</h3>
                         <p className="text-xs text-muted-foreground max-w-[220px]">

@@ -2582,7 +2582,13 @@ def get_prediction_detail(fixture_id: str):
         raise HTTPException(status_code=404, detail="Fixture not found")
 
     prediction_data = (
-        supabase.table("predictions").select("*").eq("fixture_id", fixture_id).execute().data
+        supabase.table("predictions")
+        .select("*")
+        .eq("fixture_id", fixture_id)
+        .order("created_at")
+        .limit(1)
+        .execute()
+        .data
     )
     prediction = prediction_data[0] if prediction_data else None
 

@@ -315,20 +315,30 @@ function StatsDashboard({ stats, isAdmin }) {
         )
     }
 
-    // Market name display
+    // Market name display — rename internal algo names to user-friendly labels
     const marketLabels = {
         "Victoire domicile": "Victoire domicile",
         "Victoire extérieur": "Victoire extérieur",
+        "Victoire": "Victoire",
         "Match nul": "Match nul",
         "BTTS — Les deux équipes marquent": "BTTS",
+        "BTTS": "BTTS",
         "Over 2.5 buts": "Over 2.5 buts",
         "Over 1.5 buts": "Over 1.5 buts",
         "Over 3.5 buts": "Over 3.5 buts",
+        "Double chance 1N": "Double Chance 1N",
         "player_points_over_0.5": "Over 0.5 Pts (NHL)",
+        "fun_football": "Football IA",
+        "fun_nhl": "NHL IA",
+        "safe_football": "Football Safe",
+        "safe_nhl": "NHL Safe",
+        "Victoire + Over 1.5": "Victoire + Over 1.5",
     }
 
     const byMarket = stats.by_market || {}
-    const sortedMarkets = Object.entries(byMarket).sort((a, b) => b[1].total - a[1].total)
+    const sortedMarkets = Object.entries(byMarket)
+        .filter(([, data]) => data.total >= 3)
+        .sort((a, b) => b[1].total - a[1].total)
 
     return (
         <div className="mt-6">
@@ -461,6 +471,7 @@ function StatsDashboard({ stats, isAdmin }) {
                         </div>
                         <div className="divide-y divide-border/30">
                             {Object.entries(stats.model_by_market)
+                                .filter(([, data]) => data.total >= 3)
                                 .sort(([, a], [, b]) => b.total - a.total)
                                 .map(([market, data]) => (
                                     <div key={market} className="flex items-center justify-between px-4 py-2.5">
@@ -835,7 +846,7 @@ export default function ParisDuSoir() {
                         </div>
                     ) : (
                         <div className="rounded-xl border border-dashed border-border/50 bg-muted/20 px-4 py-6 text-center">
-                            <p className="text-xs text-muted-foreground">😴 Rien d'intéressant aujourd'hui</p>
+                            <p className="text-xs text-muted-foreground">📡 Pas de pick expert ce soir — notre algorithme continue l'analyse en continu</p>
                         </div>
                     )}
                 </div>

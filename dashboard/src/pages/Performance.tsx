@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { fetchPerformance } from "@/lib/api"
 import {
     BarChart3, Target, TrendingUp, Percent, Calendar,
-    CheckCircle2, XCircle, Trophy, Zap, Activity, Swords
+    CheckCircle2, XCircle, Trophy, Zap, Activity, Swords, Info
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import {
@@ -179,7 +179,7 @@ export default function PerformancePage() {
         { label: "Plus de 1.5 buts", accuracy: data.accuracy_over_15 ?? "—", icon: TrendingUp, color: "text-blue-400" },
         { label: "Plus de 2.5 buts", accuracy: data.accuracy_over_25 ?? "—", icon: TrendingUp, color: "text-amber-400" },
         { label: "Plus de 3.5 buts", accuracy: data.accuracy_over_35 ?? "—", icon: TrendingUp, color: "text-orange-400" },
-        { label: "Score exact", accuracy: data.accuracy_score ?? "—", icon: Target, color: "text-purple-400" },
+        { label: "Score exact (expérimental)", accuracy: data.accuracy_score ?? "—", icon: Target, color: "text-purple-400" },
     ].filter(m => m.accuracy !== "—") : [
         { label: "Taux Buts (Top 1)", accuracy: data.accuracy_goal, icon: Target, color: "text-emerald-400" },
         { label: "Taux Passes (Top 1)", accuracy: data.accuracy_assist, icon: Target, color: "text-blue-400" },
@@ -258,24 +258,37 @@ export default function PerformancePage() {
                             icon={Target}
                             accent="bg-emerald-500/10 text-emerald-400"
                         />
-                        <StatTile
-                            value={data.brier_score_1x2?.toFixed(3) || "—"}
-                            label="Brier Score (1X2)"
-                            icon={Activity}
-                            accent="bg-blue-500/10 text-blue-400"
-                        />
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-card/50 border border-border/40">
+                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                                <Activity className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-black tabular-nums">{data.brier_score_1x2?.toFixed(3) || "—"}</p>
+                                <div className="flex items-center gap-1">
+                                    <p className="text-[11px] text-muted-foreground font-medium">Calibration</p>
+                                    <div className="group relative">
+                                        <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-card border border-border rounded-lg shadow-xl text-[10px] text-muted-foreground w-48 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                            <strong className="text-foreground">Brier Score</strong> : mesure la qualité des probabilités. Plus c'est proche de 0, mieux c'est. &lt;0.25 = bon.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <StatTile
                             value={data.avg_confidence}
                             label="Confiance moyenne"
                             icon={Zap}
                             accent="bg-amber-500/10 text-amber-400"
                         />
-                        <StatTile
-                            value={data.value_bets}
-                            label="Paris value"
-                            icon={Trophy}
-                            accent="bg-purple-500/10 text-purple-400"
-                        />
+                        {data.value_bets > 0 && (
+                            <StatTile
+                                value={data.value_bets}
+                                label="Paris value"
+                                icon={Trophy}
+                                accent="bg-purple-500/10 text-purple-400"
+                            />
+                        )}
                     </>
                 ) : (
                     <>

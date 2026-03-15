@@ -60,7 +60,11 @@ export default function AdminOverview() {
                                 <Icon className={`w-5 h-5 ${kpi.color}`} />
                                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{kpi.label}</span>
                             </div>
-                            <div className={`text-3xl font-black ${kpi.color}`}>{loading ? '...' : kpi.value}</div>
+                            {loading ? (
+                                <div className="h-9 w-16 rounded-lg bg-white/10 animate-pulse" />
+                            ) : (
+                                <div className={`text-3xl font-black ${kpi.color}`}>{kpi.value}</div>
+                            )}
                         </div>
                     )
                 })}

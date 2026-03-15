@@ -299,8 +299,12 @@ function AdminDashboard() {
                                             {isRunning && <span className="inline-block w-2 h-4 bg-emerald-500 animate-pulse ml-1 align-middle" />}
                                         </div>
                                     ) : (
-                                        <div className="flex items-center justify-center h-full text-muted-foreground/50 italic">
-                                            En attente de logs...
+                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground/40 gap-3">
+                                            <Terminal className="w-8 h-8" />
+                                            <div className="text-center">
+                                                <p className="text-sm font-medium">Aucun pipeline actif</p>
+                                                <p className="text-xs mt-1">Lancez un pipeline pour voir les logs en temps réel</p>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -335,7 +339,10 @@ function AdminDashboard() {
                                             <div className="text-[10px] font-mono text-muted-foreground">{t.time} UTC</div>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-semibold">{t.name}</div>
+                                            <div className="text-xs font-semibold flex items-center gap-1.5">
+                                                {t.name}
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Automatisé" />
+                                            </div>
                                             <div className="text-[10px] text-muted-foreground">{t.desc}</div>
                                             <div className="text-[9px] font-mono text-muted-foreground/60 mt-0.5">{t.cron}</div>
                                         </div>
@@ -359,7 +366,10 @@ function AdminDashboard() {
                                             <div className="text-[10px] font-mono text-muted-foreground">{t.time} UTC</div>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-semibold">{t.name}</div>
+                                            <div className="text-xs font-semibold flex items-center gap-1.5">
+                                                {t.name}
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Automatisé" />
+                                            </div>
                                             <div className="text-[10px] text-muted-foreground whitespace-pre-line">{t.desc}</div>
                                             <div className="text-[9px] font-mono text-muted-foreground/60 mt-0.5">{t.cron}</div>
                                         </div>
@@ -384,7 +394,10 @@ function AdminDashboard() {
                                             <div className="text-[10px] font-mono text-muted-foreground">{t.time} UTC</div>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-semibold">{t.name}</div>
+                                            <div className="text-xs font-semibold flex items-center gap-1.5">
+                                                {t.name}
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Automatisé" />
+                                            </div>
                                             <div className="text-[10px] text-muted-foreground">{t.desc}</div>
                                             <div className="text-[9px] font-mono text-muted-foreground/60 mt-0.5">{t.cron}</div>
                                         </div>

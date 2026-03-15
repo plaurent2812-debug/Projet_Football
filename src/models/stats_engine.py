@@ -2260,19 +2260,20 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         context["euro_draw_boost"] = euro_boost
 
     # ── 10. Calibration fine (si disponible) ───────────────────────
+    # ⚠️ 1X2 calibration DISABLED (mars 2026):
+    # With only 74 samples, Platt scaling produces degenerate parameters
+    # (1x2_draw: a=-0.13 → sigmoid always ≈ 24%, crushing all inputs to same output).
+    # This makes ALL matches show ~38/19/43 regardless of actual Poisson/ELO output.
+    # Re-enable once prediction_results table has 500+ samples for Isotonic regression.
     if CALIBRATION_AVAILABLE:
         try:
             lid = league_id
-            cal_home = apply_calibration(final_home, "1x2_home", lid)
-            cal_draw = apply_calibration(final_draw, "1x2_draw", lid)
-            cal_away = apply_calibration(final_away, "1x2_away", lid)
-            # Renormaliser à 100%
-            cal_total = cal_home + cal_draw + cal_away
-            if cal_total > 0:
-                final_home = round(cal_home / cal_total * 100)
-                final_draw = round(cal_draw / cal_total * 100)
-                final_away = 100 - final_home - final_draw
+            # Skip 1X2 calibration — it destroys per-match differentiation
+            # cal_home = apply_calibration(final_home, "1x2_home", lid)
+            # cal_draw = apply_calibration(final_draw, "1x2_draw", lid)
+            # cal_away = apply_calibration(final_away, "1x2_away", lid)
 
+            # BTTS and Over markets: binary calibration is less harmful
             poisson_probs["proba_btts"] = apply_calibration(
                 poisson_probs["proba_btts"], "btts", lid
             )

@@ -2198,6 +2198,23 @@ def delete_expert_pick(pick_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/expert-picks/latest")
+def get_latest_expert_pick():
+    """Return the most recent expert pick — used by frontend polling for notifications."""
+    try:
+        data = (
+            supabase.table("expert_picks")
+            .select("id, date, sport, market, match_label, odds, created_at")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        return {"pick": data[0] if data else None}
+    except Exception as e:
+        return {"pick": None, "error": str(e)}
+
+
 @app.post("/api/expert-picks/resolve")
 def resolve_expert_picks(body: ResolveExpertPicksRequest, authorization: str = Header(None)):
     """

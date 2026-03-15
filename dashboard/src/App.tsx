@@ -74,6 +74,7 @@ const WatchlistPage = lazy(() => import("@/pages/WatchlistPage"))
 const ParisDuSoirPage = lazy(() => import("@/pages/ParisDuSoir"))
 const UpdatePasswordPage = lazy(() => import("@/pages/UpdatePassword"))
 import GoalNotifications from "@/components/GoalNotifications"
+import ExpertPickNotifications from "@/components/ExpertPickNotifications"
 
 
 function PageLoader() {
@@ -353,6 +354,7 @@ function AppContent() {
       <Footer />
       <BottomNav />
       <GoalNotifications />
+      <ExpertPickNotifications />
     </div>
   )
 }

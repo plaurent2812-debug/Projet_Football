@@ -343,11 +343,12 @@ function MatchRow({ match, isStarred, onToggleStar }) {
     const awayWon = isFinished && match.away_goals > match.home_goals
     const time = match.date?.slice(11, 16) || "--:--"
     const isHot = pred?.confidence_score >= 7 && !isFinished
+    const isLowConfidence = pred?.confidence_score != null && pred.confidence_score <= 3 && !isFinished && !isLive
     const hasScore = isFinished || isLive
 
     return (
         <div
-            className="fs-match-row"
+            className={cn("fs-match-row", isLowConfidence && "opacity-45")}
             onClick={() => navigate(`/football/match/${match.id}`)}
         >
             {/* Time / Status */}
@@ -388,8 +389,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                         </>
                     ) : (
                         <>
-                            <span className="score-val text-muted-foreground/40">-</span>
-                            <span className="score-val text-muted-foreground/40">-</span>
+                            <span className="text-[10px] font-medium text-muted-foreground/50">vs</span>
                         </>
                     )}
                 </div>
@@ -425,11 +425,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                                 )
                             }
                             if (probaOver25 != null && probaOver25 <= 35) {
-                                return (
-                                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400">
-                                        Défensif
-                                    </span>
-                                )
+                                return null
                             }
                             return null
                         })()}

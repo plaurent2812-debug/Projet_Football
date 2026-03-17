@@ -103,12 +103,9 @@ function FootballMetaAnalysisCard({ date }) {
                     <div className="flex items-center gap-1.5">
                         <span className="text-sm font-bold">Analyse Stratégique</span>
                         <Sparkles className="w-3 h-3 text-emerald-400" />
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 uppercase tracking-wider">
-                            DeepThink
-                        </span>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                        Méta-analyse IA de la journée — spots à haute value
+                        Méta-analyse de la journée — spots à haute value
                     </p>
                 </div>
                 {expanded ? (

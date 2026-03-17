@@ -176,7 +176,7 @@ export default function LoginPage() {
                         </div>
                         <span className="text-2xl font-black">Proba<span className="text-primary">Lab</span></span>
                     </div>
-                    <p className="text-sm text-muted-foreground">Analyses sportives augmentées par l'IA</p>
+                    <p className="text-sm text-muted-foreground">Analyses sportives avancées</p>
                 </div>
 
                 <Card className="border-border/50 shadow-lg shadow-primary/5">

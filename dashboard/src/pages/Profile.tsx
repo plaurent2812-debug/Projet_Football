@@ -137,7 +137,7 @@ export default function ProfilePage() {
                             <div>
                                 <p className="font-bold text-foreground mb-1">Plan Gratuit</p>
                                 <p className="text-sm text-muted-foreground">
-                                    Passez Premium pour accéder aux probas buteurs, scores exacts et analyses IA.
+                                    Passez Premium pour accéder aux probas buteurs, scores exacts et analyses avancées.
                                 </p>
                             </div>
                             <Button className="shrink-0" onClick={() => navigate("/premium")}>

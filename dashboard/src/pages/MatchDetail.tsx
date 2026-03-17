@@ -717,8 +717,8 @@ export default function MatchDetailPage() {
                 )}
             </PremiumSection>
 
-            {/* Analyse IA — PREMIUM */}
-            <PremiumSection title="Analyse IA" icon={BrainCircuit}>
+            {/* Analyse approfondie — PREMIUM */}
+            <PremiumSection title="Analyse approfondie" icon={BrainCircuit}>
                 {p?.analysis_text ? (
                     <p className="text-sm text-foreground/80 leading-relaxed">{p.analysis_text}</p>
                 ) : (

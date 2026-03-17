@@ -523,7 +523,7 @@ export default function NHLMatchDetailPage() {
                 </CardContent>
             </Card>
 
-            {/* Analyse IA — PREMIUM */}
+            {/* Analyse approfondie — PREMIUM */}
             {(() => {
                 const analysis = fixture?.analysis_text
                 if (!isPremium && !isAdmin) {
@@ -532,7 +532,7 @@ export default function NHLMatchDetailPage() {
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-bold flex items-center gap-2">
                                     <BrainCircuit className="w-4 h-4 text-muted-foreground" />
-                                    Analyse IA
+                                    Analyse approfondie
                                     <Lock className="w-3.5 h-3.5 text-amber-500 ml-auto" />
                                 </CardTitle>
                             </CardHeader>
@@ -565,7 +565,7 @@ export default function NHLMatchDetailPage() {
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-bold flex items-center gap-2">
                                 <BrainCircuit className="w-4 h-4 text-primary" />
-                                Analyse IA
+                                Analyse approfondie
                             </CardTitle>
                         </CardHeader>
                         <CardContent>

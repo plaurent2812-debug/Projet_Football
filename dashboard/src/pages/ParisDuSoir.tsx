@@ -344,8 +344,8 @@ function StatsDashboard({ stats, isAdmin }) {
         "player_assists_over_0.5": "Over 0.5 Assists (NHL)",
         "player_goals_over_0.5": "Over 0.5 Goals (NHL)",
         "player_shots_over_2.5": "Over 2.5 Tirs (NHL)",
-        "fun_football": "Football IA",
-        "fun_nhl": "NHL IA",
+        "fun_football": "Football Algo",
+        "fun_nhl": "NHL Algo",
         "safe_football": "Football Safe",
         "safe_nhl": "NHL Safe",
         "Victoire + Over 1.5": "Victoire + Over 1.5",
@@ -438,14 +438,14 @@ function StatsDashboard({ stats, isAdmin }) {
                 </div>
             )}
 
-            {/* ── Model Prediction Accuracy (ProbaLab IA) ──────── */}
+            {/* ── Model Prediction Accuracy ──────────────────────── */}
             {stats.model_by_market && Object.keys(stats.model_by_market).length > 0 && (
                 <div className="mt-5">
                     <div className="flex items-center gap-2 mb-3">
                         <TrendingUp className="w-4 h-4 text-emerald-500" />
                         <span className="text-xs font-bold uppercase tracking-wider">Performance (30 J)</span>
                         <div className="ml-auto flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded">Experts + IA</span>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase bg-muted px-1.5 py-0.5 rounded">Experts + Algo</span>
                         </div>
                     </div>
 
@@ -453,7 +453,7 @@ function StatsDashboard({ stats, isAdmin }) {
                     <div className="grid grid-cols-2 gap-3 mb-3">
                         {stats.model_football?.total > 0 && (
                             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 overflow-hidden">
-                                <p className="text-[10px] text-muted-foreground mb-1">⚽ Football IA</p>
+                                <p className="text-[10px] text-muted-foreground mb-1">⚽ Football Algo</p>
                                 <div className="flex items-end gap-1">
                                     <span className="text-xl font-black leading-tight">{stats.model_football.win_rate}%</span>
                                     <span className="text-[9px] text-muted-foreground mb-0.5">réussite</span>
@@ -466,7 +466,7 @@ function StatsDashboard({ stats, isAdmin }) {
                         )}
                         {stats.model_nhl?.total > 0 && (
                             <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 overflow-hidden">
-                                <p className="text-[10px] text-muted-foreground mb-1">🏒 NHL IA</p>
+                                <p className="text-[10px] text-muted-foreground mb-1">🏒 NHL Algo</p>
                                 <div className="flex items-end gap-1">
                                     <span className="text-xl font-black leading-tight">{stats.model_nhl.win_rate}%</span>
                                     <span className="text-[9px] text-muted-foreground mb-0.5">réussite</span>
@@ -1065,7 +1065,7 @@ export default function ParisDuSoir() {
                         {[
                             { key: "all", label: "Tous", emoji: "📊" },
                             { key: "expert", label: "Expert", emoji: "🎯" },
-                            { key: "model", label: "IA", emoji: "🤖" },
+                            { key: "model", label: "Algo", emoji: "📊" },
                         ].map(({ key, label, emoji }) => (
                             <button
                                 key={key}

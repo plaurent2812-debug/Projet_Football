@@ -141,7 +141,7 @@ export default function SemanticSearch() {
                 <div className="px-4 py-6 text-center">
                   <Sparkles className="w-6 h-6 text-primary/40 mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground">
-                    Powered by <span className="font-bold text-primary/70">Gemini Embedding 2</span>
+                    Recherche par <span className="font-bold text-primary/70">similarité sémantique</span>
                   </p>
                   <p className="text-[11px] text-muted-foreground/60 mt-1">
                     Tape une description de match, un style de jeu, un scénario...
@@ -226,7 +226,7 @@ export default function SemanticSearch() {
                 <div>
                   <div className="px-4 py-2 bg-muted/30">
                     <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">
-                      🧠 Learnings IA ({results.learnings.length})
+                      📚 Enseignements ({results.learnings.length})
                     </span>
                   </div>
                   {results.learnings.map((l, i) => (
@@ -259,7 +259,7 @@ export default function SemanticSearch() {
             {/* Footer */}
             <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-muted/20">
               <span className="text-[9px] text-muted-foreground/50">
-                Gemini Embedding 2 · Recherche sémantique
+                ProbaLab · Recherche sémantique
               </span>
               <span className="text-[9px] text-muted-foreground/50">
                 ESC pour fermer

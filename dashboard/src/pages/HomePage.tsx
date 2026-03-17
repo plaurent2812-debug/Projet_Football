@@ -224,7 +224,7 @@ export default function HomePage() {
                     Proba<span className="text-primary">Lab</span>
                 </h1>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                    Prédictions IA, Live Tracking et Value Bets en un coup d'œil.
+                    Prédictions, Live Tracking et Value Bets en un coup d'œil.
                 </p>
             </div>
 
@@ -241,10 +241,10 @@ export default function HomePage() {
                 <div className="grid grid-cols-4 divide-x divide-border/20">
                     {/* Pillar 1 */}
                     <div className="p-2.5 text-center">
-                        <div className="text-lg mb-1">🧠</div>
-                        <div className="text-[10px] font-bold text-foreground mb-0.5">Experts + IA</div>
+                        <div className="text-lg mb-1">🎯</div>
+                        <div className="text-[10px] font-bold text-foreground mb-0.5">Experts</div>
                         <div className="text-[9px] text-muted-foreground leading-tight">
-                            Nos experts sélectionnent grâce aux probas IA
+                            Sélection quotidienne par nos analystes
                         </div>
                     </div>
                     {/* Pillar 2 */}
@@ -290,7 +290,7 @@ export default function HomePage() {
                         <div className="fs-summary-bar border-b border-border/50 bg-muted/20">
                             <TrendingUp className="w-4 h-4 text-emerald-500" />
                             <span className="text-xs font-bold uppercase tracking-wider">Bilan de {currentMonth}</span>
-                            <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">Experts + IA</span>
+                            <span className="fs-summary-badge bg-muted text-muted-foreground ml-auto">Experts</span>
                         </div>
 
                         {/* Main metrics */}

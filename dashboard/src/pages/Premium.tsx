@@ -22,7 +22,7 @@ const features = [
     { label: "Top 5 Buteurs NHL", free: false, premium: true },
     { label: "Top 5 Passeurs NHL", free: false, premium: true },
     { label: "Top 5 Tirs (SOG) NHL", free: false, premium: true },
-    { label: "Analyse IA complète de chaque match", free: false, premium: true },
+    { label: "Analyse approfondie de chaque match", free: false, premium: true },
     { label: "Pronostics VIP Quotidiens (Telegram)", free: false, premium: true },
 ]
 
@@ -67,7 +67,7 @@ export default function PremiumPage() {
                     Débloquez toutes les analyses
                 </h1>
                 <p className="text-muted-foreground max-w-md mx-auto">
-                    Accédez aux statistiques avancées, aux buteurs probables et aux analyses IA complètes pour chaque match.
+                    Accédez aux statistiques avancées, aux buteurs probables et aux analyses complètes pour chaque match.
                 </p>
             </div>
 

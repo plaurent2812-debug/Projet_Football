@@ -425,11 +425,26 @@ def calculate_team_strengths(league_id: int) -> dict | None:
     }
 
 
+    # Map cup/cross-league IDs to their domestic league equivalents.
+    # The teams table sometimes stores the cup league_id instead of
+    # the domestic one, so we normalise here.
+_CUP_TO_DOMESTIC: dict[int, int] = {
+    2: None,    # Champions League — no single domestic league
+    3: None,    # Europa League
+    45: 39,     # FA Cup → Premier League
+    66: 61,     # Coupe de France → Ligue 1
+    143: 140,   # Copa del Rey → La Liga
+    137: 135,   # Coppa Italia → Serie A
+    81: 78,     # DFB-Pokal → Bundesliga
+}
+
+
 def _get_domestic_league_id(team_api_id: int) -> int | None:
     """Look up a team's domestic league from the teams table.
 
     Used for cross-league competitions (Champions League, Europa League,
     national cups) where teams come from different domestic leagues.
+    Normalises cup league IDs to their domestic equivalent.
 
     Returns:
         The domestic league_id, or None if not found.
@@ -441,9 +456,14 @@ def _get_domestic_league_id(team_api_id: int) -> int | None:
         .limit(1)
         .execute()
     )
-    if resp.data:
-        return resp.data[0].get("league_id")
-    return None
+    if not resp.data:
+        return None
+    lid = resp.data[0].get("league_id")
+    # Normalise: if the stored league is a cup, map to domestic league
+    if lid in _CUP_TO_DOMESTIC:
+        mapped = _CUP_TO_DOMESTIC[lid]
+        return mapped  # None for CL/EL (handled by caller)
+    return lid
 
 
 def calculate_xg(
@@ -473,55 +493,57 @@ def calculate_xg(
         ``XG_CEIL``.
     """
     from src.config import logger
+    from src.constants import XG_FALLBACK_HOME, XG_FALLBACK_AWAY
 
-    if not league_data:
-        from src.constants import XG_FALLBACK_AWAY, XG_FALLBACK_HOME
+    home_s = None
+    away_s = None
+    home_league_data = None
+    away_league_data = None
 
-        return XG_FALLBACK_HOME, XG_FALLBACK_AWAY  # Fallback
+    # ── Try league-level strengths first (domestic league matches) ──
+    if league_data:
+        strengths = league_data["strengths"]
+        home_s = strengths.get(home_team_id)
+        away_s = strengths.get(away_team_id)
 
-    strengths = league_data["strengths"]
-    home_s = strengths.get(home_team_id)
-    away_s = strengths.get(away_team_id)
+    # ── Fallback: use each team's domestic league strengths ──────
+    # This is critical for CL/EL/cup matches where league_data is None
+    # or the team isn't found in the competition's strength table.
+    if not home_s and home_team_id:
+        domestic_lid = _get_domestic_league_id(home_team_id)
+        if domestic_lid:
+            home_league_data = calculate_team_strengths(domestic_lid)
+            if home_league_data:
+                home_s = home_league_data["strengths"].get(home_team_id)
+                logger.info(f"  ↪ Forces domestiques {home_team_id}: league {domestic_lid}")
 
-    # ── Cross-league fallback: use domestic league strengths ──────
+    if not away_s and away_team_id:
+        domestic_lid = _get_domestic_league_id(away_team_id)
+        if domestic_lid:
+            away_league_data = calculate_team_strengths(domestic_lid)
+            if away_league_data:
+                away_s = away_league_data["strengths"].get(away_team_id)
+                logger.info(f"  ↪ Forces domestiques {away_team_id}: league {domestic_lid}")
+
+    # If still missing after all lookups, use hardcoded fallback
     if not home_s or not away_s:
-        home_league_data = None
-        away_league_data = None
+        logger.warning(f"  ⚠ xG fallback pour {home_team_id} vs {away_team_id} (données insuffisantes)")
+        return XG_FALLBACK_HOME, XG_FALLBACK_AWAY
 
-        if not home_s and home_team_id:
-            domestic_lid = _get_domestic_league_id(home_team_id)
-            if domestic_lid:
-                home_league_data = calculate_team_strengths(domestic_lid)
-                if home_league_data:
-                    home_s = home_league_data["strengths"].get(home_team_id)
-                    logger.info(f"  ↪ Fallback domestique {home_team_id}: league {domestic_lid}")
-
-        if not away_s and away_team_id:
-            domestic_lid = _get_domestic_league_id(away_team_id)
-            if domestic_lid:
-                away_league_data = calculate_team_strengths(domestic_lid)
-                if away_league_data:
-                    away_s = away_league_data["strengths"].get(away_team_id)
-                    logger.info(f"  ↪ Fallback domestique {away_team_id}: league {domestic_lid}")
-
-        # If still missing after fallback, use true fallback
-        if not home_s or not away_s:
-            from src.constants import XG_FALLBACK_AWAY, XG_FALLBACK_HOME
-            return XG_FALLBACK_HOME, XG_FALLBACK_AWAY
-
-        # Cross-league xG: use average of both leagues' averages
-        avg_home_league = (
-            (home_league_data or league_data)["league_avg_home"]
-        )
-        avg_away_league = (
-            (away_league_data or league_data)["league_avg_away"]
-        )
-        # Average the league contexts for a neutral baseline
-        league_avg_home = (avg_home_league + league_data["league_avg_home"]) / 2.0
-        league_avg_away = (avg_away_league + league_data["league_avg_away"]) / 2.0
-    else:
+    # ── Determine league context for xG baseline ──────────────────
+    if home_league_data or away_league_data:
+        # Cross-league: average both teams' domestic league contexts
+        src_home = home_league_data or away_league_data or league_data
+        src_away = away_league_data or home_league_data or league_data
+        league_avg_home = (src_home["league_avg_home"] + src_away["league_avg_home"]) / 2.0
+        league_avg_away = (src_home["league_avg_away"] + src_away["league_avg_away"]) / 2.0
+    elif league_data:
         league_avg_home = league_data["league_avg_home"]
         league_avg_away = league_data["league_avg_away"]
+    else:
+        # No league context at all — use reasonable defaults
+        league_avg_home = XG_FALLBACK_HOME
+        league_avg_away = XG_FALLBACK_AWAY
 
     # Avantage domicile spécifique à l'équipe, ou la moyenne de la ligue si manquant
     home_bonus = home_s.get("home_advantage", HOME_XG_BONUS)

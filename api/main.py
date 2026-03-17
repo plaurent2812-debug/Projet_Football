@@ -1613,11 +1613,43 @@ def resolve_best_bets(body: ResolveBetsRequest, authorization: str = Header(None
             key = f"{f['home_team']} vs {f['away_team']}"
             fx_by_teams[key] = f
 
+        def _evaluate_single_football_market(market_name: str, h: int, a: int) -> str | None:
+            """Evaluate a single football market. Returns WIN/LOSS or None if unknown."""
+            total = h + a
+            if market_name == "Victoire domicile":
+                return "WIN" if h > a else "LOSS"
+            elif market_name == "Victoire extérieur":
+                return "WIN" if a > h else "LOSS"
+            elif market_name == "Match nul":
+                return "WIN" if h == a else "LOSS"
+            elif market_name == "Double Chance 1X":
+                return "WIN" if h >= a else "LOSS"
+            elif market_name == "Double Chance X2":
+                return "WIN" if a >= h else "LOSS"
+            elif market_name == "Over 2.5 buts":
+                return "WIN" if total > 2.5 else "LOSS"
+            elif market_name == "Over 1.5 buts":
+                return "WIN" if total > 1.5 else "LOSS"
+            elif market_name == "Over 3.5 buts":
+                return "WIN" if total > 3.5 else "LOSS"
+            elif market_name in ("BTTS — Les deux équipes marquent", "BTTS", "BTTS Oui"):
+                return "WIN" if (h > 0 and a > 0) else "LOSS"
+            return None
+
         for bet in bets:
             try:
-                label = bet["bet_label"]   # e.g. "PSG vs Lyon — Over 2.5 buts"
+                label = bet["bet_label"]   # e.g. "PSG vs Lyon — Victoire domicile"
                 market = bet["market"]
                 fixture_id = bet.get("fixture_id")
+
+                # If market is a category (safe_football, fun_football, etc.),
+                # extract the actual market from the bet_label after "—" or " — "
+                actual_market = market
+                if market in ("safe_football", "fun_football", "safe_nhl", "fun_nhl"):
+                    if " — " in label:
+                        actual_market = label.split(" — ", 1)[1].strip()
+                    elif "—" in label:
+                        actual_market = label.split("—", 1)[1].strip()
 
                 # Try to find the fixture
                 fx = None
@@ -1636,27 +1668,26 @@ def resolve_best_bets(body: ResolveBetsRequest, authorization: str = Header(None
 
                 h = fx.get("home_goals") or 0
                 a = fx.get("away_goals") or 0
-                total = h + a
 
-                # Evaluate market
+                # Handle combo markets (e.g. "Victoire domicile + BTTS Oui")
                 result_val = None
-                if market == "Victoire domicile":
-                    result_val = "WIN" if h > a else "LOSS"
-                elif market == "Victoire extérieur":
-                    result_val = "WIN" if a > h else "LOSS"
-                elif market == "Match nul":
-                    result_val = "WIN" if h == a else "LOSS"
-                elif market == "Over 2.5 buts":
-                    result_val = "WIN" if total > 2.5 else "LOSS"
-                elif market == "Over 1.5 buts":
-                    result_val = "WIN" if total > 1.5 else "LOSS"
-                elif market == "Over 3.5 buts":
-                    result_val = "WIN" if total > 3.5 else "LOSS"
-                elif market in ("BTTS — Les deux équipes marquent", "BTTS"):
-                    result_val = "WIN" if (h > 0 and a > 0) else "LOSS"
+                if " + " in actual_market:
+                    parts = [p.strip() for p in actual_market.split(" + ")]
+                    all_win = True
+                    for part in parts:
+                        part_result = _evaluate_single_football_market(part, h, a)
+                        if part_result is None:
+                            all_win = None
+                            break
+                        if part_result == "LOSS":
+                            all_win = False
+                    if all_win is None:
+                        continue  # Unknown sub-market
+                    result_val = "WIN" if all_win else "LOSS"
                 else:
-                    # Unknown market
-                    continue
+                    result_val = _evaluate_single_football_market(actual_market, h, a)
+                    if result_val is None:
+                        continue  # Unknown market
 
                 # Update best_bets
                 (
@@ -1732,6 +1763,19 @@ def resolve_best_bets(body: ResolveBetsRequest, authorization: str = Header(None
                 )
 
                 if not stats_resp.data:
+                    # Fallback: search by last name (handles abbreviated names e.g. "C. McDavid")
+                    last_name = player_name.split()[-1] if player_name else ""
+                    if last_name and len(last_name) > 2:
+                        stats_resp = (
+                            supabase.table("nhl_player_game_stats")
+                            .select("player_name, team, goals, assists, points, shots, game_id")
+                            .ilike("player_name", f"%{last_name}%")
+                            .eq("game_date", date)
+                            .limit(1)
+                            .execute()
+                        )
+
+                if not stats_resp.data:
                     # Stats not yet loaded — check if the game is finished at all
                     player_team = bet.get("team", "")
                     fx = fx_by_team.get(player_team) if player_team else None
@@ -1748,15 +1792,32 @@ def resolve_best_bets(body: ResolveBetsRequest, authorization: str = Header(None
                 p_stats = stats_resp.data[0]
                 actual_points = int(p_stats.get("points") or 0)
                 actual_goals = int(p_stats.get("goals") or 0)
+                actual_assists = int(p_stats.get("assists") or 0)
                 actual_shots = int(p_stats.get("shots") or 0)
                 game_id = p_stats.get("game_id")
 
-                # Determine result based on market
+                # If market is a category, extract actual market from label
                 market = bet.get("market", "player_points_over_0.5")
+                if market in ("safe_nhl", "fun_nhl"):
+                    # Labels like "Nick Suzuki Faire une passe — MTL vs ANA"
+                    if "Marquer un but" in label:
+                        market = "player_goals_over_0.5"
+                    elif "Faire une passe" in label:
+                        market = "player_assists_over_0.5"
+                    elif "Over 0.5 Points" in label:
+                        market = "player_points_over_0.5"
+                    elif "Tirs" in label or "tirs" in label:
+                        market = "player_shots_over_2.5"
+                    else:
+                        market = "player_points_over_0.5"
+
+                # Determine result based on market
                 if market == "player_points_over_0.5":
                     result_val = "WIN" if actual_points >= 1 else "LOSS"
                 elif market == "player_goals_over_0.5":
                     result_val = "WIN" if actual_goals >= 1 else "LOSS"
+                elif market == "player_assists_over_0.5":
+                    result_val = "WIN" if actual_assists >= 1 else "LOSS"
                 elif market == "player_shots_over_2.5":
                     result_val = "WIN" if actual_shots >= 3 else "LOSS"
                 else:
@@ -2016,10 +2077,15 @@ def get_best_bets_stats(request: Request):
 def get_best_bets_history(
     days: int = Query(30, description="Number of days to look back"),
     sport: str | None = Query(None, description="'football' | 'nhl' | None = both"),
+    date_from: str | None = Query(None, description="Start date YYYY-MM-DD (overrides days)"),
+    date_to: str | None = Query(None, description="End date YYYY-MM-DD"),
 ):
     """Return all resolved picks from both best_bets and expert_picks for the history table."""
     try:
-        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        if date_from:
+            cutoff = date_from
+        else:
+            cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
         # ── 1. Fetch from best_bets (model predictions) ──────────
         bb_query = (
@@ -2029,6 +2095,8 @@ def get_best_bets_history(
             .order("date", desc=True)
             .limit(300)
         )
+        if date_to:
+            bb_query = bb_query.lte("date", date_to)
         if sport:
             bb_query = bb_query.eq("sport", sport)
         bb_rows = bb_query.execute().data or []
@@ -2045,6 +2113,8 @@ def get_best_bets_history(
             .order("date", desc=True)
             .limit(300)
         )
+        if date_to:
+            ep_query = ep_query.lte("date", date_to)
         if sport:
             ep_query = ep_query.eq("sport", sport)
         ep_rows = ep_query.execute().data or []
@@ -2198,6 +2268,24 @@ def delete_expert_pick(pick_id: int):
         return {"deleted": True, "id": pick_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/expert-picks/backfill")
+def backfill_expert_picks(body: dict, authorization: str = Header(None)):
+    """Admin-only: bulk insert expert picks (bypass RLS via server-side supabase client)."""
+    _verify_cron_auth(authorization)
+    picks = body.get("picks", [])
+    if not picks:
+        raise HTTPException(status_code=400, detail="No picks provided")
+    inserted = []
+    errors = []
+    for i, p in enumerate(picks):
+        try:
+            resp = supabase.table("expert_picks").insert(p).execute()
+            inserted.append({"index": i, "id": resp.data[0]["id"]})
+        except Exception as e:
+            errors.append({"index": i, "error": str(e)})
+    return {"inserted": len(inserted), "errors": errors, "ids": inserted}
 
 
 @app.get("/api/expert-picks/latest")

@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { format, addDays, subDays } from "date-fns"
 import { fr } from "date-fns/locale"
 import {
     ChevronLeft, ChevronRight, Target, Trophy, Lock,
     CheckCircle2, XCircle, Clock, Minus, TrendingUp,
-    BarChart3, Sparkles, RefreshCw, Trash2
+    BarChart3, Sparkles, RefreshCw, Trash2, Calendar
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -117,13 +117,25 @@ function MarketBadge({ market }) {
         "Victoire domicile": "bg-blue-500/15 text-blue-400",
         "Victoire extérieur": "bg-purple-500/15 text-purple-400",
         "Match nul": "bg-slate-500/15 text-slate-400",
+        "Double Chance 1X": "bg-blue-500/15 text-blue-400",
+        "Double Chance X2": "bg-purple-500/15 text-purple-400",
         "BTTS — Les deux équipes marquent": "bg-pink-500/15 text-pink-400",
+        "BTTS Oui": "bg-pink-500/15 text-pink-400",
         "Over 2.5 buts": "bg-orange-500/15 text-orange-400",
         "Over 1.5 buts": "bg-emerald-500/15 text-emerald-400",
         "Over 3.5 buts": "bg-red-500/15 text-red-400",
         "player_points_over_0.5": "bg-cyan-500/15 text-cyan-400",
+        "player_assists_over_0.5": "bg-cyan-500/15 text-cyan-400",
+        "player_goals_over_0.5": "bg-cyan-500/15 text-cyan-400",
+        "player_shots_over_2.5": "bg-cyan-500/15 text-cyan-400",
     }
-    const label = market === "player_points_over_0.5" ? "Over 0.5 Points" : market
+    const labelMap = {
+        "player_points_over_0.5": "Over 0.5 Points",
+        "player_assists_over_0.5": "Over 0.5 Assists",
+        "player_goals_over_0.5": "Over 0.5 Goals",
+        "player_shots_over_2.5": "Over 2.5 Tirs",
+    }
+    const label = labelMap[market] || market
     return (
         <span className={cn("px-2 py-0.5 rounded text-[10px] font-semibold", colors[market] || "bg-primary/15 text-primary")}>
             {label}
@@ -321,13 +333,19 @@ function StatsDashboard({ stats, isAdmin }) {
         "Victoire extérieur": "Victoire extérieur",
         "Victoire": "Victoire",
         "Match nul": "Match nul",
+        "Double Chance 1X": "Double Chance 1X",
+        "Double Chance X2": "Double Chance X2",
         "BTTS — Les deux équipes marquent": "BTTS",
         "BTTS": "BTTS",
+        "BTTS Oui": "BTTS",
         "Over 2.5 buts": "Over 2.5 buts",
         "Over 1.5 buts": "Over 1.5 buts",
         "Over 3.5 buts": "Over 3.5 buts",
         "Double chance 1N": "Double Chance 1N",
         "player_points_over_0.5": "Over 0.5 Pts (NHL)",
+        "player_assists_over_0.5": "Over 0.5 Assists (NHL)",
+        "player_goals_over_0.5": "Over 0.5 Goals (NHL)",
+        "player_shots_over_2.5": "Over 2.5 Tirs (NHL)",
         "fun_football": "Football IA",
         "fun_nhl": "NHL IA",
         "safe_football": "Football Safe",
@@ -739,6 +757,9 @@ export default function ParisDuSoir() {
     const [history, setHistory] = useState(null)
     const [historyLoading, setHistoryLoading] = useState(false)
     const [expertPicks, setExpertPicks] = useState([])
+    const [historyDateFrom, setHistoryDateFrom] = useState("")
+    const [historyDateTo, setHistoryDateTo] = useState("")
+    const [historySourceFilter, setHistorySourceFilter] = useState("all") // "all" | "expert" | "model"
 
     const canAccess = hasAccess("premium")
 
@@ -766,13 +787,46 @@ export default function ParisDuSoir() {
     useEffect(() => {
         if (!showHistory || !canAccess) return
         setHistoryLoading(true)
-        const sportParam = sportFilter === "both" ? "" : `&sport=${sportFilter}`
-        fetch(`${API_BASE}/api/best-bets/history?days=60${sportParam}`)
+        const params = new URLSearchParams()
+        if (historyDateFrom) {
+            params.set("date_from", historyDateFrom)
+        } else {
+            params.set("days", "90")
+        }
+        if (historyDateTo) params.set("date_to", historyDateTo)
+        const sportParam = sportFilter === "both" ? "" : sportFilter
+        if (sportParam) params.set("sport", sportParam)
+        fetch(`${API_BASE}/api/best-bets/history?${params}`)
             .then(r => r.json())
             .then(setHistory)
             .catch(() => { })
             .finally(() => setHistoryLoading(false))
-    }, [showHistory, sportFilter, canAccess])
+    }, [showHistory, sportFilter, canAccess, historyDateFrom, historyDateTo])
+
+    // Filter history picks by source
+    const filteredHistory = useMemo(() => {
+        if (!history?.picks) return []
+        if (historySourceFilter === "all") return history.picks
+        return history.picks.filter(p => p.source === historySourceFilter)
+    }, [history, historySourceFilter])
+
+    // Recalculate stats from filtered picks
+    const filteredHistoryStats = useMemo(() => {
+        const resolved = filteredHistory.filter(p => p.result === "WIN" || p.result === "LOSS")
+        let pl = 0
+        for (const r of resolved) {
+            if (r.result === "WIN") pl += (parseFloat(r.odds || 1.85) - 1)
+            else pl -= 1
+        }
+        return {
+            total: filteredHistory.length,
+            resolved: resolved.length,
+            wins: resolved.filter(r => r.result === "WIN").length,
+            losses: resolved.filter(r => r.result === "LOSS").length,
+            total_pl: Math.round(pl * 100) / 100,
+            win_rate: resolved.length > 0 ? Math.round(resolved.filter(r => r.result === "WIN").length / resolved.length * 100) : 0,
+        }
+    }, [filteredHistory])
 
     if (!canAccess) return <PremiumLock />
 
@@ -968,34 +1022,103 @@ export default function ParisDuSoir() {
             ) : (
                 /* ── History Table ──────────────────────────────────── */
                 <div className="space-y-3">
+                    {/* Date filter */}
+                    <div className="rounded-xl border border-border/50 bg-card p-3">
+                        <div className="flex items-center gap-2 mb-2.5">
+                            <Calendar className="w-3.5 h-3.5 text-primary" />
+                            <span className="text-xs font-semibold">Filtrer par date</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <label className="text-[10px] text-muted-foreground mb-0.5 block">Du</label>
+                                <input
+                                    type="date"
+                                    value={historyDateFrom}
+                                    onChange={e => setHistoryDateFrom(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-[10px] text-muted-foreground mb-0.5 block">Au</label>
+                                <input
+                                    type="date"
+                                    value={historyDateTo}
+                                    onChange={e => setHistoryDateTo(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                />
+                            </div>
+                            {(historyDateFrom || historyDateTo) && (
+                                <button
+                                    onClick={() => { setHistoryDateFrom(""); setHistoryDateTo("") }}
+                                    className="self-end px-2 py-1.5 rounded-lg text-[10px] font-bold text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted transition-colors"
+                                >
+                                    ✕ Reset
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Source filter tabs */}
+                    <div className="flex gap-1">
+                        {[
+                            { key: "all", label: "Tous", emoji: "📊" },
+                            { key: "expert", label: "Expert", emoji: "🎯" },
+                            { key: "model", label: "IA", emoji: "🤖" },
+                        ].map(({ key, label, emoji }) => (
+                            <button
+                                key={key}
+                                onClick={() => setHistorySourceFilter(key)}
+                                className={cn(
+                                    "flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                                    historySourceFilter === key
+                                        ? "bg-card shadow-sm text-foreground border border-border/60"
+                                        : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {emoji} {label}
+                            </button>
+                        ))}
+                    </div>
+
                     {historyLoading ? (
                         <div className="space-y-2">
                             {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
                         </div>
-                    ) : history?.picks?.length > 0 ? (
+                    ) : filteredHistory.length > 0 ? (
                         <>
                             {/* Summary header */}
                             <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-border/50 bg-card">
-                                <div className="flex items-center gap-4 text-xs">
-                                    <span className="text-muted-foreground">{history.resolved} résolus / {history.total} total</span>
+                                <div className="flex items-center gap-3 text-xs">
+                                    <span className="text-muted-foreground">{filteredHistoryStats.resolved} résolus / {filteredHistoryStats.total} total</span>
+                                    {filteredHistoryStats.resolved > 0 && (
+                                        <span className={cn(
+                                            "font-bold px-1.5 py-0.5 rounded text-[10px]",
+                                            filteredHistoryStats.win_rate >= 60 ? "bg-emerald-500/15 text-emerald-400" :
+                                                filteredHistoryStats.win_rate >= 45 ? "bg-amber-500/15 text-amber-400" :
+                                                    "bg-red-500/15 text-red-400"
+                                        )}>
+                                            {filteredHistoryStats.win_rate}% réussite · {filteredHistoryStats.wins}W {filteredHistoryStats.losses}L
+                                        </span>
+                                    )}
                                 </div>
                                 <span className={cn(
                                     "text-sm font-black",
-                                    history.total_pl >= 0 ? "text-emerald-500" : "text-red-500"
+                                    filteredHistoryStats.total_pl >= 0 ? "text-emerald-500" : "text-red-500"
                                 )}>
-                                    P&L : {history.total_pl >= 0 ? "+" : ""}{history.total_pl} u
+                                    P&L : {filteredHistoryStats.total_pl >= 0 ? "+" : ""}{filteredHistoryStats.total_pl} u
                                 </span>
                             </div>
 
                             {/* Picks table */}
                             <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
                                 <div className="divide-y divide-border/30">
-                                    {history.picks.map((pick) => {
+                                    {filteredHistory.map((pick) => {
                                         const isWin = pick.result === "WIN"
                                         const isLoss = pick.result === "LOSS"
                                         const isPending = pick.result === "PENDING"
+                                        const isExpert = pick.source === "expert"
                                         return (
-                                            <div key={pick.id} className="flex items-center gap-2 px-3 py-2.5">
+                                            <div key={`${pick.source}-${pick.id}`} className="flex items-center gap-2 px-3 py-2.5">
                                                 {/* Result icon */}
                                                 <div className="shrink-0">
                                                     {isWin ? (
@@ -1009,8 +1132,15 @@ export default function ParisDuSoir() {
 
                                                 {/* Match + market */}
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-xs font-medium truncate">
-                                                        {pick.bet_label || pick.player_name || "—"}
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs font-medium truncate">
+                                                            {pick.bet_label || pick.player_name || "—"}
+                                                        </span>
+                                                        {isExpert && (
+                                                            <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                                                🎯 Expert
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="flex items-center gap-1.5 mt-0.5">
                                                         <span className="text-[9px] text-muted-foreground">{pick.date}</span>

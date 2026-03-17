@@ -342,13 +342,11 @@ function MatchRow({ match, isStarred, onToggleStar }) {
     const homeWon = isFinished && match.home_goals > match.away_goals
     const awayWon = isFinished && match.away_goals > match.home_goals
     const time = match.date?.slice(11, 16) || "--:--"
-    const isHot = pred?.confidence_score >= 7 && !isFinished
-    const isLowConfidence = pred?.confidence_score != null && pred.confidence_score <= 3 && !isFinished && !isLive
     const hasScore = isFinished || isLive
 
     return (
         <div
-            className={cn("fs-match-row", isLowConfidence && "opacity-60")}
+            className="fs-match-row"
             role="button"
             tabIndex={0}
             onClick={() => navigate(`/football/match/${match.id}`)}
@@ -433,21 +431,6 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                             return null
                         })()}
 
-                        <div className="flex items-center gap-1 ml-0.5">
-                            {isHot && (
-                                <Flame className="w-3 h-3 text-orange-500 flame-badge" />
-                            )}
-                            {pred?.confidence_score != null && (
-                                <span className={cn(
-                                    "fs-pred-chip",
-                                    pred.confidence_score >= 8 ? "bg-emerald-500/15 text-emerald-500" :
-                                        pred.confidence_score >= 6 ? "bg-amber-500/15 text-amber-500" :
-                                            "bg-muted text-muted-foreground"
-                                )}>
-                                    {pred.confidence_score}/10
-                                </span>
-                            )}
-                        </div>
                     </>
                 )}
             </div>

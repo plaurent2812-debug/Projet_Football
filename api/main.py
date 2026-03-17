@@ -1926,12 +1926,17 @@ def get_best_bets_stats(request: Request):
         def normalize_market(raw, bet_label=""):
             """Normalize market name. For category meta-tags, extract real market from bet_label."""
             if raw in CATEGORY_MARKETS and bet_label:
-                # Extract actual market from label: "PSG vs Lyon — Victoire domicile"
                 for sep in (" — ", "—"):
                     if sep in bet_label:
                         actual = bet_label.split(sep, 1)[1].strip()
+                        # Skip if extracted value looks like a match name
+                        if " vs " in actual.lower():
+                            return "__skip__"
                         return MARKET_NORMALIZE.get(actual, actual)
-                return "unknown"
+                return "__skip__"
+            # Skip if the raw market itself is a match name (malformed expert picks)
+            if " vs " in raw.lower() or " vs. " in raw.lower():
+                return "__skip__"
             return MARKET_NORMALIZE.get(raw, raw)
 
         def build_market_breakdown(rows):
@@ -1939,7 +1944,7 @@ def get_best_bets_stats(request: Request):
             for b in rows:
                 label = b.get("bet_label") or b.get("match_label") or ""
                 key = normalize_market(b.get("market", "unknown"), label)
-                if key == "unknown":
+                if key == "__skip__":
                     continue
                 grouped[key].append(b)
             breakdown = {}
@@ -2035,8 +2040,9 @@ def get_best_bets_stats(request: Request):
         all_football = [b for b in all_rows if b["sport"] == "football"]
         all_nhl = [b for b in all_rows if b["sport"] == "nhl"]
 
-        # Combined market breakdown (normalized)
-        combined_market_breakdown = build_market_breakdown(all_rows)
+        # Combined market breakdown — split by sport
+        combined_market_football = build_market_breakdown(all_football)
+        combined_market_nhl = build_market_breakdown(all_nhl)
 
         # Combined timeline
         combined_timeline = defaultdict(lambda: {"wins": 0, "losses": 0})
@@ -2099,7 +2105,8 @@ def get_best_bets_stats(request: Request):
             "global": calc_stats(all_rows),
             "football": calc_stats(all_football),
             "nhl": calc_stats(all_nhl),
-            "by_market": combined_market_breakdown,
+            "by_market_football": combined_market_football,
+            "by_market_nhl": combined_market_nhl,
             "timeline": [{"date": k, **v} for k, v in sorted(combined_timeline.items())][-30:],
             "last_10": combined_last_10,
             "best_pick": combined_best_pick,

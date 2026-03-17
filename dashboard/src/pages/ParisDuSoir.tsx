@@ -325,15 +325,13 @@ function StatsDashboard({ stats, isAdmin }) {
         )
     }
 
-    // Markets are already normalized by the backend — no label map needed.
-    // Detect NHL markets by name suffix "(NHL)" or known NHL-only names.
-    const NHL_MARKETS = new Set(["Points (NHL)", "Buts (NHL)", "Passes (NHL)", "Tirs (NHL)"])
-    const isNhlMarket = (m: string) => NHL_MARKETS.has(m) || m.includes("(NHL)")
-
-    const byMarket = stats.by_market || {}
-    const allMarkets = Object.entries(byMarket).filter(([, data]) => data.total >= 3)
-    const footballMarkets = allMarkets.filter(([m]) => !isNhlMarket(m)).sort((a, b) => b[1].total - a[1].total)
-    const nhlMarkets = allMarkets.filter(([m]) => isNhlMarket(m)).sort((a, b) => b[1].total - a[1].total)
+    // Markets are split by sport from the backend — no guessing needed.
+    const footballMarkets = Object.entries(stats.by_market_football || {})
+        .filter(([, data]) => data.total >= 3)
+        .sort((a, b) => b[1].total - a[1].total)
+    const nhlMarkets = Object.entries(stats.by_market_nhl || {})
+        .filter(([, data]) => data.total >= 3)
+        .sort((a, b) => b[1].total - a[1].total)
 
     function MarketRow({ market, data }) {
         return (

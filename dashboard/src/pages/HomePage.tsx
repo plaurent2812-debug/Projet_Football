@@ -281,7 +281,7 @@ export default function HomePage() {
             {(() => {
                 const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
                 const currentMonth = monthNames[new Date().getMonth()]
-                const roiIsGood = (g.roi_pct || 0) >= -2
+                const roiIsGood = (g.roi_singles_pct || 0) >= -2
                 const bestOdds = betStats?.best_pick?.odds
                 const maxStreak = betStats?.max_streak || 0
 
@@ -298,13 +298,18 @@ export default function HomePage() {
                             <div className="p-3 text-center bg-card hover:bg-accent/10 transition-colors">
                                 {roiIsGood ? (
                                     <>
-                                        <div className="text-xs text-muted-foreground font-semibold mb-1">ROI</div>
+                                        <div className="text-xs text-muted-foreground font-semibold mb-1">ROI Singles</div>
                                         <div className={cn(
                                             "text-lg font-black tabular-nums",
-                                            (g.roi_pct || 0) >= 0 ? "text-emerald-500" : "text-amber-500"
+                                            (g.roi_singles_pct || 0) >= 0 ? "text-emerald-500" : "text-red-500"
                                         )}>
-                                            {g.roi_pct != null ? `${g.roi_pct > 0 ? "+" : ""}${g.roi_pct}%` : "—"}
+                                            {g.roi_singles_pct != null ? `${g.roi_singles_pct > 0 ? "+" : ""}${g.roi_singles_pct}%` : "—"}
                                         </div>
+                                        {g.combines_count > 0 && (
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">
+                                                hors {g.combines_count} combiné{g.combines_count > 1 ? "s" : ""}
+                                            </div>
+                                        )}
                                     </>
                                 ) : bestOdds ? (
                                     <>

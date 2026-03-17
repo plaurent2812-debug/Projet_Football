@@ -1882,8 +1882,13 @@ def get_best_bets_stats(request: Request):
             voids = sum(1 for b in bets if b["result"] == "VOID")
             total = wins + losses
             win_rate = round(wins / total * 100, 1) if total else 0
-            roi = 0
+
+            roi = 0             # Full ROI (all bets)
+            roi_singles = 0     # ROI singles only (odds <= 3.0)
+            singles_count = 0
+            combines_count = 0
             odds_estimated = 0
+
             for b in resolved:
                 odds_val = b.get("odds")
                 if not odds_val:
@@ -1891,12 +1896,34 @@ def get_best_bets_stats(request: Request):
                     odds_estimated += 1
                 else:
                     odds_val = float(odds_val)
+
+                # Full ROI
                 if b["result"] == "WIN":
                     roi += (odds_val - 1)
                 else:
                     roi -= 1
+
+                # Singles ROI (odds <= 3.0 = paris simples)
+                if odds_val <= 3.0:
+                    singles_count += 1
+                    if b["result"] == "WIN":
+                        roi_singles += (odds_val - 1)
+                    else:
+                        roi_singles -= 1
+                else:
+                    combines_count += 1
+
             roi_pct = round(roi / total * 100, 1) if total else 0
-            result = {"wins": wins, "losses": losses, "voids": voids, "total": total, "win_rate": win_rate, "roi_pct": roi_pct}
+            roi_singles_pct = round(roi_singles / singles_count * 100, 1) if singles_count else 0
+
+            result = {
+                "wins": wins, "losses": losses, "voids": voids,
+                "total": total, "win_rate": win_rate,
+                "roi_pct": roi_pct,
+                "roi_singles_pct": roi_singles_pct,
+                "singles_count": singles_count,
+                "combines_count": combines_count,
+            }
             if odds_estimated > 0:
                 result["odds_estimated_count"] = odds_estimated
             if total > 0 and total < 10:

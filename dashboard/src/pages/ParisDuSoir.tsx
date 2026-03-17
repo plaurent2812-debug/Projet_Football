@@ -312,8 +312,9 @@ function StatsDashboard({ stats, isAdmin }) {
                     <span className="text-emerald-400 font-semibold">{data.wins}W</span>
                     <span className="text-red-400 font-semibold">{data.losses}L</span>
                 </div>
-                <div className={cn("text-[10px] font-bold mt-1", data.roi_pct >= 0 ? "text-emerald-400" : "text-red-400")}>
-                    ROI {data.roi_pct >= 0 ? "+" : ""}{data.roi_pct}%
+                <div className={cn("text-[10px] font-bold mt-1", (data.roi_singles_pct ?? data.roi_pct) >= 0 ? "text-emerald-400" : "text-red-400")}>
+                    ROI {(data.roi_singles_pct ?? data.roi_pct) >= 0 ? "+" : ""}{data.roi_singles_pct ?? data.roi_pct}%
+                    {data.combines_count > 0 && <span className="text-muted-foreground font-normal ml-1">(singles)</span>}
                 </div>
                 <div className="mt-1.5 h-1.5 rounded-full bg-border/40 overflow-hidden">
                     <div

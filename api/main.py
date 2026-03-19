@@ -253,33 +253,7 @@ async def lifespan(app_instance):
                 misfire_grace_time=300,
             )
 
-            # Envoi des tickets Telegram chaque matin à 10h00 heure Paris
-            scheduler.add_job(
-                _scheduled_telegram_tickets,
-                trigger=CronTrigger(
-                    hour="10",
-                    minute="0",
-                    timezone=paris_tz,
-                ),
-                id="telegram_tickets",
-                name="Envoi tickets Paris Telegram",
-                replace_existing=True,
-                misfire_grace_time=600,
-            )
-
-            # 🏒 NHL Tickets — 16h30 Paris (after NHL pipeline at 16h)
-            scheduler.add_job(
-                _scheduled_nhl_tickets,
-                trigger=CronTrigger(
-                    hour="16",
-                    minute="30",
-                    timezone=paris_tz,
-                ),
-                id="nhl_tickets",
-                name="NHL Tickets Telegram (après pipeline)",
-                replace_existing=True,
-                misfire_grace_time=600,
-            )
+            # Telegram ticket jobs removed (notifications disabled)
 
             # 🏒 NHL Pipeline — 16h00 Paris (premier scan)
             scheduler.add_job(

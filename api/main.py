@@ -2982,17 +2982,20 @@ def get_monitoring():
 
 
 @app.get("/api/performance")
-def get_performance(days: int = Query(30, description="Rolling window in days")):
-    """Get model performance metrics over the last N days."""
+def get_performance(days: int = Query(0, description="Rolling window in days (0 = all-time)")):
+    """Get model performance metrics over the last N days (0 = all-time)."""
     try:
-        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-
         # Get finished fixtures with predictions
-        finished = (
+        query = (
             supabase.table("fixtures")
             .select("id, home_team, away_team, home_goals, away_goals, date, status")
             .eq("status", "FT")
-            .gte("date", cutoff)
+        )
+        if days > 0:
+            cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+            query = query.gte("date", cutoff)
+        finished = (
+            query
             .order("date")
             .execute()
             .data

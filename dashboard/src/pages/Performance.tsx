@@ -113,7 +113,7 @@ function ChartTooltip({ active, payload, label }) {
    ═══════════════════════════════════════════════════════════ */
 export default function PerformancePage() {
     const [data, setData] = useState(null)
-    const [jours, setJours] = useState(30)
+    const [jours, setJours] = useState(0)  // 0 = all-time
     const [sport, setSport] = useState("football") // 'football' | 'nhl'
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -224,7 +224,7 @@ export default function PerformancePage() {
 
                     {/* Date Toggle */}
                     <div className="flex p-0.5 rounded-lg bg-secondary/50 ring-1 ring-border/50">
-                        {[7, 14, 30, 60, 90].map((d) => (
+                        {[{ d: 0, label: "Tout" }, { d: 7, label: "7j" }, { d: 14, label: "14j" }, { d: 30, label: "30j" }, { d: 60, label: "60j" }, { d: 90, label: "90j" }].map(({ d, label }) => (
                             <button
                                 key={d}
                                 onClick={() => setJours(d)}
@@ -235,7 +235,7 @@ export default function PerformancePage() {
                                         : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
-                                {d}j
+                                {label}
                             </button>
                         ))}
                     </div>

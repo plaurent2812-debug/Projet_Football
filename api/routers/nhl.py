@@ -504,16 +504,16 @@ def get_nhl_performance(days: int = 30):
     try:
         from datetime import datetime, timedelta
 
-        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-
-        # Get all performance rows with match + player info for top-1 filtering
-        resp = (
+        # days=0 → all-time (no date filter)
+        query = (
             supabase.table("nhl_suivi_algo_clean")
             .select("date, match, joueur, pari, résultat, proba_predite")
-            .gte("date", cutoff)
-            .order("date")
-            .execute()
         )
+        if days > 0:
+            cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+            query = query.gte("date", cutoff)
+
+        resp = query.order("date").execute()
 
         rows = resp.data or []
 

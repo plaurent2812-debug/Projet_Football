@@ -172,7 +172,7 @@ def _build_football_safe(predictions: list, fixture_map: dict, odds_map: dict) -
     for i in range(min(5, len(candidates))):
         for j in range(i + 1, min(8, len(candidates))):
             total = candidates[i]["odds"] * candidates[j]["odds"]
-            if 1.70 <= total <= 2.80:
+            if 1.75 <= total <= 3.00:
                 # Score: prefer higher combined proba + closer to 2.0 odds
                 proba_score = candidates[i]["proba"] + candidates[j]["proba"]
                 odds_penalty = abs(total - 2.0) * 10
@@ -182,8 +182,8 @@ def _build_football_safe(predictions: list, fixture_map: dict, odds_map: dict) -
                     best_pair = [candidates[i], candidates[j]]
 
     if not best_pair:
-        # Fallback: just take the top 2
-        best_pair = candidates[:2]
+        # No valid pair found in target range — skip SAFE ticket
+        return None
 
     total_odds = round(best_pair[0]["odds"] * best_pair[1]["odds"], 2)
     if total_odds < 1.40 or total_odds > 3.50:

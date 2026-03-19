@@ -383,21 +383,31 @@ def _build_football_fun(predictions: list, fixture_map: dict, odds_map: dict) ->
     if len(candidates) < 3:
         return None
 
-    # Select 3-5 picks targeting combined odds ~12-20
-    # Strategy: take highest-proba picks first, stop when odds reach 12+
+    # Select 3-5 picks targeting combined odds ~20
+    # Strategy: take highest-proba picks first, aim for 20x but accept 12x+
+    # if adding more picks would tank the combined proba too much
     picks = []
     running_odds = 1.0
     for c in candidates:
-        if running_odds * c["odds"] > 40:  # Don't overshoot too much
+        if running_odds * c["odds"] > 40:
             continue
+        # If we already have 3+ picks at 12x+ and adding this pick
+        # would drop combined proba below 2%, stop here
+        if len(picks) >= 3 and running_odds >= 12:
+            combined_proba = 1.0
+            for p in picks:
+                combined_proba *= p["proba"] / 100
+            next_proba = combined_proba * (c["proba"] / 100)
+            if next_proba < 0.02:  # < 2% combined proba = too risky
+                break
         picks.append(c)
         running_odds *= c["odds"]
-        if running_odds >= 12 and len(picks) >= 3:
+        if running_odds >= 20 and len(picks) >= 3:
             break
         if len(picks) >= 5:
             break
 
-    if running_odds < 5 or len(picks) < 3:
+    if running_odds < 8 or len(picks) < 3:
         return None
 
     return {"type": "FUN", "sport": "football", "picks": picks, "total_odds": round(running_odds, 2)}

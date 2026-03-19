@@ -982,8 +982,8 @@ def get_best_bets(
                         seen_fx.add(c["fixture_id"])
 
                 if len(fun_deduped) >= 3:
-                    # Greedy: pick highest-proba bets, stop when odds reach 12+
-                    # Prefer proba over odds — a 12x ticket that hits > a 20x that doesn't
+                    # Greedy: highest-proba picks first, target 20x, accept 12x+
+                    # if adding more picks would drop combined proba below 2%
                     fun_deduped.sort(key=lambda x: -x["proba_model"])
 
                     selected = []
@@ -992,9 +992,15 @@ def get_best_bets(
                         new_odds = current_odds * c["odds"]
                         if new_odds > 40 and len(selected) >= 3:
                             break
+                        if len(selected) >= 3 and current_odds >= 12:
+                            combined_p = 1.0
+                            for s in selected:
+                                combined_p *= s["proba_model"] / 100
+                            if combined_p * (c["proba_model"] / 100) < 0.02:
+                                break
                         selected.append(c)
                         current_odds = new_odds
-                        if current_odds >= 12 and len(selected) >= 3:
+                        if current_odds >= 20 and len(selected) >= 3:
                             break
                         if len(selected) >= 5:
                             break

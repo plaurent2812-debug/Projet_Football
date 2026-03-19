@@ -113,7 +113,7 @@ function ChartTooltip({ active, payload, label }) {
    ═══════════════════════════════════════════════════════════ */
 export default function PerformancePage() {
     const [data, setData] = useState(null)
-    const [jours, setJours] = useState(0)  // 0 = all-time
+    const [jours, setJours] = useState(90)  // default 90j (covers full history)
     const [sport, setSport] = useState("football") // 'football' | 'nhl'
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)

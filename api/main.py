@@ -2983,26 +2983,22 @@ def get_monitoring():
 
 @app.get("/api/performance")
 def get_performance(days: int = Query(0, description="Rolling window in days (0 = all-time)")):
-    """Get model performance metrics over the last N days (0 = all-time)."""
+    """Get model performance metrics over the last N days (0 = all-time, capped at 180)."""
     try:
-        # Get finished fixtures with predictions (paginated for all-time)
-        finished = []
-        offset = 0
-        PAGE = 1000
-        while True:
-            query = (
-                supabase.table("fixtures")
-                .select("id, home_team, away_team, home_goals, away_goals, date, status")
-                .eq("status", "FT")
-            )
-            if days > 0:
-                cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-                query = query.gte("date", cutoff)
-            page = query.order("date").range(offset, offset + PAGE - 1).execute().data or []
-            finished.extend(page)
-            if len(page) < PAGE:
-                break
-            offset += PAGE
+        # Cap all-time to 180 days to avoid timeout on large datasets
+        effective_days = days if days > 0 else 180
+        cutoff = (datetime.now() - timedelta(days=effective_days)).strftime("%Y-%m-%d")
+
+        finished = (
+            supabase.table("fixtures")
+            .select("id, home_team, away_team, home_goals, away_goals, date, status")
+            .eq("status", "FT")
+            .gte("date", cutoff)
+            .order("date")
+            .execute()
+            .data
+            or []
+        )
 
         fixture_ids = [f["id"] for f in finished]
         if not fixture_ids:

@@ -325,7 +325,7 @@ def train_classifier(
     # Cross-validation temporelle (5 folds) — with balanced sample weights
     cv_scores = cross_val_score(
         model, X_train, y_train, cv=tscv, scoring="accuracy",
-        fit_params={"sample_weight": sample_weight_train},
+        params={"sample_weight": sample_weight_train},
     )
     logger.info(f"  CV Accuracy (temporal, balanced) : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 

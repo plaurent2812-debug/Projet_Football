@@ -30,7 +30,7 @@ except ImportError:
 # Add the parent package to the path so we can import config
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 try:
     import httpx
@@ -3126,7 +3126,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
     try:
         # Cap all-time to 180 days to avoid timeout on large datasets
         effective_days = days if days > 0 else 180
-        cutoff = (datetime.now() - timedelta(days=effective_days)).strftime("%Y-%m-%d")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=effective_days)).strftime("%Y-%m-%d")
 
         finished = (
             supabase.table("fixtures")
@@ -3163,6 +3163,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
 
         correct_1x2 = 0
         correct_btts = 0
+        total_btts = 0
         correct_over_05 = 0
         correct_over_15 = 0
         correct_over_25 = 0
@@ -3225,10 +3226,12 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             if predicted_result == actual_result:
                 correct_1x2 += 1
 
-            # BTTS accuracy
-            btts_pred = (get_val("proba_btts", 50)) > 50
-            if btts_pred == actual_btts:
-                correct_btts += 1
+            # BTTS accuracy (only count matches with actual BTTS data)
+            p_btts = get_val("proba_btts")
+            if p_btts is not None:
+                total_btts += 1
+                if (p_btts > 50) == actual_btts:
+                    correct_btts += 1
 
             # Over 0.5
             p_o05 = get_val("proba_over_05")
@@ -3285,7 +3288,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             "days": days,
             "total_matches": total_with_pred,
             "accuracy_1x2": _pct(correct_1x2, total_with_pred),
-            "accuracy_btts": _pct(correct_btts, total_with_pred),
+            "accuracy_btts": _pct(correct_btts, total_btts),
             "accuracy_over_05": _pct(correct_over_05, total_over_05),
             "accuracy_over_15": _pct(correct_over_15, total_over_15),
             "accuracy_over_25": _pct(correct_over_25, total_over_25),
@@ -3297,6 +3300,9 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             "brier_score_1x2": round(brier_sum / total_with_pred, 3) if total_with_pred else 0,
             "brier_score_1x2_normalized": round(brier_sum / total_with_pred / 2, 3) if total_with_pred else 0,
             "daily_stats": sorted(daily.values(), key=lambda x: x["date"]),
+            # Coverage info: how many finished fixtures had predictions
+            "total_finished": len(finished),
+            "total_without_prediction": len(finished) - total_with_pred,
         }
 
     except Exception as e:

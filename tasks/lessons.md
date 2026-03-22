@@ -21,3 +21,4 @@
 | 2026-03-22 | api_get retournait HTTP 200 avec response=[] sans retry — données perdues silencieusement | Ajouter un second niveau de retry (api_get_with_retry) pour les endpoints critiques qui retournent des réponses vides |
 | 2026-03-22 | datetime.now() sans timezone dans config.py et matches.py — comparaisons naive vs aware impossibles | Toujours utiliser datetime.now(timezone.utc) — jamais datetime.now() nu |
 | 2026-03-22 | place_bet read-then-write non atomique : deux paris simultanés lisent le même bankroll | Pour toute opération read-modify-write sur une ressource partagée, utiliser SELECT FOR UPDATE dans une fonction PostgreSQL (RPC) |
+| 2026-03-22 | BTTS accuracy utilisait total_with_pred comme dénominateur au lieu d'un compteur dédié — les matchs sans proba_btts comptaient comme "No BTTS" | Chaque marché doit avoir son propre compteur total, comme Over/Under le faisait déjà |

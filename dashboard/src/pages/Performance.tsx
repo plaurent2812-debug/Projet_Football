@@ -245,7 +245,7 @@ export default function PerformancePage() {
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <StatTile
-                    value={data.total_matches}
+                    value={data.total_finished ? `${data.total_matches}/${data.total_finished}` : data.total_matches}
                     label="Matchs analysés"
                     icon={BarChart3}
                     accent="bg-indigo-500/10 text-indigo-400"

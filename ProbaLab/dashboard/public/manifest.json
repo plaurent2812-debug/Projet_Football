@@ -1,0 +1,16 @@
+{
+  "name": "ProbaLab",
+  "short_name": "ProbaLab",
+  "description": "Prédictions sportives IA — Football & NHL",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B1120",
+  "theme_color": "#3B82F6",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

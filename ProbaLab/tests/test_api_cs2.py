@@ -1,0 +1,21 @@
+import os
+import sys
+
+import requests
+
+sys.path.insert(0, os.path.abspath("."))
+from src.config import API_FOOTBALL_KEY
+
+HOCKEY_API_URL = "https://v3.football.api-sports.io"
+HOCKEY_HEADERS = {
+    "x-rapidapi-host": "v3.football.api-sports.io",
+    "x-rapidapi-key": API_FOOTBALL_KEY,
+}
+resp = requests.get(
+    f"{HOCKEY_API_URL}/players/squads",
+    headers=HOCKEY_HEADERS,
+    params={"team": 85},
+).json()
+
+if resp and resp.get("response"):
+    print(resp["response"][0]["players"])

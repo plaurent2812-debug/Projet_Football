@@ -1,0 +1,36 @@
+target-version = "py310"
+line-length = 100
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort (imports)
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "C4",   # flake8-comprehensions
+]
+ignore = [
+    "E501",   # line too long (géré par formatter)
+    "E402",   # module import not at top (lazy imports dans run_pipeline)
+    "E701",   # multiple statements on one line (compact try/except OK)
+    "E741",   # ambiguous variable name (l, I, O — contextuel)
+    "N802",   # function name should be lowercase (OK pour xG etc.)
+    "N803",   # argument name should be lowercase
+    "N806",   # variable in function should be lowercase (X, K etc.)
+    "B904",   # raise without from (contextuel)
+    "B905",   # zip without strict (Python 3.10+ feature, pas critique)
+    "SIM102", # collapsible-if (lisibilité préférée)
+    "SIM105", # suppressible-exception (try/except plus explicite)
+    "SIM114", # if-with-same-arms (contextuel)
+]
+
+[lint.per-file-ignores]
+"Projet_Football/tests/*" = ["N802", "N803", "N806", "B011"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

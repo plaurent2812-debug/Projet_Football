@@ -1,0 +1,22 @@
+[build]
+builder = "nixpacks"
+
+[[services]]
+name = "web"
+source = "."
+
+[services.deploy]
+startCommand = "uvicorn api.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "worker"
+source = "."
+
+[services.deploy]
+startCommand = "python worker.py"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

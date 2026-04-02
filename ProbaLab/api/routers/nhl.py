@@ -535,35 +535,48 @@ def get_nhl_performance(days: int = 30):
         if days > 0:
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
-        # 1. Fetch from old table (nhl_suivi_algo_clean)
-        q1 = (
-            supabase.table("nhl_suivi_algo_clean")
-            .select("date, match, joueur, pari, résultat, proba_predite")
-            .neq("résultat", "PENDING")
+        # ── Helper: paginated fetch (Supabase caps at 1000 rows per request) ──
+        def _fetch_all(table, select_cols, filters=None, cutoff_date=None):
+            """Fetch all rows from a Supabase table, paginating in batches of 1000."""
+            all_data = []
+            page_size = 1000
+            offset = 0
+            while True:
+                q = supabase.table(table).select(select_cols)
+                if filters:
+                    for method, args in filters:
+                        q = getattr(q, method)(*args)
+                if cutoff_date:
+                    q = q.gte("date", cutoff_date)
+                q = q.order("date", desc=True).range(offset, offset + page_size - 1)
+                resp = q.execute()
+                batch = resp.data or []
+                all_data.extend(batch)
+                if len(batch) < page_size:
+                    break
+                offset += page_size
+            return all_data
+
+        # 1. Fetch ALL rows from old table (nhl_suivi_algo_clean)
+        rows = _fetch_all(
+            "nhl_suivi_algo_clean",
+            "date, match, joueur, pari, résultat, proba_predite",
+            filters=[("neq", ("résultat", "PENDING"))],
+            cutoff_date=cutoff,
         )
-        if cutoff:
-            q1 = q1.gte("date", cutoff)
-        resp1 = q1.order("date", desc=True).limit(5000).execute()
-        rows = resp1.data or []
 
         # 2. Fetch from new table (best_bets)
-        q2 = (
-            supabase.table("best_bets")
-            .select("date, bet_label, market, result, proba_model")
-            .eq("sport", "nhl")
-            .neq("result", "PENDING")
-        )
-        if cutoff:
-            q2 = q2.gte("date", cutoff)
-        
-        # Don't fail if column doesn't exist yet (e.g. if proba_model was not fully migrated)
         try:
-            resp2 = q2.order("date", desc=True).limit(5000).execute()
-            raw_bets = resp2.data or []
+            raw_bets = _fetch_all(
+                "best_bets",
+                "date, bet_label, market, result, proba_model",
+                filters=[("eq", ("sport", "nhl")), ("neq", ("result", "PENDING"))],
+                cutoff_date=cutoff,
+            )
         except Exception:
             raw_bets = []
 
-        # Merge new bets into the rows list formatted optimally
+        # Merge new bets into the rows list formatted identically
         for b in raw_bets:
             label = b.get("bet_label") or ""
             # Label format: "Match — Joueur — Pari"

@@ -441,7 +441,7 @@ def ingest_data_lake(req: IngestDataLakeRequest):
     try:
         data = [r.dict() for r in req.rows]
         for d in data:
-            d["ts"] = datetime.datetime.utcnow().isoformat() + "Z"
+            d["ts"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         for i in range(0, len(data), 1000):
             supabase.table("nhl_data_lake").insert(data[i : i + 1000]).execute()
         supabase_ok = True
@@ -806,7 +806,7 @@ def get_nhl_meta_analysis(date: str = None):
     Fetches from nhl_data_lake where player_id = 'META_ANALYSIS'.
     """
     if not date:
-        date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+        date = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
     # Fetch meta_analysis from nhl_data_lake
     try:

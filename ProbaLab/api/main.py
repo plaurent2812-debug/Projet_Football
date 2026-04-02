@@ -2845,11 +2845,11 @@ def get_predictions(
         )
         logo_map = {t["name"]: t.get("logo_url") for t in teams_data if t.get("logo_url")}
 
-    pred_by_fixture = {p["fixture_id"]: p for p in predictions}
+    pred_by_fixture = {str(p["fixture_id"]): p for p in predictions}
 
     matches = []
     for f in fixtures:
-        pred = pred_by_fixture.get(f["id"])
+        pred = pred_by_fixture.get(str(f["id"]))
         league_id = f.get("league_id")
 
         # Parse stats_json safely
@@ -3002,11 +3002,12 @@ def get_prediction_detail(fixture_id: str):
         for field in _proba_fields:
             if prediction.get(field) is None and sj.get(field) is not None:
                 prediction[field] = sj[field]
-        # Normalise over_2_5 vs over_25
+        # Normalise over_2_5 vs over_25 (stats_engine stores proba_over_25 without underscore)
         if prediction.get("proba_over_2_5") is None:
             prediction["proba_over_2_5"] = (
-                prediction.get("proba_over_2_5")
-                or sj.get("proba_over_2_5")
+                sj.get("proba_over_2_5")
+                or prediction.get("proba_over_25")
+                or sj.get("proba_over_25")
             )
 
         # Enrich top_scorers with photos if available
@@ -3350,7 +3351,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             page = supabase.table("predictions").select("*").in_("fixture_id", chunk).execute().data or []
             predictions.extend(page)
 
-        pred_by_fixture = {p["fixture_id"]: p for p in predictions}
+        pred_by_fixture = {str(p["fixture_id"]): p for p in predictions}
 
         correct_1x2 = 0
         correct_btts = 0
@@ -3372,7 +3373,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
         daily: dict[str, dict] = {}
 
         for f in finished:
-            pred = pred_by_fixture.get(f["id"])
+            pred = pred_by_fixture.get(str(f["id"]))
             if not pred:
                 continue
 

@@ -46,7 +46,7 @@
 - **Fichier** : `api/main.py:165`
 - **Bug** : Stats joueur chargées uniquement pour J-1, les bets J-2/J-3 restent PENDING à jamais
 - **Fix** : Boucler `fetch_and_store_game_stats` sur les 3 derniers jours
-- [ ] Élargir la fenêtre de fetch
+- [x] Élargir la fenêtre de fetch
 
 ### 1.6 — Unifier les statuts NHL terminés
 - **Fichiers** : `fetch_nhl_results.py:36`, `api/main.py:1709`, `update_nhl_results.py:58`, `live.py`
@@ -74,33 +74,33 @@
 ### 2.1 — Corriger le type mismatch fixture_id TEXT vs INT
 - **Fichier** : `api/main.py:1633`
 - **Bug** : `fixture_id` est TEXT en DB, `fixtures.id` est numérique → lookup direct échoue (`"123" != 123`)
-- **Fix** : `int(fixture_id)` dans la comparaison Python
-- [ ] Corriger la comparaison
+- **Fix** : `str()` sur les deux côtés du dict lookup (2 endroits : ~2848 et ~3354)
+- [x] Corriger la comparaison (pred_by_fixture keys + .get() normalisés avec str())
 
 ### 2.2 — Normaliser proba_over_2_5 partout
 - **Fichiers** : `src/brain.py:563,798`, `api/main.py:886,3256`
 - **Bug** : `proba_over_25` et `proba_over_2_5` utilisés de manière incohérente → NULL dans les stats Over 2.5
 - **Fix** : Tout aligner sur `proba_over_2_5` (nom de la colonne DB)
-- [ ] Auditer toutes les occurrences
-- [ ] Remplacer `proba_over_25` → `proba_over_2_5`
+- [x] Auditer toutes les occurrences
+- [x] Fallback proba_over_25 → proba_over_2_5 dans brain.py:563 et api/main.py normalization block
 
 ### 2.3 — Unifier les sources de données NHL
 - **Tables** : `nhl_suivi_algo_clean` vs `best_bets`
 - **Bug** : La page Perf NHL lit l'ancienne table, les nouveaux paris vont dans `best_bets`
 - **Fix** : Soit migrer vers une source unique, soit faire lire `/nhl/performance` depuis `best_bets` aussi
-- [ ] Choisir la stratégie
-- [ ] Implémenter
+- [x] Choisir la stratégie (lire les deux sources et merger)
+- [x] Implémenter (commit c87e3dd — endpoint lit nhl_suivi_algo_clean + best_bets, merge en mémoire)
 
 ### 2.4 — Corriger la fenêtre timezone UTC/Paris pour résolution
 - **Fichier** : `src/fetchers/results.py:128-133`
 - **Bug** : Fixtures en heure Paris, résolution en UTC → matchs tardifs (22h+) dans le mauvais jour
 - **Fix** : Utiliser Europe/Paris dans le calcul de fenêtre OU élargir à D-1/D+1
-- [ ] Corriger la fenêtre
+- [x] Corriger la fenêtre (fenêtre -12h/+36h appliquée aux lignes 134-135 — intégrée dès la création du fichier dans commit 93760f5)
 
 ### 2.5 — Remplacer datetime.now() naive dans nhl.py
 - **Fichier** : `api/routers/nhl.py:540`
 - **Fix** : `datetime.now(timezone.utc)`
-- [ ] Corriger
+- [x] Corriger (utcnow() remplacé par now(datetime.timezone.utc) aux lignes 444 et 809)
 
 ---
 

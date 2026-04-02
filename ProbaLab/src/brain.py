@@ -560,7 +560,7 @@ def blend_predictions(stats_result: dict, ai_result: AIFeatures | None) -> dict:
         "proba_btts": final.get("proba_btts"),
         "proba_over_05": final.get("proba_over_05"),
         "proba_over_15": final.get("proba_over_15"),
-        "proba_over_2_5": final.get("proba_over_2_5") or stats_result.get("proba_over_2_5"),
+        "proba_over_2_5": final.get("proba_over_2_5") or stats_result.get("proba_over_2_5") or stats_result.get("proba_over_25"),
         "proba_over_35": final.get("proba_over_35"),
         "proba_dc_1x": final.get("proba_dc_1x"),
         "proba_dc_x2": final.get("proba_dc_x2"),

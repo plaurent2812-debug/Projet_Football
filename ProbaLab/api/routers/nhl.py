@@ -531,21 +531,39 @@ def get_nhl_performance(days: int = 30):
     try:
         from datetime import datetime, timedelta, timezone
 
-        # days=0 → all-time (no date filter)
-        query = (
+        cutoff = None
+        if days > 0:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+
+        # 1. Fetch from old table (nhl_suivi_algo_clean)
+        q1 = (
+            supabase.table("nhl_suivi_algo_clean")
+            .select("date, match, joueur, pari, résultat, proba_predite")
+            .neq("résultat", "PENDING")
+        )
+        if cutoff:
+            q1 = q1.gte("date", cutoff)
+        resp1 = q1.order("date", desc=True).limit(5000).execute()
+        rows = resp1.data or []
+
+        # 2. Fetch from new table (best_bets)
+        q2 = (
             supabase.table("best_bets")
-            .select("date, bet_label, market, result, proba")
+            .select("date, bet_label, market, result, proba_model")
             .eq("sport", "nhl")
             .neq("result", "PENDING")
         )
-        if days > 0:
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
-            query = query.gte("date", cutoff)
+        if cutoff:
+            q2 = q2.gte("date", cutoff)
+        
+        # Don't fail if column doesn't exist yet (e.g. if proba_model was not fully migrated)
+        try:
+            resp2 = q2.order("date", desc=True).limit(5000).execute()
+            raw_bets = resp2.data or []
+        except Exception:
+            raw_bets = []
 
-        resp = query.order("date", desc=True).limit(5000).execute()
-
-        raw_bets = resp.data or []
-        rows = []
+        # Merge new bets into the rows list formatted optimally
         for b in raw_bets:
             label = b.get("bet_label") or ""
             # Label format: "Match — Joueur — Pari"
@@ -566,7 +584,7 @@ def get_nhl_performance(days: int = 30):
                 "joueur": joueur_str,
                 "pari": pari_str,
                 "résultat": res,
-                "proba_predite": b.get("proba", 0)
+                "proba_predite": b.get("proba_model", 0)
             })
 
         # ── Classify each row by market type ─────────────────────────

@@ -1,7 +1,0 @@
-01:23:05 [INFO] football_ia: ╔══════════════════════════════════════════════════════════╗
-01:23:05 [INFO] football_ia: ║          ⚽ FOOTBALL IA — Pipeline v2                   ║
-01:23:05 [INFO] football_ia: ║   Poisson + ELO + Forme + Repos + Enjeu + Buteur       ║
-01:23:05 [INFO] football_ia: ╚══════════════════════════════════════════════════════════╝
-01:23:05 [INFO] football_ia: Mode inconnu : force
-01:23:05 [INFO] football_ia: Usage : python3 run_pipeline.py [full|data|analyze|results]
-01:23:05 [INFO] football_ia:         python3 run_pipeline.py results --date 2025-02-18

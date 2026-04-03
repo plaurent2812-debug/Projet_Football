@@ -1882,10 +1882,7 @@ def generate_deepthink_meta_analysis(
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=0.4,
-                max_output_tokens=8192,
-                thinking_config=types.ThinkingConfig(
-                    thinking_budget=4096,
-                ),
+                max_output_tokens=2048,
             ),
         )
         # Robuste: extraire le texte de la réponse

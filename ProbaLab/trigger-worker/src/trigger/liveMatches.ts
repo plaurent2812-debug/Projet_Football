@@ -1,4 +1,4 @@
-import { task, wait, schedules } from "@trigger.dev/sdk/v3";
+import { task, schedules, wait } from "@trigger.dev/sdk/v3";
 
 const CRON_SECRET = process.env.CRON_SECRET || "";
 const API_URL = process.env.API_URL || "https://web-production-ff663.up.railway.app";
@@ -62,12 +62,6 @@ export const scheduleDailyMatches = schedules.task({
     cron: "0 8 * * *",
     retry: standardRetry,
     run: async () => {
-        // NHL daily evaluation (non-blocking)
-        await fetch(`${API_URL}/api/trigger/nhl-evaluate-performance`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CRON_SECRET}` },
-        }).catch(e => console.error("NHL eval error:", e));
-
         // Fetch today's football matches
         const res = await fetch(`${API_URL}/api/trigger/daily-matches`, {
             headers: { "Authorization": `Bearer ${CRON_SECRET}` }
@@ -91,7 +85,7 @@ export const scheduleDailyMatches = schedules.task({
 // Updates live scores every minute during active match windows
 export const globalMinutelyScheduler = schedules.task({
     id: "global-minutely-scheduler",
-    cron: "*/2 * * * *",   // Every 2 minutes
+    cron: "*/5 * * * *",   // Every 5 minutes (optimized from */2)
     retry: standardRetry,
     run: async () => {
         const now = new Date();
@@ -125,8 +119,8 @@ export const globalMinutelyScheduler = schedules.task({
             }));
         }
 
-        // Football momentum every 6 min
-        if (min % 6 === 0) {
+        // Football momentum every 10 min (adjusted for */5 interval)
+        if (min % 10 === 0) {
             promises.push(fetch(`${API_URL}/api/trigger/football-momentum`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CRON_SECRET}` }
@@ -161,14 +155,12 @@ export const fetchLineups = schedules.task({
     },
 });
 
-// ─── Task 6: NHL ML Reminder (toutes les 2 semaines) ────────────────
-// Long-running wait — checkpointed automatiquement par Trigger.dev
-export const nhlMlReminder = task({
+// ─── Task 6: NHL ML Reminder (1er et 15 de chaque mois) ────────────
+export const nhlMlReminder = schedules.task({
     id: "nhl-ml-reminder",
+    cron: "0 9 1,15 * *",   // 09:00 UTC le 1er et 15 du mois
     retry: standardRetry,
     run: async () => {
-        await wait.for({ days: 14 });
-
         const res = await fetch(`${API_URL}/api/trigger/nhl-ml-reminder`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CRON_SECRET}` },

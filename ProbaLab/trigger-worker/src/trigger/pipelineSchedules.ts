@@ -52,22 +52,6 @@ async function fetchNHLOdds(date: string, label: string): Promise<object> {
 }
 
 /**
- * ── NHL Odds Fetch (early) ────────────────────────────────────────
- * Fetches real bookmaker odds at 18:00 UTC (19:00 Paris).
- * Lines for night games often open around 17-18h UTC.
- */
-export const scheduleNHLOddsFetch = schedules.task({
-    id: "schedule-nhl-odds-fetch",
-    cron: "0 18 * * *",   // 18:00 UTC = 19:00 Paris
-    retry: standardRetry,
-    run: async (payload) => {
-        const date = payload.timestamp.toISOString().slice(0, 10);
-        console.log(`[NHL Odds] Fetching bookmaker odds for ${date}`);
-        return await fetchNHLOdds(date, "NHL Odds Early");
-    },
-});
-
-/**
  * ── NHL Pipeline ─────────────────────────────────────────────────────
  * Runs at 20:00 UTC (21:00 Paris) every day.
  * Step 1: Fetch real bookmaker odds from The Odds API → nhl_odds table

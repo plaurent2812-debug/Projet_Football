@@ -348,6 +348,6 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             },
         }
 
-    except Exception:
+    except Exception as exc:
         logger.exception("get_performance failed")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"DEBUG: {type(exc).__name__}: {exc}")

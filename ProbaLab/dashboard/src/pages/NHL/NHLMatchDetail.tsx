@@ -186,7 +186,6 @@ export default function NHLMatchDetailPage() {
     const homeProb = fixture?.home_win_prob ?? fixture?.proba_home
     const awayProb = fixture?.away_win_prob ?? fixture?.proba_away
     const confidence = fixture?.confidence_score
-    const recommendedBet = fixture?.recommended_bet
 
     // Calculate Value Bet (EV+ with True Odds)
     let valueBet = null
@@ -292,14 +291,10 @@ export default function NHLMatchDetailPage() {
                     </div>
                 </div>
 
-                {/* Pari recommandé + confiance — FREE */}
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs text-muted-foreground mb-1">Pari recommandé</p>
-                            <p className="text-base font-bold text-primary">{recommendedBet || "—"}</p>
-                        </div>
-                        {confidence != null && (
+                {/* Confiance — FREE */}
+                {confidence != null && (
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-end">
                             <div className="text-center">
                                 <p className="text-xs text-muted-foreground mb-1">Confiance</p>
                                 <div className={cn(
@@ -311,9 +306,9 @@ export default function NHLMatchDetailPage() {
                                     {confidence}<span className="text-sm text-muted-foreground font-normal">/10</span>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                </CardContent>
+                        </div>
+                    </CardContent>
+                )}
             </Card>
 
             {/* True Value Bet Banner */}

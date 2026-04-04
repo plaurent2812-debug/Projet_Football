@@ -324,15 +324,6 @@ export default function MatchDetailPage() {
                     </div>
                 </div>
 
-                {/* Pari recommandé + confiance — FREE */}
-                {p && (
-                    <CardContent className="p-4 space-y-3">
-                        <div>
-                            <p className="text-xs text-muted-foreground mb-1">Pari recommandé</p>
-                            <p className="text-base font-bold text-primary">{p.recommended_bet || "—"}</p>
-                        </div>
-                    </CardContent>
-                )}
             </Card>
 
             {/* True Value Bet Banner (Football) */}

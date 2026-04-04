@@ -212,8 +212,8 @@ WEIGHT_AI: float = 0.30
 META_LEARNER_ENABLED: bool = False
 
 # Stats vs ML XGBoost
-WEIGHT_STATS_VS_ML: float = 0.60
-WEIGHT_ML: float = 0.40
+WEIGHT_STATS_VS_ML: float = 0.50
+WEIGHT_ML: float = 0.50
 
 
 # ═══════════════════════════════════════════════════════════════════

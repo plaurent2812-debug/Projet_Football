@@ -520,11 +520,15 @@ def calibrate_1x2_bayesian(
     proba_away: float,
     league_id: int | None = None,
 ) -> tuple[float, float, float]:
-    """Bayesian shrinkage calibration for 1X2 when sample size < MIN_ISOTONIC_SAMPLES.
+    """Bayesian shrinkage calibration for 1X2 when sample size is small.
 
     Shrinks extreme predictions toward the base rate (league average).
     With more data, the shrinkage factor approaches 1.0 and this converges
-    to identity — at which point the Isotonic calibrator takes over.
+    to identity.
+
+    **Skipped entirely when n >= 200** — once we have enough evaluated
+    predictions, the raw model probabilities are trusted as-is, and
+    Isotonic/Platt calibration handles the fine-tuning instead.
 
     Formula: ``calibrated = base_rate + shrinkage * (raw - base_rate)``
     where ``shrinkage = n / (n + k)``, *n* = sample count, *k* = shrinkage strength.
@@ -539,6 +543,13 @@ def calibrate_1x2_bayesian(
         Tuple of ``(cal_home, cal_draw, cal_away)`` as integers summing to 100.
     """
     n = _get_1x2_sample_count()
+
+    # With enough data (200+ evaluated predictions), skip shrinkage entirely.
+    # The model's probabilities have earned enough trust, and Platt/Isotonic
+    # calibration handles fine-tuning via apply_calibration().
+    if n >= 200:
+        return proba_home, proba_draw, proba_away
+
     shrinkage = n / (n + BAYESIAN_SHRINKAGE_K) if n > 0 else 0.0
 
     # Base rates — could be per-league in the future

@@ -95,7 +95,9 @@ export default function PerformancePage() {
         { label: "Taux Tirs (Top 1)", accuracy: data.accuracy_shot, icon: Target, color: "text-orange-400", total: undefined },
     ].filter(m => m.accuracy !== "—")
 
-    const brierScore: number | null = data.brier_score_1x2_normalized ?? data.brier_score_1x2 ?? null
+    const brierScore: number | null = sport === 'football'
+        ? (data.brier_score_1x2_normalized ?? data.brier_score_1x2 ?? null)
+        : (data.brier_score ?? null)
 
     return (
         <div className="space-y-6 pb-12">
@@ -214,6 +216,28 @@ export default function PerformancePage() {
                             icon={Target}
                             accent="bg-emerald-500/10 text-emerald-400"
                         />
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-card/50 border border-border/40">
+                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                                <Activity className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-black tabular-nums">
+                                    {data.brier_score != null
+                                        ? data.brier_score.toFixed(3)
+                                        : "—"}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <p className="text-[11px] text-muted-foreground font-medium">Calibration</p>
+                                    <div className="group relative">
+                                        <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-card border border-border rounded-lg shadow-xl text-[10px] text-muted-foreground w-52 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                            <strong className="text-foreground">Brier Score</strong> — qualite des probabilites binaires.
+                                            <br /><span className="text-emerald-400">0 = parfait</span> · 0.25 = hasard · <span className="text-red-400">0.5 = mauvais</span>.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <StatTile
                             value={`${data.accuracy_point}%`}
                             label="Points Top 1"
@@ -261,8 +285,8 @@ export default function PerformancePage() {
                 </CardContent>
             </Card>
 
-            {/* Brier score detail — football only */}
-            {sport === 'football' && brierScore != null && (
+            {/* Brier score detail */}
+            {brierScore != null && (
                 <BrierCard score={brierScore} />
             )}
 

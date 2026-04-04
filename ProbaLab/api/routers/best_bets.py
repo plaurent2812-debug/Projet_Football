@@ -161,8 +161,10 @@ def get_best_bets(
                             "market": market_name,
                             "odds": odds_val,
                             "proba_model": model_proba,
+                            "proba_bookmaker": round(100 / odds_val, 1) if odds_val > 1.0 else None,
                             "confidence": p.get("confidence_score") or 0,
                             "ev": ev,
+                            "edge_pct": round(ev * 100, 1),
                             "is_value": ev > 0.03,
                             "odds_source": odds_source,
                             "result": "PENDING",
@@ -292,18 +294,21 @@ def get_best_bets(
                             "count": len(selected),
                         }
 
-                # Legacy: top 5 with confidence >= 6
-                legacy = [c for c in all_candidates if c.get("confidence", 0) >= 6 and 1.65 <= c["odds"] <= 2.30]
-                legacy.sort(key=lambda x: -(x.get("confidence", 0) * 10 + x["ev"] * 50 + x["proba_model"] * 0.3))
+                # Value-first: uniquement des paris qui battent le marché
+                value_candidates = [
+                    c for c in all_candidates
+                    if c["ev"] > 0 and c["odds_source"] == "real"
+                ]
+                value_candidates.sort(key=lambda x: -x["ev"])
                 seen = set()
-                top5 = []
-                for b in legacy:
+                top_value = []
+                for b in value_candidates:
                     if b["fixture_id"] not in seen:
-                        top5.append(b)
+                        top_value.append(b)
                         seen.add(b["fixture_id"])
-                    if len(top5) >= 5:
+                    if len(top_value) >= 10:
                         break
-                result["football"] = top5
+                result["football"] = top_value
 
         except Exception:
             logger.exception("Error building football best bets for date=%s", date)
@@ -569,14 +574,16 @@ def get_best_bets(
                     "market": "player_points_over_0.5",
                     "odds": round(od["odds"], 2),
                     "proba_model": prob,
+                    "proba_bookmaker": round(100 / od["odds"], 1) if od["odds"] > 1.0 else None,
                     "ev": ev,
+                    "edge_pct": round(ev * 100, 1),
                     "bookmaker": od.get("bookmaker", ""),
                     "is_value": ev > 0.03,
                     "odds_source": "real",
                     "result": "PENDING",
                 })
             nhl_legacy.sort(key=lambda x: -x["ev"])
-            result["nhl"] = nhl_legacy[:5]
+            result["nhl"] = nhl_legacy[:10]
             result["nhl_odds_source"] = "real" if player_odds_map else "pending"
 
         except Exception:

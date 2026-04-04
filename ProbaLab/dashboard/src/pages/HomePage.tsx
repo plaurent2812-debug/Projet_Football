@@ -27,7 +27,6 @@ function LiveAlertBanner({ alert }) {
                         </span>
                     </div>
                     <p className="text-xs text-foreground/80">{alert.analysis_text}</p>
-                    <p className="text-xs font-bold text-orange-500 mt-0.5">Pari: {alert.recommended_bet}</p>
                 </div>
             </div>
         </div>

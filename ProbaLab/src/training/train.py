@@ -31,6 +31,7 @@ import numpy as np
 import optuna
 import xgboost as xgb
 from sklearn.impute import SimpleImputer
+from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import accuracy_score, brier_score_loss, f1_score, log_loss
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from sklearn.preprocessing import LabelEncoder
@@ -371,20 +372,71 @@ def train_classifier(
     logger.info(f"  CV Accuracy (temporal, balanced) : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
     logger.info(f"  CV Folds : {[round(s, 4) for s in cv_scores.tolist()]}")
 
+    # ── Split train into fit + calibration sets ─────────────────
+    # Reserve 20% of training data for post-training probability calibration.
+    # Isotonic regression per class corrects XGBoost's overconfident softmax.
+    cal_size = max(len(X_train) // 5, 30)
+    X_train_fit, X_cal = X_train[:-cal_size], X_train[-cal_size:]
+    y_train_fit, y_cal = y_train[:-cal_size], y_train[-cal_size:]
+    weight_fit = sample_weight_train[:-cal_size]
+
+    logger.info(f"  Split calibration : fit={len(X_train_fit)}, cal={len(X_cal)}, test={len(X_test)}")
+
     # Entraînement final
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
         warnings.filterwarnings("ignore", category=FutureWarning)
         model.fit(
-            X_train, y_train,
-            sample_weight=sample_weight_train,
+            X_train_fit, y_train_fit,
+            sample_weight=weight_fit,
             eval_set=[(X_test, y_test)],
             verbose=False,
         )
 
-    # Évaluation
-    y_pred = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)
+    # ── Post-training probability calibration ─────────────────
+    # Fit IsotonicRegression per class on the calibration set to correct
+    # XGBoost's probability outputs. This is critical for Brier score.
+    calibrators: list[IsotonicRegression] | None = None
+    try:
+        y_proba_cal = model.predict_proba(X_cal)
+        calibrators = []
+        for k in range(n_classes):
+            ir = IsotonicRegression(out_of_bounds="clip")
+            y_binary = (y_cal == k).astype(float)
+            ir.fit(y_proba_cal[:, k], y_binary)
+            calibrators.append(ir)
+        logger.info(f"  🎯 Isotonic calibration fitted on {len(X_cal)} samples ({n_classes} classes)")
+    except Exception as e:
+        logger.warning(f"  ⚠️ Calibration step failed: {e}")
+        calibrators = None
+
+    # Évaluation — apply calibration if available
+    y_proba_raw = model.predict_proba(X_test)
+
+    if calibrators:
+        # Apply isotonic calibration to test probabilities
+        y_proba_calibrated = np.column_stack([
+            calibrators[k].predict(y_proba_raw[:, k]) for k in range(n_classes)
+        ])
+        # Renormalize rows to sum to 1.0
+        row_sums = y_proba_calibrated.sum(axis=1, keepdims=True)
+        row_sums = np.where(row_sums > 0, row_sums, 1.0)
+        y_proba = y_proba_calibrated / row_sums
+
+        ll_raw = log_loss(y_test, y_proba_raw)
+        ll_cal = log_loss(y_test, y_proba)
+        logger.info(f"  Log Loss raw:        {ll_raw:.4f}")
+        logger.info(f"  Log Loss calibrated: {ll_cal:.4f}")
+        if ll_cal >= ll_raw:
+            logger.warning("  ⚠️ Calibration degraded log loss — discarding calibrators")
+            y_proba = y_proba_raw
+            calibrators = None
+        else:
+            logger.info("  ✅ Calibration improved probabilities")
+    else:
+        y_proba = y_proba_raw
+
+    y_pred = np.argmax(y_proba, axis=1)
 
     acc = accuracy_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred, average="weighted")
@@ -411,11 +463,13 @@ def train_classifier(
             logger.info(f"    {fname:35s} {imp:.4f}")
 
     # Sérialiser le modèle — XGBoost via save_raw(), sklearn via pickle
+    # Note: pickle used here for sklearn model serialization (internal, trusted models only)
     payload = {
         "xgb_model_bytes": base64.b64encode(model.get_booster().save_raw("ubj")).decode("utf-8"),
         "xgb_model_format": "ubj",
         "imputer": None,
         "label_encoder": le,
+        "calibrators": calibrators,  # IsotonicRegression per class (or None)
     }
     model_bytes = pickle.dumps(payload)
     model_b64 = base64.b64encode(model_bytes).decode("utf-8")

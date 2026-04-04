@@ -41,7 +41,7 @@ function BetSection({ sport, betsArr, emoji, label, accentColor, loading, isAdmi
             <div className="flex items-center gap-2 mb-3">
                 <span className="text-base">{emoji}</span>
                 <h2 className={cn("text-sm font-bold", accentColor)}>{label}</h2>
-                <span className="text-xs text-muted-foreground">— 5 meilleurs pronos</span>
+                <span className="text-xs text-muted-foreground">— Value Bets (EV+)</span>
                 {isAdmin && betsArr.length > 0 && (
                     <span className="ml-auto text-[9px] text-muted-foreground">
                         Boutons WIN/LOSS visibles (admin)
@@ -68,7 +68,7 @@ function BetSection({ sport, betsArr, emoji, label, accentColor, loading, isAdmi
                 </div>
             ) : (
                 <div className="text-center py-8 text-xs text-muted-foreground border border-dashed border-border/50 rounded-xl">
-                    Aucun prono {label} detecte pour cette date.
+                    Aucun Value Bet {label} detecte pour cette date. Le modele ne bat pas le bookmaker sur les matchs disponibles.
                 </div>
             )}
         </div>
@@ -192,7 +192,7 @@ export default function ParisDuSoir() {
                 <Sparkles className="w-4 h-4 text-primary shrink-0" />
                 <p className="text-xs text-muted-foreground">
                     <strong className="text-foreground">Strategie :</strong>{" "}
-                    Simples 90% (cotes 1.75–2.20) · Doubles 10% (~2.00) · Mise 1% bankroll · Max 5 paris/soir · 1 Fun/jour si opportunite
+                    Uniquement des Value Bets (EV+) · Notre modele bat le bookmaker · Edge = avantage mathematique · Plus l'edge est haut, plus le pari a de valeur
                 </p>
             </div>
 

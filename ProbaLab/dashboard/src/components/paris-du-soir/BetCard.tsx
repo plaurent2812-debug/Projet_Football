@@ -1,8 +1,8 @@
 import { useState } from "react"
 import { CheckCircle2, XCircle, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { formatOdds, formatProba, formatEV } from "@/lib/statsHelper"
-import { ResultBadge, MarketBadge, ConfStars } from "./badges"
+import { formatOdds, formatProba } from "@/lib/statsHelper"
+import { ResultBadge, MarketBadge } from "./badges"
 import { saveBet, updateBetResult } from "./api"
 
 interface Bet {
@@ -14,6 +14,7 @@ interface Bet {
     proba_bookmaker?: number | null
     confidence: number
     ev?: number | null
+    edge_pct?: number | null
     bookmaker?: string | null
     is_value?: boolean
     fixture_id?: string | number
@@ -69,14 +70,20 @@ export function BetCard({ bet, sport, date, isAdmin, onResultUpdate }: BetCardPr
     }
 
     const isTracked = !!betId
-    const isBestOdds = bet.odds >= 1.75 && bet.odds <= 2.20
+    const edgePct = bet.edge_pct ?? (bet.ev != null ? Math.round(bet.ev * 1000) / 10 : 0)
 
     return (
         <div className={cn(
             "rounded-xl border p-4 transition-all duration-200",
             localResult === "WIN" && "border-emerald-500/30 bg-emerald-500/5",
             localResult === "LOSS" && "border-red-500/20 bg-red-500/5",
-            localResult === "PENDING" && "border-border/60 bg-card hover:border-border",
+            localResult === "PENDING" && edgePct > 10
+                ? "border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60"
+                : localResult === "PENDING" && edgePct > 5
+                    ? "border-emerald-500/25 bg-emerald-500/3 hover:border-emerald-500/40"
+                    : localResult === "PENDING"
+                        ? "border-emerald-500/15 bg-card hover:border-emerald-500/30"
+                        : "",
             localResult === "VOID" && "border-slate-500/20 bg-slate-500/5",
         )}>
             <div className="flex items-start justify-between gap-3 mb-2">
@@ -84,14 +91,9 @@ export function BetCard({ bet, sport, date, isAdmin, onResultUpdate }: BetCardPr
                     <p className="text-sm font-semibold text-foreground leading-tight">{bet.label}</p>
                     <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
                         <MarketBadge market={bet.market} />
-                        {bet.is_value && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-400 uppercase tracking-wider">
-                                Value
-                            </span>
-                        )}
-                        {isBestOdds && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400">
-                                Cible
+                        {bet.bookmaker && (
+                            <span className="text-[9px] text-muted-foreground opacity-60 capitalize">
+                                {bet.bookmaker}
                             </span>
                         )}
                     </div>
@@ -100,29 +102,32 @@ export function BetCard({ bet, sport, date, isAdmin, onResultUpdate }: BetCardPr
             </div>
 
             <div className="flex items-center justify-between mt-3">
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-4">
+                    {/* Edge — hero metric */}
+                    <div className="flex items-center gap-1.5">
+                        <span className={cn(
+                            "text-lg font-black",
+                            edgePct >= 10 ? "text-emerald-400" : edgePct >= 5 ? "text-emerald-500" : "text-emerald-600"
+                        )}>
+                            +{edgePct.toFixed(1)}%
+                        </span>
+                        <span className="text-[9px] text-muted-foreground uppercase font-bold">Edge</span>
+                    </div>
+
+                    {/* Odds */}
                     <span className="font-mono font-bold text-foreground text-base">
                         {formatOdds(bet.odds)}
                     </span>
-                    <div className="flex flex-col">
+
+                    {/* Model vs Book */}
+                    <div className="flex flex-col text-xs text-muted-foreground">
                         <span>{formatProba(bet.proba_model)} modele</span>
                         {bet.proba_bookmaker != null && (
-                            <span className="text-[10px] text-muted-foreground">
-                                {formatProba(bet.proba_bookmaker)} bookmaker
+                            <span className="text-[10px]">
+                                vs {formatProba(bet.proba_bookmaker)} book
                             </span>
                         )}
-                        <ConfStars conf={bet.confidence} />
                     </div>
-                    {bet.ev != null && bet.ev > 0 && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-400">
-                            EV {formatEV(bet.ev)}
-                        </span>
-                    )}
-                    {bet.bookmaker && (
-                        <span className="text-[9px] text-muted-foreground opacity-60 capitalize">
-                            {bet.bookmaker}
-                        </span>
-                    )}
                 </div>
 
                 {isAdmin && (

@@ -656,11 +656,11 @@ def get_nhl_performance(days: int = 30):
 
         # ── Compute stats on top-1 only ──────────────────────────────
         stats = {
-            "goal": {"total": 0, "correct": 0},
-            "assist": {"total": 0, "correct": 0},
-            "point": {"total": 0, "correct": 0},
-            "shot": {"total": 0, "correct": 0},
-            "all": {"total": 0, "correct": 0, "sum_conf": 0},
+            "goal": {"total": 0, "correct": 0, "brier_sum": 0.0},
+            "assist": {"total": 0, "correct": 0, "brier_sum": 0.0},
+            "point": {"total": 0, "correct": 0, "brier_sum": 0.0},
+            "shot": {"total": 0, "correct": 0, "brier_sum": 0.0},
+            "all": {"total": 0, "correct": 0, "sum_conf": 0, "brier_sum": 0.0},
         }
         daily = {}
 
@@ -676,6 +676,12 @@ def get_nhl_performance(days: int = 30):
             prob = float(r.get("proba_predite") or 50)
             stats["all"]["sum_conf"] += prob
 
+            # Brier score binaire : (proba/100 - outcome)²
+            outcome = 1.0 if is_win else 0.0
+            brier_match = (prob / 100.0 - outcome) ** 2
+            stats[market]["brier_sum"] += brier_match
+            stats["all"]["brier_sum"] += brier_match
+
             if day not in daily:
                 daily[day] = {"date": day, "total": 0, "correct": 0}
             daily[day]["total"] += 1
@@ -685,16 +691,29 @@ def get_nhl_performance(days: int = 30):
         def _pct(c, t):
             return round(c / t * 100, 1) if t > 0 else 0
 
+        total_all = stats["all"]["total"]
+
+        # Brier score global (binaire : 0 = parfait, 0.25 = aléatoire)
+        brier_global = round(stats["all"]["brier_sum"] / total_all, 4) if total_all > 0 else None
+
+        # Brier par marché
+        brier_by_market = {}
+        for mkt in ("goal", "assist", "point", "shot"):
+            n = stats[mkt]["total"]
+            brier_by_market[mkt] = round(stats[mkt]["brier_sum"] / n, 4) if n > 0 else None
+
         metrics = {
             "days": days,
-            "total_matches": stats["all"]["total"],
+            "total_matches": total_all,
             "accuracy_goal": _pct(stats["goal"]["correct"], stats["goal"]["total"]),
             "accuracy_assist": _pct(stats["assist"]["correct"], stats["assist"]["total"]),
             "accuracy_point": _pct(stats["point"]["correct"], stats["point"]["total"]),
             "accuracy_shot": _pct(stats["shot"]["correct"], stats["shot"]["total"]),
+            "brier_score": brier_global,
+            "brier_by_market": brier_by_market,
             "avg_confidence": (
-                round(stats["all"]["sum_conf"] / stats["all"]["total"], 1)
-                if stats["all"]["total"] > 0
+                round(stats["all"]["sum_conf"] / total_all, 1)
+                if total_all > 0
                 else 0
             ),
             "daily_stats": sorted(daily.values(), key=lambda x: x["date"]),

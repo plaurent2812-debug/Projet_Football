@@ -75,11 +75,6 @@ function MiniMatchRow({ match, isStarred, onToggleStar, sport = "football" }) {
             </div>
 
             {/* Prediction */}
-            {pred?.recommended_bet && !isFinished && (
-                <span className="fs-pred-chip bg-primary/10 text-primary hidden sm:inline-flex truncate max-w-[80px]">
-                    {pred.recommended_bet}
-                </span>
-            )}
 
             {/* Star */}
             <button

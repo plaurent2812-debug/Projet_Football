@@ -229,6 +229,19 @@ def predict_1x2(context: dict) -> dict[str, int] | None:
 
     probas: NDArray[np.floating] = model.predict_proba(X)[0]
 
+    # Apply isotonic calibration if calibrators were saved during training
+    calibrators = _model_cache["xgb_1x2"].get("calibrators")
+    if calibrators and len(calibrators) == len(probas):
+        try:
+            calibrated = np.array([
+                calibrators[k].predict([probas[k]])[0] for k in range(len(probas))
+            ])
+            total = calibrated.sum()
+            if total > 0:
+                probas = calibrated / total  # Renormalize to sum to 1.0
+        except Exception:
+            pass  # Fallback to raw probabilities
+
     if le:
         classes: NDArray = le.classes_  # ['A', 'D', 'H'] typiquement
         proba_map: dict[str, float] = dict(zip(classes, probas))
@@ -264,6 +277,15 @@ def predict_binary(model_name: str, context: dict) -> int | None:
 
     model = _model_cache[model_name]["model"]
     probas: NDArray[np.floating] = model.predict_proba(X)[0]
+
+    # Apply isotonic calibration if calibrators were saved during training
+    calibrators = _model_cache[model_name].get("calibrators")
+    if calibrators and len(calibrators) == 2:
+        try:
+            p_cal = calibrators[1].predict([probas[1]])[0]
+            return round(float(np.clip(p_cal, 0.01, 0.99)) * 100)
+        except Exception:
+            pass  # Fallback to raw
 
     # probas[1] = probabilité de la classe positive (True/1)
     return round(float(probas[1]) * 100)

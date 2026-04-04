@@ -131,11 +131,12 @@ def _get_blend_weights(has_odds: bool, has_ml: bool) -> tuple[float, float, floa
         ``(w_poisson, w_elo, w_market)`` summing to 1.0.
     """
     if has_odds and has_ml:
-        # Market + ML available: reduce Poisson reliance, ELO stays stable
-        return (0.45, 0.20, 0.35)
+        # Market + ML available: market is the strongest signal, Poisson/ELO
+        # serve as sanity checks. ML (50% in next step) does fine-tuning.
+        return (0.25, 0.15, 0.60)
     elif has_odds:
-        # Market available but no ML: standard blend
-        return (WEIGHT_POISSON, WEIGHT_ELO, WEIGHT_MARKET)
+        # Market available but no ML: market-heavy blend
+        return (0.35, 0.20, 0.45)
     elif has_ml:
         # No market, but ML will adjust: balanced Poisson/ELO, no market term
         return (WEIGHT_POISSON_NO_MARKET, WEIGHT_ELO_NO_MARKET, 0.0)
@@ -2265,12 +2266,12 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         final_draw = poisson_probs["proba_draw"] * w_poisson + elo_probs["elo_draw"] * w_elo
         final_away = poisson_probs["proba_away"] * w_poisson + elo_probs["elo_away"] * w_elo
 
-    # Normaliser à 100%
+    # Normaliser à 100% (garder en float — arrondi final en fin de pipeline)
     total = final_home + final_draw + final_away
     if total > 0:
-        final_home = round(final_home / total * 100)
-        final_draw = round(final_draw / total * 100)
-        final_away = 100 - final_home - final_draw
+        final_home = final_home / total * 100
+        final_draw = final_draw / total * 100
+        final_away = 100.0 - final_home - final_draw
 
     # ── 8. Probabilité de penalty ────────────────────────────────
     try:
@@ -2401,12 +2402,12 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
             context["ml_predictions"] = ml_preds
 
             if ml_preds.get("ml_home") is not None:
-                # Pondération : 60% modèle stats, 40% ML XGBoost
+                # Pondération : 50% modèle stats, 50% ML XGBoost
                 w_stats = WEIGHT_STATS_VS_ML
                 w_ml = WEIGHT_ML
-                final_home = round(final_home * w_stats + ml_preds["ml_home"] * w_ml)
-                final_draw = round(final_draw * w_stats + ml_preds["ml_draw"] * w_ml)
-                final_away = 100 - final_home - final_draw
+                final_home = final_home * w_stats + ml_preds["ml_home"] * w_ml
+                final_draw = final_draw * w_stats + ml_preds["ml_draw"] * w_ml
+                final_away = 100.0 - final_home - final_draw
 
             if ml_preds.get("ml_btts") is not None:
                 poisson_probs["proba_btts"] = round(
@@ -2436,10 +2437,10 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     # and redistribute from home/away proportionally
     if stakes_h > 1.0 and stakes_a > 1.0:
         draw_boost = STAKES_DRAW_BOOST * 100  # e.g. 3%
-        final_draw = round(final_draw + draw_boost)
+        final_draw = final_draw + draw_boost
         home_share = final_home / max(final_home + final_away, 1)
-        final_home = round(final_home - draw_boost * home_share)
-        final_away = 100 - final_home - final_draw
+        final_home = final_home - draw_boost * home_share
+        final_away = 100.0 - final_home - final_draw
 
     # ── 9c. European competition draw boost ────────────────────
     # CL/EL matches are higher stakes → more cautious → more draws
@@ -2450,10 +2451,10 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     has_calibrated_draw = league_id in DRAW_FACTOR_BY_LEAGUE
     if euro_boost > 0 and not has_calibrated_draw:
         boost_pts = euro_boost * 100
-        final_draw = round(final_draw + boost_pts)
+        final_draw = final_draw + boost_pts
         home_share = final_home / max(final_home + final_away, 1)
-        final_home = round(final_home - boost_pts * home_share)
-        final_away = 100 - final_home - final_draw
+        final_home = final_home - boost_pts * home_share
+        final_away = 100.0 - final_home - final_draw
         context["euro_draw_boost"] = euro_boost
 
     # ── 10. Calibration fine (si disponible) ───────────────────────
@@ -2491,32 +2492,36 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             context["ml_calibrated"] = False  # Non-critical: predictions work without calibration
 
-    # ── 10b. Soft cap — probas 1X2 plafonnées à 80% ──────────────
-    # In professional football, even heavy mismatches rarely exceed 80%.
-    # Capping prevents compounding factors (form + injury + ELO + ML)
-    # from producing unrealistic extremes, then renormalize to 100%.
-    MAX_WIN_PROB = 80
+    # ── 10b. Soft cap — probas 1X2 plafonnées à 85% ──────────────
+    # Capping prevents compounding factors from producing unrealistic extremes.
+    # 85% allows strong favorites (PSG vs lower division) while preventing
+    # degenerate probabilities.
+    MAX_WIN_PROB = 85
     if final_home > MAX_WIN_PROB:
         excess = final_home - MAX_WIN_PROB
         final_home = MAX_WIN_PROB
-        # Redistribute proportionally to draw and away instead of only to draw
         total_remaining = final_draw + final_away
         if total_remaining > 0:
-            final_draw = round(final_draw + excess * (final_draw / total_remaining))
-            final_away = 100 - final_home - final_draw
+            final_draw = final_draw + excess * (final_draw / total_remaining)
+            final_away = 100.0 - final_home - final_draw
         else:
-            final_draw = round(final_draw + excess * 0.5)
-            final_away = 100 - final_home - final_draw
+            final_draw = final_draw + excess * 0.5
+            final_away = 100.0 - final_home - final_draw
     elif final_away > MAX_WIN_PROB:
         excess = final_away - MAX_WIN_PROB
         final_away = MAX_WIN_PROB
         total_remaining = final_draw + final_home
         if total_remaining > 0:
-            final_draw = round(final_draw + excess * (final_draw / total_remaining))
-            final_home = 100 - final_away - final_draw
+            final_draw = final_draw + excess * (final_draw / total_remaining)
+            final_home = 100.0 - final_away - final_draw
         else:
-            final_draw = round(final_draw + excess * 0.5)
-            final_home = 100 - final_away - final_draw
+            final_draw = final_draw + excess * 0.5
+            final_home = 100.0 - final_away - final_draw
+
+    # ── ARRONDI FINAL — une seule fois en fin de pipeline ─────────
+    final_home = round(final_home)
+    final_draw = round(final_draw)
+    final_away = 100 - final_home - final_draw
 
     # ── 10. Résultat final ────────────────────────────────────────
     result = {

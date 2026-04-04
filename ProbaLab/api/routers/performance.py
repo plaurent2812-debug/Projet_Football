@@ -43,7 +43,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
         while True:
             q = (
                 supabase.table("fixtures")
-                .select("id, home_team, away_team, home_goals, away_goals, date, status")
+                .select("id, api_fixture_id, home_team, away_team, home_goals, away_goals, date, status")
                 .in_("status", ["FT", "AET", "PEN"])
                 .in_("league_id", LEAGUES_TO_FETCH)
             )
@@ -56,8 +56,12 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
                 break
             offset += page_size
 
-        # predictions.fixture_id is INTEGER — skip UUID fixture IDs
-        fixture_ids = [f["id"] for f in finished if str(f["id"]).isdigit()]
+        fixture_ids = [f["id"] for f in finished]
+        # Build api_fixture_id lookup for odds queries (fixture_odds uses integer API IDs)
+        api_id_by_fixture: dict[str, int] = {}
+        for f in finished:
+            if f.get("api_fixture_id"):
+                api_id_by_fixture[str(f["id"])] = f["api_fixture_id"]
         if not fixture_ids:
             return {
                 "days": days,
@@ -79,9 +83,11 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             predictions.extend(page)
 
         # Fetch bookmaker odds for benchmark computation
-        bookmaker_odds_by_fixture: dict[str, dict] = {}
-        for i in range(0, len(fixture_ids), CHUNK):
-            chunk = fixture_ids[i : i + CHUNK]
+        # fixture_odds uses integer api_fixture_id, not UUID fixture id
+        api_ids = list(api_id_by_fixture.values())
+        bookmaker_odds_by_api_id: dict[int, dict] = {}
+        for i in range(0, len(api_ids), CHUNK):
+            chunk = api_ids[i : i + CHUNK]
             odds_page = (
                 supabase.table("fixture_odds")
                 .select("fixture_api_id, home_win_odds, draw_odds, away_win_odds")
@@ -90,9 +96,9 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
                 .data or []
             )
             for o in odds_page:
-                fid = str(o["fixture_api_id"])
-                if fid not in bookmaker_odds_by_fixture:
-                    bookmaker_odds_by_fixture[fid] = o
+                aid = o["fixture_api_id"]
+                if aid not in bookmaker_odds_by_api_id:
+                    bookmaker_odds_by_api_id[aid] = o
 
         # Deduplicate: keep FIRST prediction per fixture (oldest = original prediction)
         pred_by_fixture: dict[str, dict] = {}
@@ -160,8 +166,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
                 if actual_result == "H":
                     bench_home_correct += 1
                 # Bookmaker benchmark — check if odds available
-                fid_str = str(f["id"])
-                bm_odds = bookmaker_odds_by_fixture.get(fid_str)
+                bm_odds = bookmaker_odds_by_api_id.get(f.get("api_fixture_id"))
                 if bm_odds and bm_odds.get("home_win_odds") and bm_odds.get("draw_odds") and bm_odds.get("away_win_odds"):
                     h_o = float(bm_odds["home_win_odds"])
                     d_o = float(bm_odds["draw_odds"])
@@ -221,8 +226,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
                 bench_home_correct += 1
 
             # Benchmark "Bookmaker implied" — only for matches with bookmaker odds
-            fid_str = str(f["id"])
-            bm_odds = bookmaker_odds_by_fixture.get(fid_str)
+            bm_odds = bookmaker_odds_by_api_id.get(f.get("api_fixture_id"))
             if bm_odds and bm_odds.get("home_win_odds") and bm_odds.get("draw_odds") and bm_odds.get("away_win_odds"):
                 h_o = float(bm_odds["home_win_odds"])
                 d_o = float(bm_odds["draw_odds"])

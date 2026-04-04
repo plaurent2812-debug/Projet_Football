@@ -461,6 +461,16 @@ assert KELLY_MAX_BET_FRACTION > 0 and KELLY_MAX_BET_FRACTION <= 1.0, "KELLY_MAX_
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  LEAGUES
+# ═══════════════════════════════════════════════════════════════════
+
+# Ligues : 61 = Ligue 1, 62 = Ligue 2, 39 = Premier League, 140 = La Liga,
+#          135 = Serie A, 78 = Bundesliga, 2 = Champions League, 3 = Europa League,
+#          1 = Coupe du Monde, 4 = Euro
+LEAGUES_TO_FETCH: list[int] = [61, 62, 39, 140, 135, 78, 2, 3, 1, 4]
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  API CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════
 

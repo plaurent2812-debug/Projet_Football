@@ -12,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 
-from api.response_models import PerformanceResponse
 from src.config import supabase
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
         # Only count leagues where predictions are generated
-        from src.fetchers.matches import LEAGUES_TO_FETCH
+        from src.constants import LEAGUES_TO_FETCH
 
         # Paginated fetch — Supabase caps at 1000 rows per request
         finished = []

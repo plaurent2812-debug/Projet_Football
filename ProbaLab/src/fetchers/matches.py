@@ -6,6 +6,7 @@ import requests
 from dotenv import load_dotenv
 
 from src.config import logger
+from src.constants import LEAGUES_TO_FETCH
 from supabase import Client, create_client
 
 # 1. Chargement des secrets
@@ -21,10 +22,6 @@ if not api_key:
 supabase: Client = create_client(url, key)
 
 # 2. Configuration API-Football
-# Ligues : 61 = Ligue 1, 62 = Ligue 2, 39 = Premier League, 140 = La Liga,
-#          135 = Serie A, 78 = Bundesliga, 2 = Champions League, 3 = Europa League,
-#          1 = Coupe du Monde, 4 = Euro
-LEAGUES_TO_FETCH = [61, 62, 39, 140, 135, 78, 2, 3, 1, 4]
 SEASON = 2025
 
 headers = {"x-rapidapi-host": "v3.football.api-sports.io", "x-rapidapi-key": api_key}

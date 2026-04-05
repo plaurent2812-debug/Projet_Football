@@ -196,7 +196,7 @@ export default function HomePage() {
             {/* ── Hero (Neural Cortex) ───────────────────────────────── */}
             <div className="relative px-4 py-10 border-b border-primary/10 overflow-hidden">
                 {/* Neural network background */}
-                <NeuralCortex nodeCount={45} pulseSpeed={0.015} />
+                <NeuralCortex nodeCount={60} pulseSpeed={0.012} />
 
                 {/* Content — centered */}
                 <div className="relative z-10 text-center">

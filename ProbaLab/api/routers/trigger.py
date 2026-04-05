@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -708,9 +709,29 @@ def evaluate_performance():
         return {"status": "error", "message": str(e)}
 
 
+def _retrain_worker(rebuild: bool) -> None:
+    """Background worker for model retraining (runs in a separate thread)."""
+    mode = "REBUILD" if rebuild else "INCREMENTAL"
+    try:
+        from src.training import build_data
+
+        build_data.run(rebuild=rebuild)
+
+        from src.training import train
+
+        train.run()
+        logger.info(f"[MLOps] ✅ Réentrainement terminé ({mode})")
+    except Exception as e:
+        logger.error(f"[MLOps] Retraining Failed ({mode}): {e}", exc_info=True)
+
+
 @router.post("/retrain-models")
 def retrain_models(rebuild: bool = False):
-    """Endpoint for Trigger.dev or Vertex AI to trigger a full ML model retraining.
+    """Trigger a full ML model retraining in the background.
+
+    Returns immediately with 202 Accepted. The retrain runs in a
+    background thread and logs progress. Check ml_models table
+    for updated trained_at timestamps.
 
     Args:
         rebuild: If True, recalculate ALL features from scratch (slow but
@@ -718,22 +739,10 @@ def retrain_models(rebuild: bool = False):
                  only processes new matches.
     """
     mode = "REBUILD" if rebuild else "INCREMENTAL"
-    logger.info(f"[MLOps] 🚀 Déclenchement du réentrainement ({mode})...")
-    try:
-        # 1. Build new training data vectors
-        from src.training import build_data
-
-        build_data.run(rebuild=rebuild)
-
-        # 2. Retrain the XGBoost models and push them to Supabase
-        from src.training import train
-
-        train.run()
-
-        return {"status": "ok", "message": f"ML Models successfully retrained ({mode})"}
-    except Exception as e:
-        logger.error(f"[MLOps] Retraining Failed: {e}")
-        return {"status": "error", "message": str(e)}
+    logger.info(f"[MLOps] 🚀 Déclenchement du réentrainement ({mode}) en arrière-plan...")
+    thread = threading.Thread(target=_retrain_worker, args=(rebuild,), daemon=True)
+    thread.start()
+    return {"status": "accepted", "message": f"Retrain ({mode}) started in background"}
 
 
 @router.post("/retrain-meta-model")

@@ -10,9 +10,9 @@ import { fetchPredictions, API_ROOT } from "@/lib/api"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuth, supabase } from "@/lib/auth"
-import { ParticleNetwork } from "@/components/visuals/ParticleNetwork"
-import { GradientOrb } from "@/components/visuals/GradientOrb"
-import { AnimatedCounter } from "@/components/visuals/AnimatedCounter"
+import { AuroraBackground } from "@/components/visuals/AuroraBackground"
+import { EdgeScanner } from "@/components/visuals/EdgeScanner"
+import { PulseRing } from "@/components/visuals/PulseRing"
 
 /* ── Live Alert Banner ────────────────────────────────────────── */
 function LiveAlertBanner({ alert }) {
@@ -196,26 +196,43 @@ export default function HomePage() {
         <div className="animate-fade-in-up pb-8 w-full mx-auto">
 
             {/* ── Hero / Intro Section (Premium) ────────────────────────── */}
-            <div className="relative px-4 py-12 text-center border-b border-border/30 overflow-hidden">
-                {/* Visual layers */}
-                <GradientOrb />
-                <ParticleNetwork className="z-0" />
+            <div className="relative px-4 py-16 sm:py-20 text-center border-b border-border/20 overflow-hidden">
+                {/* Aurora background */}
+                <AuroraBackground intensity={0.6} />
 
-                {/* Content (above particles) */}
-                <div className="relative z-10">
-                    <h1 className="text-3xl sm:text-4xl font-black text-foreground mb-3 tracking-tight">
+                {/* Content */}
+                <div className="relative z-10 flex flex-col items-center">
+                    {/* Logo with pulse ring */}
+                    <div className="relative mb-6">
+                        <div className="w-16 h-16 rounded-2xl bg-primary/20 backdrop-blur-sm border border-primary/30 flex items-center justify-center animate-float">
+                            <span className="text-2xl font-black gradient-text-premium">P</span>
+                        </div>
+                        <PulseRing size={100} />
+                    </div>
+
+                    <h1 className="text-4xl sm:text-5xl font-black text-foreground mb-2 tracking-tighter">
                         Proba<span className="gradient-text-premium">Lab</span>
                     </h1>
-                    <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed mb-6">
-                        Smart Betting Assistant — d&eacute;tecte o&ugrave; le march&eacute; se trompe.
+                    <p className="text-base sm:text-lg font-medium text-primary/80 mb-2 tracking-wide uppercase" style={{ fontSize: "0.7rem", letterSpacing: "0.2em" }}>
+                        Smart Betting Assistant
                     </p>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed mb-8">
+                        Analyse le march&eacute; en temps r&eacute;el. D&eacute;tecte les cotes sous-&eacute;valu&eacute;es. Calcule votre edge.
+                    </p>
+
+                    {/* Edge Scanner */}
+                    <div className="mb-8 opacity-80">
+                        <EdgeScanner size={160} edgePoints={6} />
+                    </div>
+
                     <Link
                         to="/paris-du-soir"
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all hover:scale-105 glow-value"
+                        className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all hover:scale-105 glow-value-strong"
                     >
                         <Target className="w-4 h-4" />
                         Voir les Value Bets du jour
                     </Link>
+                    <p className="text-xs text-muted-foreground/60 mt-3">Football &amp; NHL — mis &agrave; jour quotidiennement</p>
                 </div>
             </div>
 

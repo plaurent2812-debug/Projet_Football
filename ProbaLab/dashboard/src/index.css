@@ -253,6 +253,20 @@
   animation: orb-drift-reverse 15s ease-in-out infinite;
 }
 
+@keyframes pulse-ring {
+  0% { transform: scale(0.5); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes float-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float-subtle 4s ease-in-out infinite;
+}
+
 /* ══════════════════════════════════════════════════════════════
    FlashScore-style components
    ══════════════════════════════════════════════════════════════ */

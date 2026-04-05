@@ -189,14 +189,11 @@ def _impute(X: NDArray[np.float32], model_name: str) -> NDArray[np.float32]:
     else:
         # No imputer — use sensible defaults instead of destructive 0.0
         # Market features imputed to ~33% (uniform prior), others to 0.0
-        _MARKET_COLS_1X2 = {"market_home_prob", "market_draw_prob", "market_away_prob"}
-        _MARKET_COLS_BINARY = {"market_btts_prob", "market_over25_prob", "market_over15_prob"}
+        _MARKET_COLS = {"market_home_prob", "market_draw_prob", "market_away_prob"}
         for i, col_name in enumerate(FEATURE_COLS):
             if i < X.shape[1] and np.isnan(X[0, i]):
-                if col_name in _MARKET_COLS_1X2:
-                    X[0, i] = 33.0  # Uniform prior 1X2 (no information)
-                elif col_name in _MARKET_COLS_BINARY:
-                    X[0, i] = 50.0  # Uniform prior binary (no information)
+                if col_name in _MARKET_COLS:
+                    X[0, i] = 33.0  # Uniform prior (no information)
                 elif col_name == "h2h_home_winrate":
                     X[0, i] = 0.33  # Prior: equal chances
                 elif col_name in ("home_form", "away_form", "home_form_long", "away_form_long"):

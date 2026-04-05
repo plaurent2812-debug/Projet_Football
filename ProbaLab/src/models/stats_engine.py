@@ -2423,19 +2423,19 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
                 final_away = 100.0 - final_home - final_draw
 
             if ml_preds.get("ml_btts") is not None:
-                poisson_probs["proba_btts"] = round(
+                poisson_probs["proba_btts"] = (
                     poisson_probs["proba_btts"] * 0.6 + ml_preds["ml_btts"] * 0.4
                 )
             if ml_preds.get("ml_over25") is not None:
-                poisson_probs["proba_over_25"] = round(
+                poisson_probs["proba_over_25"] = (
                     poisson_probs["proba_over_25"] * 0.6 + ml_preds["ml_over25"] * 0.4
                 )
             if ml_preds.get("ml_over15") is not None:
-                poisson_probs["proba_over_15"] = round(
+                poisson_probs["proba_over_15"] = (
                     poisson_probs["proba_over_15"] * 0.6 + ml_preds["ml_over15"] * 0.4
                 )
             if ml_preds.get("ml_over05") is not None:
-                poisson_probs["proba_over_05"] = round(
+                poisson_probs["proba_over_05"] = (
                     poisson_probs["proba_over_05"] * 0.6 + ml_preds["ml_over05"] * 0.4
                 )
 

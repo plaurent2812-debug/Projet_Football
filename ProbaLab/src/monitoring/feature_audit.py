@@ -20,10 +20,7 @@ from typing import Any
 
 from src.config import logger, supabase
 
-MARKET_FEATURES = {
-    "market_home_prob", "market_draw_prob", "market_away_prob",
-    "market_btts_prob", "market_over25_prob", "market_over15_prob",
-}
+MARKET_FEATURES = {"market_home_prob", "market_draw_prob", "market_away_prob"}
 
 
 def _load_model_importances() -> dict[str, dict[str, float]]:

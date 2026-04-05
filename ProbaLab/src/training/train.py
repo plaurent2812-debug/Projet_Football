@@ -51,6 +51,7 @@ _ALLOWED_PREFIXES = (
     "sklearn.linear_model.",
     "sklearn.preprocessing.",
     "sklearn.calibration.",
+    "sklearn.isotonic",     # IsotonicRegression used for probability calibration
     "sklearn.pipeline.",
     "sklearn.impute.",
     "sklearn.tree.",       # used by ensemble internals
@@ -196,7 +197,7 @@ def _optuna_xgb_params(
     X_train: np.ndarray,
     y_train: np.ndarray,
     n_classes: int,
-    n_trials: int = 50,
+    n_trials: int = 20,
 ) -> dict:
     """Find optimal XGBoost hyperparameters via Bayesian optimization.
 
@@ -605,7 +606,7 @@ def _optuna_lgb_params(
     X_train: np.ndarray,
     y_train: np.ndarray,
     n_classes: int,
-    n_trials: int = 50,
+    n_trials: int = 20,
 ) -> dict:
     """Find optimal LightGBM hyperparameters via Bayesian optimization."""
     import lightgbm as lgb

@@ -155,7 +155,7 @@ function Header() {
                 isActive ? "text-amber-400 border-amber-400" : "text-muted-foreground border-transparent hover:text-foreground"
               )}
             >
-              <Target className="w-3 h-3" />Pronos
+              <Target className="w-3 h-3" />Value Bets
             </NavLink>
             {isAdmin && (
               <>
@@ -235,7 +235,7 @@ function BottomNav() {
     { to: "/", label: "Accueil", icon: LayoutGrid, exact: true },
     { to: "/football", label: "Football", icon: FootballIcon },
     { to: "/nhl", label: "NHL", icon: NHLIcon },
-    { to: "/paris-du-soir", label: "Pronos", icon: Target },
+    { to: "/paris-du-soir", label: "Value Bets", icon: Target },
     { to: user ? "/profile" : "/login", label: "Profil", icon: User, exact: true },
   ]
 

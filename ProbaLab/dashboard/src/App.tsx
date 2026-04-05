@@ -86,6 +86,7 @@ const ParisDuSoirPage = lazy(() => import("@/pages/ParisDuSoir"))
 const UpdatePasswordPage = lazy(() => import("@/pages/UpdatePassword"))
 const CGUPage = lazy(() => import("@/pages/CGU"))
 const ConfidentialitePage = lazy(() => import("@/pages/Confidentialite"))
+const HeroShowcase = lazy(() => import("@/pages/HeroShowcase"))
 import GoalNotifications from "@/components/GoalNotifications"
 import ExpertPickNotifications from "@/components/ExpertPickNotifications"
 import Toaster from "@/components/Toaster"
@@ -386,6 +387,7 @@ function AppContent() {
               <Route path="/update-password" element={<UpdatePasswordPage />} />
               <Route path="/cgu" element={<CGUPage />} />
               <Route path="/confidentialite" element={<ConfidentialitePage />} />
+              <Route path="/hero-showcase" element={<HeroShowcase />} />
             </Routes>
           </div>
         </Suspense>

@@ -15,7 +15,16 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': {
+        target: 'https://api.probalab.net',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/nhl': {
+        target: 'https://api.probalab.net',
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
 })

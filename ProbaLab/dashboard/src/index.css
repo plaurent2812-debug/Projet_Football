@@ -493,20 +493,26 @@
   }
 }
 
-/* ── Bottom Navigation Bar (mobile) ────────────────────────── */
+/* ── Bottom Navigation Bar (mobile only) ──────────────────── */
 .fs-bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 50;
-  display: flex;
+  display: none;              /* hidden by default (desktop) */
   align-items: stretch;
   justify-content: space-around;
   background: hsl(var(--card));
   border-top: 1px solid hsl(var(--border));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   height: 56px;
+}
+
+@media (max-width: 767px) {
+  .fs-bottom-nav {
+    display: flex;            /* shown on mobile only */
+  }
 }
 
 .fs-bottom-nav-item {

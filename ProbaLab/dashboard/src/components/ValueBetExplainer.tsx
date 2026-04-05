@@ -39,9 +39,9 @@ export function ValueBetExplainer({ defaultOpen = false }: { defaultOpen?: boole
                     {/* Simple explanation */}
                     <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                         Un <strong className="text-foreground">Value Bet</strong>, c'est un pari
-                        o&ugrave; la cote du bookmaker est <strong className="text-primary">plus
-                        g&eacute;n&eacute;reuse</strong> que la probabilit&eacute; r&eacute;elle.
-                        En d'autres termes : le bookmaker sous-estime les chances.
+                        o&ugrave; le bookmaker <strong className="text-primary">sous-estime
+                        la probabilit&eacute;</strong> d'un r&eacute;sultat. Sa cote est trop
+                        haute par rapport aux chances r&eacute;elles — c'est votre avantage.
                     </p>
 
                     {/* Visual example */}

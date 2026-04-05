@@ -335,8 +335,8 @@ export default function ParisDuSoir() {
                 </p>
             </div>
 
-            {/* Expert Picks section */}
-            {!showHistory && (
+            {/* Expert Picks section — hidden for Smart Betting Assistant pivot (keep code for later) */}
+            {false && !showHistory && (
                 <div className="mb-5">
                     <div className="flex items-center gap-2 mb-3">
                         <span className="text-base">🎯</span>

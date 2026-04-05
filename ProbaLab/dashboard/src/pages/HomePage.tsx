@@ -10,9 +10,7 @@ import { fetchPredictions, API_ROOT } from "@/lib/api"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuth, supabase } from "@/lib/auth"
-import { AuroraBackground } from "@/components/visuals/AuroraBackground"
-import { EdgeScanner } from "@/components/visuals/EdgeScanner"
-import { PulseRing } from "@/components/visuals/PulseRing"
+import { NeuralCortex } from "@/components/visuals/NeuralCortex"
 
 /* ── Live Alert Banner ────────────────────────────────────────── */
 function LiveAlertBanner({ alert }) {
@@ -195,37 +193,29 @@ export default function HomePage() {
     return (
         <div className="animate-fade-in-up pb-8 w-full mx-auto">
 
-            {/* ── Hero / Intro Section (Premium — compact) ──────────────── */}
-            <div className="relative px-4 py-8 border-b border-border/20 overflow-hidden">
-                {/* Aurora background */}
-                <AuroraBackground intensity={0.5} />
+            {/* ── Hero (Neural Cortex) ───────────────────────────────── */}
+            <div className="relative px-4 py-10 border-b border-primary/10 overflow-hidden">
+                {/* Neural network background */}
+                <NeuralCortex nodeCount={45} pulseSpeed={0.015} />
 
-                {/* Content — horizontal layout */}
-                <div className="relative z-10 flex items-center justify-between gap-4 max-w-lg mx-auto">
-                    {/* Left: text */}
-                    <div className="flex-1 min-w-0">
-                        <h1 className="text-2xl sm:text-3xl font-black text-foreground mb-1 tracking-tighter">
-                            Proba<span className="gradient-text-premium">Lab</span>
-                        </h1>
-                        <p className="text-[0.6rem] font-semibold text-primary/70 uppercase tracking-[0.15em] mb-2">
-                            Smart Betting Assistant
-                        </p>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                            D&eacute;tecte les cotes sous-&eacute;valu&eacute;es. Calcule votre edge.
-                        </p>
-                        <Link
-                            to="/paris-du-soir"
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all hover:scale-105 glow-value"
-                        >
-                            <Target className="w-3.5 h-3.5" />
-                            Value Bets du jour
-                        </Link>
-                    </div>
-
-                    {/* Right: Edge Scanner (compact) */}
-                    <div className="shrink-0 opacity-70 hidden sm:block">
-                        <EdgeScanner size={110} edgePoints={5} />
-                    </div>
+                {/* Content — centered */}
+                <div className="relative z-10 text-center">
+                    <h1 className="text-3xl sm:text-4xl font-black text-foreground mb-1 tracking-tighter">
+                        Proba<span className="gradient-text-premium">Lab</span>
+                    </h1>
+                    <p className="text-[0.6rem] font-semibold text-primary/60 uppercase tracking-[0.2em] mb-3">
+                        Smart Betting Assistant
+                    </p>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed mb-5">
+                        Notre IA analyse le march&eacute; et d&eacute;tecte les cotes sous-&eacute;valu&eacute;es en temps r&eacute;el.
+                    </p>
+                    <Link
+                        to="/paris-du-soir"
+                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all hover:scale-105 glow-value"
+                    >
+                        <Target className="w-4 h-4" />
+                        Value Bets du jour
+                    </Link>
                 </div>
             </div>
 

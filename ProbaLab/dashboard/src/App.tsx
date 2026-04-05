@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ModeToggle } from "@/components/mode-toggle"
-import SemanticSearch from "@/components/SemanticSearch"
+// SemanticSearch removed — not needed for Smart Betting Assistant
+// import SemanticSearch from "@/components/SemanticSearch"
 import "./App.css"
 
 // ── React Query client ────────────────────────────────────────
@@ -184,7 +185,7 @@ function Header() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-1.5">
-            <SemanticSearch />
+            {/* SemanticSearch removed — not needed for Smart Betting Assistant */}
             <ModeToggle />
 
             {!isPremium && !isAdmin && (

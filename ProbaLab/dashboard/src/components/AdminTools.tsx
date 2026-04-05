@@ -135,7 +135,7 @@ export default function AdminTools() {
                         { label: 'Frontend', value: window.location.origin },
                         { label: 'Modèle IA', value: 'Gemini 2.5 Flash' },
                         { label: 'Base de données', value: 'Supabase (PostgreSQL)' },
-                        { label: 'Scheduler', value: 'Trigger.dev v4' },
+                        { label: 'Scheduler', value: 'APScheduler (Worker Railway)' },
                         { label: 'Hébergement API', value: 'Railway' },
                     ].map(info => (
                         <div key={info.label} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5">

@@ -323,88 +323,85 @@ function AdminDashboard() {
                     <div className="glass rounded-2xl border border-white/5 p-6 shadow-xl">
                         <h2 className="text-lg font-semibold flex items-center gap-2 mb-6">
                             <Clock className="w-5 h-5 text-amber-400" />
-                            <span>Automatisations Trigger.dev</span>
-                            <span className="text-xs font-normal text-muted-foreground ml-auto">Heures en UTC → Paris</span>
+                            <span>Automatisations Worker (APScheduler)</span>
+                            <span className="text-xs font-normal text-muted-foreground ml-auto">Heures en Europe/Paris</span>
                         </h2>
 
                         <div className="grid md:grid-cols-3 gap-6">
-                            {/* ⚽ Football Only */}
+                            {/* Continu */}
                             <div className="space-y-3">
                                 <h3 className="text-sm font-bold text-indigo-400 flex items-center gap-1.5 mb-3">
-                                    <span>⚽</span> Football
+                                    <span>🔄</span> Continu
                                 </h3>
                                 {[
-                                    { time: '06:00', paris: '07:00', cron: '0 6 * * *', name: 'Pipeline Quotidien', desc: 'Reflection + Fetch données + IA + Prédictions + DeepThink' },
-                                    { time: '*/15 (10h-22h)', paris: '11h-23h', cron: '*/15 10-22 * * *', name: 'Fetch Lineups', desc: 'Compos probables H-1 avant kickoff' },
-                                    { time: '23:30', paris: '00:30', cron: '30 23 * * *', name: 'Recap Journée', desc: 'Résumé des résultats + bilan du jour' },
+                                    { paris: '*/5 min', cron: '*/5 * * * *', name: 'Live Scores', desc: '⚽ Football (9h-23h) + 🏒 NHL (16h-08h)\nGating intelligent par fuseau horaire' },
+                                    { paris: '*/15 min', cron: '*/15 * * * *', name: 'Résultats FT', desc: 'Mise à jour des scores finaux' },
+                                    { paris: ':30', cron: '30 * * * *', name: 'Nouvelles fixtures', desc: 'Détection de nouveaux matchs programmés' },
                                 ].map((t, i) => (
                                     <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-white/5 hover:bg-white/8 transition-colors">
-                                        <div className="shrink-0 w-[85px] text-right">
+                                        <div className="shrink-0 w-[60px] text-right">
                                             <div className="text-xs font-mono font-bold text-foreground">{t.paris}</div>
-                                            <div className="text-[10px] font-mono text-muted-foreground">{t.time} UTC</div>
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="text-xs font-semibold flex items-center gap-1.5">
                                                 {t.name}
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Automatisé" />
-                                            </div>
-                                            <div className="text-[10px] text-muted-foreground">{t.desc}</div>
-                                            <div className="text-[9px] font-mono text-muted-foreground/60 mt-0.5">{t.cron}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* ⚽🏒 Mixed */}
-                            <div className="space-y-3">
-                                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-1.5 mb-3">
-                                    <span>⚽🏒</span> Mixte
-                                </h3>
-                                {[
-                                    { time: '08:00', paris: '09:00', cron: '0 8 * * *', name: 'Schedule Daily', desc: '⚽ Matchs du jour + halftime/70min monitors\n🏒 NHL Performance eval' },
-                                    { time: '*/1 min', paris: '24/7', cron: '* * * * *', name: 'Live Tracker', desc: '⚽ Scores */1min (1 call) · Events+Stats */5min (detail)\n🏒 NHL live scores (16h-08h)' },
-                                    { time: '10:00 / 15:00', paris: '11:00 / 16:00', cron: '0 10,15 * * *', name: 'Value Bets', desc: '⚽ Football value bets (10h UTC)\n🏒 NHL value bets (15h UTC)' },
-                                ].map((t, i) => (
-                                    <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-white/5 hover:bg-white/8 transition-colors">
-                                        <div className="shrink-0 w-[85px] text-right">
-                                            <div className="text-xs font-mono font-bold text-foreground">{t.paris}</div>
-                                            <div className="text-[10px] font-mono text-muted-foreground">{t.time} UTC</div>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-semibold flex items-center gap-1.5">
-                                                {t.name}
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Automatisé" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Actif" />
                                             </div>
                                             <div className="text-[10px] text-muted-foreground whitespace-pre-line">{t.desc}</div>
-                                            <div className="text-[9px] font-mono text-muted-foreground/60 mt-0.5">{t.cron}</div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            {/* 🏒 NHL + 🧠 ML */}
+                            {/* Quotidien */}
                             <div className="space-y-3">
-                                <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-1.5 mb-3">
-                                    <span>🏒</span> NHL + <span className="text-purple-400">🧠 ML</span>
+                                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-1.5 mb-3">
+                                    <span>📅</span> Quotidien
                                 </h3>
                                 {[
-                                    { time: '09:00', paris: '10:00', cron: '0 9 * * *', name: '🏒 Pipeline NHL', desc: 'Schedule + Roster + Scoring + ML Blend + DeepThink' },
-                                    { time: '22:00', paris: '23:00', cron: '0 22 * * *', name: '🏒 Fetch Odds NHL', desc: 'Cotes des bookmakers pour value bets' },
-                                    { time: '04:00', paris: '05:00', cron: '0 4 * * *', name: '🧠 ML Évaluation', desc: '⚽ Football: Brier Score + Log Loss + ECE\n🏒 NHL: history sync' },
-                                    { time: 'Ven 02:00', paris: 'Ven 03:00', cron: '0 2 * * 5', name: '🧠 Retrain XGBoost', desc: '⚽ Football Meta-Modèle + 🏒 NHL Match ML\nRetrain hebdomadaire des deux modèles' },
+                                    { paris: '06:00', name: 'Résolution paris', desc: 'WIN/LOSS/VOID sur 7 jours glissants' },
+                                    { paris: '07:00', name: 'Data pipeline', desc: 'Équipes, classements, blessures, météo' },
+                                    { paris: '07:45', name: 'Cotes fraîches', desc: 'Bet365 — AVANT le brain pour edges précis' },
+                                    { paris: '08:00', name: 'Éval NHL', desc: 'Évaluation matchs nuit US' },
+                                    { paris: '08:30', name: 'Éval foot + calibration', desc: 'Brier + recalibration draw factors' },
+                                    { paris: '09:00', name: 'Drift detection', desc: 'Brier 7j vs 30j — alerte si dégradation' },
                                 ].map((t, i) => (
                                     <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-white/5 hover:bg-white/8 transition-colors">
-                                        <div className="shrink-0 w-[85px] text-right">
+                                        <div className="shrink-0 w-[60px] text-right">
                                             <div className="text-xs font-mono font-bold text-foreground">{t.paris}</div>
-                                            <div className="text-[10px] font-mono text-muted-foreground">{t.time} UTC</div>
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="text-xs font-semibold flex items-center gap-1.5">
                                                 {t.name}
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Automatisé" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Actif" />
                                             </div>
                                             <div className="text-[10px] text-muted-foreground">{t.desc}</div>
-                                            <div className="text-[9px] font-mono text-muted-foreground/60 mt-0.5">{t.cron}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Prédictions + ML */}
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-bold text-cyan-400 flex items-center gap-1.5 mb-3">
+                                    <span>🧠</span> Prédictions + ML
+                                </h3>
+                                {[
+                                    { paris: '10:00', name: 'Brain IA', desc: 'Poisson + ELO + ML + Gemini\nAvec cotes fraîches (07:45)' },
+                                    { paris: '12:00', name: '⚽ Value Bets foot', desc: 'Génération picks + calcul edges' },
+                                    { paris: '17:00', name: '🏒 Value Bets NHL', desc: 'Génération picks NHL + edges' },
+                                    { paris: 'Dim 03:00', name: '🧠 Retrain ML', desc: 'Build data + XGBoost + LightGBM\n+ évaluation post-entraînement' },
+                                ].map((t, i) => (
+                                    <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-white/5 hover:bg-white/8 transition-colors">
+                                        <div className="shrink-0 w-[60px] text-right">
+                                            <div className="text-xs font-mono font-bold text-foreground">{t.paris}</div>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-semibold flex items-center gap-1.5">
+                                                {t.name}
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" title="Actif" />
+                                            </div>
+                                            <div className="text-[10px] text-muted-foreground whitespace-pre-line">{t.desc}</div>
                                         </div>
                                     </div>
                                 ))}

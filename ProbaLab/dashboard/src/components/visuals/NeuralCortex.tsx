@@ -36,8 +36,8 @@ interface Pulse {
 export function NeuralCortex({ className = "", nodeCount = 35, pulseSpeed = 0.012 }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const animRef = useRef<number>(0)
-    const stateRef = useRef<{ nodes: Node[]; pulses: Pulse[]; w: number; h: number }>({
-        nodes: [], pulses: [], w: 0, h: 0
+    const stateRef = useRef<{ nodes: Node[]; pulses: Pulse[]; w: number; h: number; mouse: { x: number; y: number } }>({
+        nodes: [], pulses: [], w: 0, h: 0, mouse: { x: -1000, y: -1000 }
     })
 
     useEffect(() => {
@@ -212,6 +212,40 @@ export function NeuralCortex({ className = "", nodeCount = 35, pulseSpeed = 0.01
                 ctx!.fill()
             }
 
+            // Mouse proximity — illuminate nearby nodes + draw connections to cursor
+            const mx = s.mouse.x
+            const my = s.mouse.y
+            const MOUSE_RADIUS = 100
+
+            if (mx > 0 && my > 0) {
+                for (const node of s.nodes) {
+                    const dx = node.x - mx
+                    const dy = node.y - my
+                    const dist = Math.sqrt(dx * dx + dy * dy)
+
+                    if (dist < MOUSE_RADIUS) {
+                        const proximity = 1 - dist / MOUSE_RADIUS
+                        // Boost node energy based on proximity
+                        node.energy = Math.min(node.energy + proximity * 0.08, 1)
+
+                        // Draw connection line to cursor
+                        ctx!.beginPath()
+                        ctx!.moveTo(node.x, node.y)
+                        ctx!.lineTo(mx, my)
+                        ctx!.strokeStyle = `rgba(52, 211, 153, ${proximity * 0.2})`
+                        ctx!.lineWidth = proximity * 1.5
+                        ctx!.stroke()
+                    }
+                }
+
+                // Cursor glow
+                const cursorGrad = ctx!.createRadialGradient(mx, my, 0, mx, my, 20)
+                cursorGrad.addColorStop(0, "rgba(16, 185, 129, 0.15)")
+                cursorGrad.addColorStop(1, "rgba(16, 185, 129, 0)")
+                ctx!.fillStyle = cursorGrad
+                ctx!.fillRect(mx - 20, my - 20, 40, 40)
+            }
+
             // Draw nodes
             for (const node of s.nodes) {
                 // Node glow when energized
@@ -239,12 +273,62 @@ export function NeuralCortex({ className = "", nodeCount = 35, pulseSpeed = 0.01
             animRef.current = requestAnimationFrame(draw)
         }
 
+        // ── Mouse / touch interaction ──────────────────────────
+        function onPointerMove(e: PointerEvent) {
+            const rect = canvas!.getBoundingClientRect()
+            stateRef.current.mouse.x = e.clientX - rect.left
+            stateRef.current.mouse.y = e.clientY - rect.top
+        }
+
+        function onPointerLeave() {
+            stateRef.current.mouse.x = -1000
+            stateRef.current.mouse.y = -1000
+        }
+
+        function onPointerDown(e: PointerEvent) {
+            const rect = canvas!.getBoundingClientRect()
+            const clickX = e.clientX - rect.left
+            const clickY = e.clientY - rect.top
+            const s = stateRef.current
+
+            // Find closest node and fire a burst of pulses from it
+            let closestIdx = 0
+            let closestDist = Infinity
+            for (let i = 0; i < s.nodes.length; i++) {
+                const dx = s.nodes[i].x - clickX
+                const dy = s.nodes[i].y - clickY
+                const d = dx * dx + dy * dy
+                if (d < closestDist) { closestDist = d; closestIdx = i }
+            }
+
+            const node = s.nodes[closestIdx]
+            node.energy = 1
+
+            // Fire pulses to ALL connections (burst)
+            for (const targetIdx of node.connections) {
+                s.pulses.push({
+                    from: closestIdx,
+                    to: targetIdx,
+                    progress: 0,
+                    speed: pulseSpeed * (1 + Math.random() * 0.5),
+                    width: 2 + Math.random(),
+                })
+            }
+        }
+
         resize()
         animRef.current = requestAnimationFrame(draw)
+
+        canvas.addEventListener("pointermove", onPointerMove)
+        canvas.addEventListener("pointerleave", onPointerLeave)
+        canvas.addEventListener("pointerdown", onPointerDown)
         window.addEventListener("resize", () => { resize() })
 
         return () => {
             cancelAnimationFrame(animRef.current)
+            canvas.removeEventListener("pointermove", onPointerMove)
+            canvas.removeEventListener("pointerleave", onPointerLeave)
+            canvas.removeEventListener("pointerdown", onPointerDown)
             window.removeEventListener("resize", resize)
         }
     }, [nodeCount, pulseSpeed])
@@ -252,7 +336,8 @@ export function NeuralCortex({ className = "", nodeCount = 35, pulseSpeed = 0.01
     return (
         <canvas
             ref={canvasRef}
-            className={`absolute inset-0 pointer-events-none ${className}`}
+            className={`absolute inset-0 ${className}`}
+            style={{ touchAction: "none" }}
         />
     )
 }

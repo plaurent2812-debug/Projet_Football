@@ -10,6 +10,9 @@ import { fetchPredictions, API_ROOT } from "@/lib/api"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuth, supabase } from "@/lib/auth"
+import { ParticleNetwork } from "@/components/visuals/ParticleNetwork"
+import { GradientOrb } from "@/components/visuals/GradientOrb"
+import { AnimatedCounter } from "@/components/visuals/AnimatedCounter"
 
 /* ── Live Alert Banner ────────────────────────────────────────── */
 function LiveAlertBanner({ alert }) {
@@ -192,21 +195,28 @@ export default function HomePage() {
     return (
         <div className="animate-fade-in-up pb-8 w-full mx-auto">
 
-            {/* ── Hero / Intro Section (Compact) ────────────────────────── */}
-            <div className="px-4 py-8 text-center bg-gradient-to-b from-primary/10 to-transparent border-b border-border/30">
-                <h1 className="text-3xl sm:text-4xl font-black text-foreground mb-3 tracking-tight">
-                    Proba<span className="text-primary">Lab</span>
-                </h1>
-                <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed mb-5">
-                    Smart Betting Assistant — d&eacute;tecte o&ugrave; le march&eacute; se trompe.
-                </p>
-                <Link
-                    to="/paris-du-soir"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors"
-                >
-                    <Target className="w-4 h-4" />
-                    Voir les Value Bets du jour
-                </Link>
+            {/* ── Hero / Intro Section (Premium) ────────────────────────── */}
+            <div className="relative px-4 py-12 text-center border-b border-border/30 overflow-hidden">
+                {/* Visual layers */}
+                <GradientOrb />
+                <ParticleNetwork className="z-0" />
+
+                {/* Content (above particles) */}
+                <div className="relative z-10">
+                    <h1 className="text-3xl sm:text-4xl font-black text-foreground mb-3 tracking-tight">
+                        Proba<span className="gradient-text-premium">Lab</span>
+                    </h1>
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed mb-6">
+                        Smart Betting Assistant — d&eacute;tecte o&ugrave; le march&eacute; se trompe.
+                    </p>
+                    <Link
+                        to="/paris-du-soir"
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all hover:scale-105 glow-value"
+                    >
+                        <Target className="w-4 h-4" />
+                        Voir les Value Bets du jour
+                    </Link>
+                </div>
             </div>
 
             {/* ── Pronos du jour card ──────────────────────────────── */}

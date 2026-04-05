@@ -70,7 +70,11 @@ export function BetCard({ bet, sport, date, isAdmin, onResultUpdate }: BetCardPr
     }
 
     const isTracked = !!betId
-    const edgePct = bet.edge_pct ?? (bet.ev != null ? Math.round(bet.ev * 1000) / 10 : 0)
+    const edgePct = bet.edge_pct ?? (
+        bet.proba_model != null && bet.odds > 1
+            ? Math.round((bet.proba_model / 100 - 1 / bet.odds) * 1000) / 10
+            : 0
+    )
 
     // Kelly criterion: fraction = edge / (odds - 1), capped at 5% (half-Kelly for safety)
     const kellyRaw = bet.odds > 1 && edgePct > 0

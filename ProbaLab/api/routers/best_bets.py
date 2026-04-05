@@ -153,6 +153,8 @@ def get_best_bets(
 
                         # EV = prob * odds - 1
                         ev = round((model_proba / 100) * odds_val - 1, 3)
+                        # Edge = model_prob - implied_prob (bookmaker)
+                        edge_pct = round(((model_proba / 100) - (1.0 / odds_val)) * 100, 1)
 
                         all_candidates.append({
                             "fixture_id": p["fixture_id"],
@@ -164,7 +166,7 @@ def get_best_bets(
                             "proba_bookmaker": round(100 / odds_val, 1) if odds_val > 1.0 else None,
                             "confidence": p.get("confidence_score") or 0,
                             "ev": ev,
-                            "edge_pct": round(ev * 100, 1),
+                            "edge_pct": edge_pct,
                             "is_value": ev > 0.03,
                             "odds_source": odds_source,
                             "result": "PENDING",
@@ -576,7 +578,7 @@ def get_best_bets(
                     "proba_model": prob,
                     "proba_bookmaker": round(100 / od["odds"], 1) if od["odds"] > 1.0 else None,
                     "ev": ev,
-                    "edge_pct": round(ev * 100, 1),
+                    "edge_pct": round(((prob / 100) - (1.0 / od["odds"])) * 100, 1),
                     "bookmaker": od.get("bookmaker", ""),
                     "is_value": ev > 0.03,
                     "odds_source": "real",

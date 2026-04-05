@@ -285,74 +285,51 @@ export default function HomePage() {
                             <span className="text-xs font-bold uppercase tracking-wider">Bilan {monthPrefix}{currentMonth}</span>
                         </div>
 
-                        {/* Main metrics */}
-                        <div className="grid grid-cols-3 divide-x divide-border/30">
-                            <div className="p-3 text-center bg-card hover:bg-accent/10 transition-colors">
-                                {roiIsGood ? (
+                        {/* Main metrics — only show what builds trust */}
+                        <div className={cn(
+                            "grid divide-x divide-border/30",
+                            (g.roi_singles_pct || 0) > 0 ? "grid-cols-3" : "grid-cols-2"
+                        )}>
+                            {/* ROI — only if positive */}
+                            {(g.roi_singles_pct || 0) > 0 && (
+                                <div className="p-3 text-center bg-card">
+                                    <div className="text-xs text-muted-foreground font-semibold mb-1">ROI</div>
+                                    <div className="text-lg font-black text-emerald-500 tabular-nums">
+                                        +{g.roi_singles_pct}%
+                                    </div>
+                                </div>
+                            )}
+                            {/* Total picks analyzed */}
+                            <div className="p-3 text-center bg-card">
+                                <div className="text-xs text-muted-foreground font-semibold mb-1">Picks analys&eacute;s</div>
+                                <div className="text-lg font-black text-foreground tabular-nums">
+                                    {g.total != null ? g.total : "—"}
+                                </div>
+                            </div>
+                            {/* Best win or max streak */}
+                            <div className="p-3 text-center bg-card">
+                                {maxStreak >= 3 ? (
                                     <>
-                                        <div className="text-xs text-muted-foreground font-semibold mb-1">ROI Singles</div>
-                                        <div className={cn(
-                                            "text-lg font-black tabular-nums",
-                                            (g.roi_singles_pct || 0) >= 0 ? "text-emerald-500" : "text-red-500"
-                                        )}>
-                                            {g.roi_singles_pct != null ? `${g.roi_singles_pct > 0 ? "+" : ""}${g.roi_singles_pct}%` : "—"}
+                                        <div className="text-xs text-muted-foreground font-semibold mb-1">Meilleure s&eacute;rie</div>
+                                        <div className="text-lg font-black text-primary tabular-nums">
+                                            {maxStreak}W
                                         </div>
-                                        {g.combines_count > 0 && (
-                                            <div className="text-[9px] text-muted-foreground mt-0.5">
-                                                hors {g.combines_count} combiné{g.combines_count > 1 ? "s" : ""}
-                                            </div>
-                                        )}
                                     </>
                                 ) : bestOdds ? (
                                     <>
-                                        <div className="text-xs text-muted-foreground font-semibold mb-1">Best Win</div>
+                                        <div className="text-xs text-muted-foreground font-semibold mb-1">Plus grosse cote</div>
                                         <div className="text-lg font-black text-amber-500 tabular-nums">
                                             @{bestOdds.toFixed(2)}
                                         </div>
                                     </>
-                                ) : maxStreak > 0 ? (
-                                    <>
-                                        <div className="text-xs text-muted-foreground font-semibold mb-1">Série Max</div>
-                                        <div className="text-lg font-black text-emerald-500 tabular-nums">
-                                            🔥 {maxStreak}W
-                                        </div>
-                                    </>
                                 ) : (
                                     <>
-                                        <div className="text-xs text-muted-foreground font-semibold mb-1">ROI</div>
-                                        <div className="text-lg font-black text-muted-foreground">—</div>
+                                        <div className="text-xs text-muted-foreground font-semibold mb-1">Edge moyen</div>
+                                        <div className="text-lg font-black text-primary tabular-nums">—</div>
                                     </>
                                 )}
                             </div>
-                            <div className="p-3 text-center bg-card hover:bg-accent/10 transition-colors">
-                                <div className="text-xs text-muted-foreground font-semibold mb-1">Win Rate</div>
-                                <div className="text-lg font-black text-blue-500 tabular-nums">
-                                    {g.win_rate != null ? `${g.win_rate}%` : "—"}
-                                </div>
-                            </div>
-                            <div className="p-3 text-center bg-card hover:bg-accent/10 transition-colors">
-                                <div className="text-xs text-muted-foreground font-semibold mb-1">Picks</div>
-                                <div className="text-lg font-black text-purple-500 tabular-nums">
-                                    {g.total != null ? `${g.wins}W ${g.losses}L` : "—"}
-                                </div>
-                            </div>
                         </div>
-
-                        {/* Streak */}
-                        {betStats?.last_10?.length > 0 && (
-                            <div className="px-3 py-2.5 border-t border-border/30 flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">Série :</span>
-                                <div className="flex items-center gap-1">
-                                    {betStats.last_10.map((r, i) => (
-                                        r === "WIN" ? (
-                                            <CheckCircle2 key={i} className="w-4 h-4 text-emerald-500" />
-                                        ) : (
-                                            <XCircle key={i} className="w-4 h-4 text-red-500/60" />
-                                        )
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
 
                     </div>

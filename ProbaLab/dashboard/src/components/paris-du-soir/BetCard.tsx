@@ -72,6 +72,12 @@ export function BetCard({ bet, sport, date, isAdmin, onResultUpdate }: BetCardPr
     const isTracked = !!betId
     const edgePct = bet.edge_pct ?? (bet.ev != null ? Math.round(bet.ev * 1000) / 10 : 0)
 
+    // Kelly criterion: fraction = edge / (odds - 1), capped at 5% (half-Kelly for safety)
+    const kellyRaw = bet.odds > 1 && edgePct > 0
+        ? (edgePct / 100) / (bet.odds - 1) * 100
+        : 0
+    const kellyPct = Math.min(kellyRaw, 5) // Cap at 5% max
+
     return (
         <div className={cn(
             "rounded-xl border p-4 transition-all duration-200",
@@ -128,6 +134,14 @@ export function BetCard({ bet, sport, date, isAdmin, onResultUpdate }: BetCardPr
                             </span>
                         )}
                     </div>
+
+                    {/* Kelly stake recommendation */}
+                    {kellyPct > 0 && localResult === "PENDING" && (
+                        <div className="flex flex-col items-center">
+                            <span className="text-xs font-bold text-primary">{kellyPct.toFixed(1)}%</span>
+                            <span className="text-[10px] text-muted-foreground">bankroll</span>
+                        </div>
+                    )}
                 </div>
 
                 {isAdmin && (

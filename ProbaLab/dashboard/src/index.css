@@ -9,8 +9,8 @@
    ═══════════════════════════════════════════════════ */
 
 :root {
-  /* Light Theme */
-  --background: 214 100% 98%;
+  /* Light Theme — Emerald primary */
+  --background: 160 20% 98%;
   --foreground: 222 47% 11%;
 
   --card: 0 0% 100%;
@@ -19,78 +19,78 @@
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
 
-  --primary: 221 83% 40%;
+  --primary: 160 84% 39%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 214 100% 95%;
-  --secondary-foreground: 221 83% 30%;
+  --secondary: 160 30% 95%;
+  --secondary-foreground: 160 84% 25%;
 
-  --muted: 214 60% 94%;
+  --muted: 220 20% 94%;
   --muted-foreground: 215 20% 40%;
 
-  --accent: 214 80% 92%;
-  --accent-foreground: 221 83% 30%;
+  --accent: 160 30% 92%;
+  --accent-foreground: 160 84% 25%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 214 40% 88%;
-  --input: 214 40% 88%;
-  --ring: 221 83% 40%;
+  --border: 220 20% 88%;
+  --input: 220 20% 88%;
+  --ring: 160 84% 39%;
 
-  --radius: 0.375rem;
+  --radius: 0.5rem;
 
   /* Brand */
-  --brand-blue: #1E40AF;
-  --brand-blue-light: #3B82F6;
-  --brand-blue-pale: #EFF6FF;
+  --brand-green: #059669;
+  --brand-green-light: #10B981;
+  --brand-green-pale: #ECFDF5;
 
   /* FlashScore specific tokens */
-  --fs-league-bg: 214 60% 96%;
-  --fs-row-hover: 214 50% 93%;
-  --fs-date-active: 221 83% 40%;
-  --fs-separator: 214 30% 90%;
+  --fs-league-bg: 220 20% 96%;
+  --fs-row-hover: 160 15% 95%;
+  --fs-date-active: 160 84% 39%;
+  --fs-separator: 220 15% 90%;
   --fs-live: 0 84% 55%;
-  --fs-score-bg: 214 30% 92%;
+  --fs-score-bg: 220 15% 93%;
 }
 
-/* Dark Theme */
+/* Dark Theme — Premium dark + emerald accents */
 .dark {
-  --background: 222 47% 7%;
-  --foreground: 210 40% 95%;
+  --background: 225 30% 6%;
+  --foreground: 210 40% 96%;
 
-  --card: 222 47% 10%;
-  --card-foreground: 210 40% 95%;
+  --card: 225 30% 9%;
+  --card-foreground: 210 40% 96%;
 
-  --popover: 222 47% 10%;
-  --popover-foreground: 210 40% 95%;
+  --popover: 225 30% 9%;
+  --popover-foreground: 210 40% 96%;
 
-  --primary: 217 91% 60%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 160 84% 45%;
+  --primary-foreground: 225 30% 6%;
 
-  --secondary: 222 47% 15%;
+  --secondary: 225 25% 14%;
   --secondary-foreground: 210 40% 90%;
 
-  --muted: 222 47% 13%;
-  --muted-foreground: 215 15% 65%;
+  --muted: 225 25% 12%;
+  --muted-foreground: 215 15% 55%;
 
-  --accent: 222 47% 16%;
+  --accent: 225 25% 15%;
   --accent-foreground: 210 40% 90%;
 
   --destructive: 0 63% 45%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 222 47% 18%;
-  --input: 222 47% 18%;
-  --ring: 217 91% 60%;
+  --border: 225 20% 16%;
+  --input: 225 20% 16%;
+  --ring: 160 84% 45%;
 
   /* FlashScore dark tokens */
-  --fs-league-bg: 222 47% 12%;
-  --fs-row-hover: 222 47% 14%;
-  --fs-date-active: 217 91% 60%;
-  --fs-separator: 222 47% 16%;
+  --fs-league-bg: 225 25% 11%;
+  --fs-row-hover: 225 25% 13%;
+  --fs-date-active: 160 84% 45%;
+  --fs-separator: 225 20% 15%;
   --fs-live: 0 70% 50%;
-  --fs-score-bg: 222 47% 16%;
+  --fs-score-bg: 225 25% 14%;
 }
 
 @theme inline {
@@ -146,7 +146,14 @@
   h5,
   h6 {
     font-feature-settings: 'cv11', 'ss01';
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
+  }
+
+  /* Tabular nums for all data */
+  .tabular-nums,
+  [data-slot="card"],
+  td, th {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -177,6 +184,50 @@
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ── Premium Glassmorphism (dark mode) ────────────────────── */
+.dark [data-slot="card"] {
+  background: hsl(var(--card) / 0.65);
+  backdrop-filter: blur(12px) saturate(1.2);
+  border-color: hsl(var(--border) / 0.4);
+}
+
+/* ── Value Glow Effects ──────────────────────────────────── */
+.glow-value {
+  box-shadow:
+    0 0 20px hsl(160 84% 45% / 0.12),
+    0 0 40px hsl(160 84% 45% / 0.04);
+}
+
+.glow-value-strong {
+  box-shadow:
+    0 0 24px hsl(160 84% 45% / 0.2),
+    0 0 48px hsl(160 84% 45% / 0.08);
+}
+
+.dark .glow-primary {
+  box-shadow:
+    0 0 16px hsl(160 84% 45% / 0.15),
+    0 0 32px hsl(160 84% 45% / 0.05);
+}
+
+/* ── Gradient text (for hero elements) ───────────────────── */
+.gradient-text-premium {
+  background: linear-gradient(135deg, hsl(160 84% 45%), hsl(160 60% 70%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Premium animations ──────────────────────────────────── */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.35s ease-out both;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -503,8 +554,9 @@
   display: none;              /* hidden by default (desktop) */
   align-items: stretch;
   justify-content: space-around;
-  background: hsl(var(--card));
-  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(16px) saturate(1.3);
+  border-top: 1px solid hsl(var(--border) / 0.3);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   height: 56px;
 }
@@ -617,7 +669,7 @@
 }
 
 .animate-fade-in-up {
-  animation: fade-in-up 0.3s ease-out both;
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes slide-in-left {

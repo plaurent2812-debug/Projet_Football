@@ -147,10 +147,14 @@ export default function ParisDuSoir() {
         return (
             <div className="animate-fade-in-up px-3 pt-4 pb-8 w-full mx-auto">
                 {/* Header */}
+                <div className="mb-3">
+                    <h1 className="text-lg font-black tracking-tight">Smart Betting Assistant</h1>
+                    <p className="text-xs text-muted-foreground">Edges d&eacute;tect&eacute;s automatiquement — ne pariez que quand le march&eacute; se trompe</p>
+                </div>
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                         <Target className="w-5 h-5 text-primary" />
-                        <h1 className="text-base font-black capitalize">{formattedDate}</h1>
+                        <h2 className="text-sm font-bold capitalize">{formattedDate}</h2>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <button
@@ -290,10 +294,14 @@ export default function ParisDuSoir() {
     return (
         <div className="animate-fade-in-up px-3 pt-4 pb-8 w-full mx-auto">
             {/* Header */}
+            <div className="mb-3">
+                <h1 className="text-lg font-black tracking-tight">Smart Betting Assistant</h1>
+                <p className="text-xs text-muted-foreground">Edges d&eacute;tect&eacute;s automatiquement — ne pariez que quand le march&eacute; se trompe</p>
+            </div>
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <Target className="w-5 h-5 text-primary" />
-                    <h1 className="text-base font-black capitalize">{formattedDate}</h1>
+                    <h2 className="text-sm font-bold capitalize">{formattedDate}</h2>
                 </div>
                 <div className="flex items-center gap-1.5">
                     <button
@@ -327,8 +335,8 @@ export default function ParisDuSoir() {
                 </p>
             </div>
 
-            {/* Expert Picks section */}
-            {!showHistory && (
+            {/* Expert Picks section — hidden for Smart Betting Assistant pivot (keep code for later) */}
+            {false && !showHistory && (
                 <div className="mb-5">
                     <div className="flex items-center gap-2 mb-3">
                         <span className="text-base">🎯</span>

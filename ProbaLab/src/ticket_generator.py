@@ -720,14 +720,19 @@ def _save_to_best_bets(date: str, sport: str, picks: list[dict], bet_type: str) 
             if len(parts) >= 2:
                 player_name = parts[0].strip()
 
+        proba = pick.get("proba", 0)
+        odds_val = pick["odds"]
+        edge = round(((proba / 100.0) - (1.0 / odds_val)) * 100, 2) if odds_val > 1 and proba > 0 else None
+
         rows.append({
             "date": date,
             "sport": sport,
             "bet_label": f"{pick['match']} — {pick['pick']}",
             "market": market,
-            "odds": pick["odds"],
+            "odds": odds_val,
             "confidence": confidence,
-            "proba_model": pick.get("proba", 0),
+            "proba_model": proba,
+            "edge_pct": edge,
             "player_name": player_name or None,
             "fixture_id": str(pick.get("fixture_id", "")) or None,
             "result": "PENDING",

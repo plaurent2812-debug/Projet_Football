@@ -637,13 +637,20 @@ def _save_and_print(rows: list[dict]) -> None:
         except Exception:
             logger.warning("Calibration save failed for bet_type=%s", row.get("bet_type"), exc_info=True)
 
-        bias_str: str = f"+{row['bias']}" if row["bias"] > 0 else str(row["bias"])
+        bias = row.get("bias")
+        bias_str = f"+{bias}" if bias is not None and bias > 0 else str(bias)
+        acc = row.get("accuracy")
+        brier = row.get("brier_score")
+        platt_a = row.get("platt_a")
+        platt_b = row.get("platt_b")
+        acc_s = f"{acc:.1%}" if acc is not None else "N/A"
+        brier_s = f"{brier:.4f}" if brier is not None else "N/A"
+        pa_s = f"{platt_a:.3f}" if platt_a is not None else "N/A"
+        pb_s = f"{platt_b:.3f}" if platt_b is not None else "N/A"
         logger.info(
             f"  {row['bet_type']:15s}  n={row['sample_size']:4d}  "
-            f"acc={row.get('accuracy', 0):.1%}  "
-            f"brier={row.get('brier_score', 0):.4f}  "
-            f"bias={bias_str}  "
-            f"platt=[{row['platt_a']:.3f}, {row['platt_b']:.3f}]"
+            f"acc={acc_s}  brier={brier_s}  bias={bias_str}  "
+            f"platt=[{pa_s}, {pb_s}]"
         )
 
 

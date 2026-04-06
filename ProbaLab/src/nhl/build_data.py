@@ -6,6 +6,7 @@ et génère le dataset CSV.
 """
 
 import time
+from pathlib import Path
 
 import httpx
 import pandas as pd

@@ -979,18 +979,16 @@ def detect_value_bets():
                         if home_odd <= 0 or draw_odd <= 0 or away_odd <= 0:
                             continue
 
-                        # FIX: Remove bookmaker margin (overround) before
-                        # computing implied probabilities. Raw 1/odds sums
-                        # to >100% due to the vig — dividing by the overround
-                        # gives fair probabilities, consistent with how the
-                        # model incorporates market odds in stats_engine.
-                        raw_h = 1 / home_odd
-                        raw_d = 1 / draw_odd
-                        raw_a = 1 / away_odd
-                        overround = raw_h + raw_d + raw_a
-                        implied_home = round(raw_h / overround * 100)
-                        implied_draw = round(raw_d / overround * 100)
-                        implied_away = round(raw_a / overround * 100)
+                        # FIX: Use Shin's method (consistent with stats_engine)
+                        # to remove bookmaker margin and correct for the
+                        # favourite-longshot bias. Basic 1/sum overestimates
+                        # longshot probabilities systematically.
+                        from src.models.stats_engine import _shin_fair_probs
+
+                        fair = _shin_fair_probs([home_odd, draw_odd, away_odd])
+                        implied_home = round(fair[0] * 100)
+                        implied_draw = round(fair[1] * 100)
+                        implied_away = round(fair[2] * 100)
 
                         # Our probabilities
                         our_home = fix.get("proba_home", 0) or 0

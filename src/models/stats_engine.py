@@ -32,6 +32,7 @@ from src.constants import (
     DRAW_FACTOR,
     DRAW_FACTOR_BY_LEAGUE,
     ELO_DECAY_RATE,
+    ELO_DRAW_DECAY_RATE,
     HOME_ELO_ADVANTAGE,
     HOME_XG_BONUS,
     K_FACTOR,
@@ -43,6 +44,8 @@ from src.constants import (
     WEIGHT_ELO_NO_MARKET,
     WEIGHT_MARKET,
     WEIGHT_ML,
+    WEIGHT_ML_MAX,
+    WEIGHT_ML_MIN,
     WEIGHT_POISSON,
     WEIGHT_POISSON_NO_MARKET,
     WEIGHT_STATS_VS_ML,
@@ -103,6 +106,58 @@ def dixon_coles_correction(
     elif h == 1 and a == 1:
         return 1 - rho
     return 1.0
+
+
+def fit_rho_mle(
+    results: list[dict],
+    league_id: int | None = None,
+) -> float:
+    """Estimate Dixon-Coles rho via maximum likelihood on historical results.
+
+    Fits rho to maximize the likelihood of observed scorelines given
+    the model's xG predictions. This replaces the hardcoded -0.13
+    with a data-driven estimate per league.
+
+    Args:
+        results: List of dicts with keys ``"xg_home"``, ``"xg_away"``,
+            ``"home_goals"``, ``"away_goals"``, and optionally
+            ``"league_id"``.
+        league_id: If provided, filters results to this league only.
+
+    Returns:
+        Fitted rho value (typically between -0.20 and -0.01).
+        Returns the default DIXON_COLES_RHO if insufficient data.
+    """
+    from scipy.optimize import minimize_scalar
+
+    filtered = results
+    if league_id is not None:
+        filtered = [r for r in results if r.get("league_id") == league_id]
+
+    if len(filtered) < 100:
+        return DIXON_COLES_RHO
+
+    def neg_log_likelihood(rho: float) -> float:
+        ll = 0.0
+        for r in filtered:
+            xg_h = r.get("xg_home", 1.3)
+            xg_a = r.get("xg_away", 1.1)
+            h = r.get("home_goals", 0)
+            a = r.get("away_goals", 0)
+            if xg_h is None or xg_a is None:
+                continue
+            # Poisson probability for this scoreline
+            from scipy.stats import poisson as poisson_dist
+
+            p = poisson_dist.pmf(h, xg_h) * poisson_dist.pmf(a, xg_a)
+            # Dixon-Coles correction
+            dc = dixon_coles_correction(h, a, xg_h, xg_a, rho)
+            p_adj = p * max(dc, 1e-10)
+            ll += math.log(max(p_adj, 1e-15))
+        return -ll
+
+    result = minimize_scalar(neg_log_likelihood, bounds=(-0.25, 0.0), method="bounded")
+    return round(result.x, 4) if result.success else DIXON_COLES_RHO
 
 
 def poisson_grid(
@@ -421,13 +476,14 @@ def elo_with_decay(
     return baseline + regression
 
 
-def get_elo_probs(home_elo: float, away_elo: float, league_id: int | None = None) -> dict[str, int]:
+def get_elo_probs(home_elo: float, away_elo: float, league_id: int | None = None) -> dict[str, float]:
     """Convert Elo ratings into 1X2 probabilities.
 
-    A home-advantage offset is added before computing expected scores,
-    and a draw component is estimated from the gap between the two sides.
-    When *league_id* is provided, uses the league-calibrated draw factor
-    (Serie A draws more than Bundesliga, etc.).
+    A home-advantage offset is added before computing expected scores.
+    Draw probability is estimated from the league-calibrated base draw
+    rate, reduced as the Elo gap increases (lopsided matches produce
+    fewer draws). The draw probability decays exponentially with the
+    absolute Elo difference.
 
     Args:
         home_elo: Elo rating of the home team.
@@ -436,19 +492,30 @@ def get_elo_probs(home_elo: float, away_elo: float, league_id: int | None = None
 
     Returns:
         Dictionary with keys ``"elo_home"``, ``"elo_draw"``, ``"elo_away"``
-        as rounded integer percentages.
+        as float percentages.
     """
-    # On utilise simplement l'ELO_EXPECTED pour les win et loss
     p_home = elo_expected(home_elo + HOME_ELO_ADVANTAGE, away_elo)
     p_away = elo_expected(away_elo, home_elo + HOME_ELO_ADVANTAGE)
 
-    # Normalisation sur 100% (sans nul)
-    total = p_home + p_away
-    p_home /= total
-    p_away /= total
+    # Draw probability: base rate decays with Elo gap
+    # Larger Elo differences → fewer draws (one side dominates)
+    base_draw = DRAW_FACTOR_BY_LEAGUE.get(league_id, DRAW_FACTOR)
+    elo_gap = abs(home_elo - away_elo)
+    draw_prob = base_draw * math.exp(-ELO_DRAW_DECAY_RATE * elo_gap)
+
+    # Distribute remaining probability to home/away proportionally
+    remaining = 1.0 - draw_prob
+    total_win = p_home + p_away
+    if total_win > 0:
+        p_home = remaining * (p_home / total_win)
+        p_away = remaining * (p_away / total_win)
+    else:
+        p_home = remaining / 2
+        p_away = remaining / 2
 
     return {
         "elo_home": p_home * 100,
+        "elo_draw": draw_prob * 100,
         "elo_away": p_away * 100,
     }
 
@@ -1095,18 +1162,87 @@ def get_injury_impact(
 # ═══════════════════════════════════════════════════════════════════
 
 
-def odds_to_probs(fixture_api_id: int) -> dict | None:
-    """Convert bookmaker odds into implied probabilities.
+def _shin_z(odds_list: list[float]) -> float:
+    """Estimate Shin's z parameter (informed trader proportion).
 
-    Removes the overround (vig) to obtain fair probabilities.
+    Shin's method models the bookmaker margin as arising from a
+    proportion *z* of bettors being perfectly informed insiders.
+    This yields fair probabilities that correctly account for the
+    favourite-longshot bias (basic 1/sum method overestimates
+    longshots and underestimates favourites).
+
+    Uses the Jia (2005) closed-form simplification:
+        z = (S - 1) / (S * (n - 1))
+    where n = number of outcomes, S = sum of 1/odds (overround).
+
+    Args:
+        odds_list: List of decimal bookmaker odds (e.g. [2.0, 3.5, 3.0]).
+
+    Returns:
+        Shin's z parameter (typically 0.01–0.06 for competitive markets).
+    """
+    n = len(odds_list)
+    s = sum(1.0 / o for o in odds_list)
+    if s <= 1.0 or n <= 1:
+        return 0.0
+    z = (s - 1.0) / (s * (n - 1))
+    return max(0.0, z)
+
+
+def _shin_fair_probs(odds_list: list[float]) -> list[float]:
+    """Convert bookmaker odds to fair probabilities using Shin's method.
+
+    Shin's fair probability for outcome i:
+        p_i = (sqrt(z^2 + 4*(1-z) * q_i^2 / S) - z) / (2*(1-z))
+    where q_i = 1/o_i, z is the informed trader proportion,
+    S = sum(q_i) = overround.
+
+    This corrects for the favourite-longshot bias: favourites get
+    slightly higher fair probabilities than basic 1/sum, and longshots
+    get slightly lower (typically 0.5-2% difference).
+
+    Args:
+        odds_list: List of decimal bookmaker odds.
+
+    Returns:
+        List of fair probabilities (sum to ~1.0).
+    """
+    z = _shin_z(odds_list)
+    if z <= 0:
+        # Fallback to basic proportional method
+        raw = [1.0 / o for o in odds_list]
+        s = sum(raw)
+        return [r / s for r in raw]
+
+    implied = [1.0 / o for o in odds_list]
+    s = sum(implied)
+    probs = []
+    for q in implied:
+        inner = z * z + 4 * (1 - z) * (q * q) / s
+        p = (math.sqrt(inner) - z) / (2 * (1 - z))
+        probs.append(max(0.0, p))
+
+    # Normalize to ensure exact sum = 1.0
+    total = sum(probs)
+    if total > 0:
+        probs = [p / total for p in probs]
+    return probs
+
+
+def odds_to_probs(fixture_api_id: int) -> dict | None:
+    """Convert bookmaker odds into fair implied probabilities.
+
+    Uses Shin's method (1993) for margin removal, which correctly
+    accounts for the favourite-longshot bias. The basic 1/sum method
+    systematically overestimates longshot probabilities and
+    underestimates favourites.
 
     Args:
         fixture_api_id: API identifier of the fixture.
 
     Returns:
-        Dictionary with keys ``"market_home"``, ``"market_draw"``,
-        ``"market_away"`` (integer percentages) and ``"overround"``,
-        or ``None`` if odds are unavailable.
+        Dictionary with fair market probabilities, overround, raw odds,
+        and Shin's z parameter, or ``None`` if odds are unavailable.
     """
     odds = (
         supabase.table("fixture_odds")
@@ -1123,20 +1259,33 @@ def odds_to_probs(fixture_api_id: int) -> dict | None:
     if not o.get("home_win_odds"):
         return None
 
-    # Probabilités implicites (avec overround)
-    raw_h = 1 / o["home_win_odds"]
-    raw_d = 1 / o["draw_odds"] if o.get("draw_odds") else 0.25
-    raw_a = 1 / o["away_win_odds"]
+    home_odds = o["home_win_odds"]
+    draw_odds = o.get("draw_odds")
+    away_odds = o["away_win_odds"]
+
+    # Overround (bookmaker margin)
+    raw_h = 1.0 / home_odds
+    raw_d = 1.0 / draw_odds if draw_odds else 0.25
+    raw_a = 1.0 / away_odds
     overround = raw_h + raw_d + raw_a
 
+    # Shin's method for fair probabilities (corrects favourite-longshot bias)
+    if draw_odds:
+        odds_list = [home_odds, draw_odds, away_odds]
+    else:
+        odds_list = [home_odds, 4.0, away_odds]  # ~25% draw fallback
+
+    fair_probs = _shin_fair_probs(odds_list)
+
     return {
-        "market_home": raw_h / overround * 100,
-        "market_draw": raw_d / overround * 100,
-        "market_away": raw_a / overround * 100,
+        "market_home": fair_probs[0] * 100,
+        "market_draw": fair_probs[1] * 100,
+        "market_away": fair_probs[2] * 100,
         "overround": round(overround, 3),
-        "raw_odds_home": o["home_win_odds"],
-        "raw_odds_draw": o.get("draw_odds"),
-        "raw_odds_away": o["away_win_odds"],
+        "shin_z": round(_shin_z(odds_list), 4),
+        "raw_odds_home": home_odds,
+        "raw_odds_draw": draw_odds,
+        "raw_odds_away": away_odds,
     }
 
 
@@ -1565,10 +1714,14 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     # ── 7. Combinaison finale ────────────────────────────────────
     # All probabilities stay as floats until final output to avoid
     # cascading rounding errors (each round() step adds ±0.5% error).
-    # Pondération dynamique :
-    w_poisson = WEIGHT_POISSON
-    w_elo = WEIGHT_ELO
-    w_market = WEIGHT_MARKET
+    #
+    # Market odds are deliberately EXCLUDED from the probability
+    # combination. Including them creates a circular dependency: we
+    # incorporate the bookmaker's view, then compare our output against
+    # that same bookmaker to find value. This contaminates the edge
+    # signal. Market odds are kept only for value bet detection.
+    w_poisson = WEIGHT_POISSON  # 0.65
+    w_elo = WEIGHT_ELO  # 0.35
 
     # Ajustement selon l'avancée de la saison
     # En début de saison (< 8 matchs par équipe en moyenne), l'ELO capture mieux
@@ -1580,28 +1733,10 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         w_elo += 0.10
         context["weights_adjusted"] = "early_season"
 
-    if market:
-        final_home = (
-            poisson_probs["proba_home"] * w_poisson
-            + elo_probs["elo_home"] * w_elo
-            + market["market_home"] * w_market
-        )
-        # On fait pleinement confiance au Poisson Bivarié pour la probabilité du Nul (Phase 4.3)
-        final_draw = (
-            poisson_probs["proba_draw"] * (w_poisson + w_elo)
-            + market["market_draw"] * w_market
-        )
-        final_away = (
-            poisson_probs["proba_away"] * w_poisson
-            + elo_probs["elo_away"] * w_elo
-            + market["market_away"] * w_market
-        )
-    else:
-        w_p = WEIGHT_POISSON_NO_MARKET
-        w_e = WEIGHT_ELO_NO_MARKET
-        final_home = poisson_probs["proba_home"] * w_p + elo_probs["elo_home"] * w_e
-        final_draw = poisson_probs["proba_draw"] * (w_p + w_e)
-        final_away = poisson_probs["proba_away"] * w_p + elo_probs["elo_away"] * w_e
+    # Combine Poisson + ELO (now includes ELO draw probability)
+    final_home = poisson_probs["proba_home"] * w_poisson + elo_probs["elo_home"] * w_elo
+    final_draw = poisson_probs["proba_draw"] * w_poisson + elo_probs["elo_draw"] * w_elo
+    final_away = poisson_probs["proba_away"] * w_poisson + elo_probs["elo_away"] * w_elo
 
     # Normaliser à 100% (float, no rounding yet)
     total = final_home + final_draw + final_away
@@ -1707,28 +1842,39 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
             context["ml_predictions"] = ml_preds
 
             if ml_preds.get("ml_home") is not None:
-                # Pondération : 60% modèle stats, 40% ML XGBoost (floats, no rounding)
-                w_stats = WEIGHT_STATS_VS_ML
-                w_ml = WEIGHT_ML
+                # Dynamic ML weighting: adjust based on ML model's
+                # calibration quality (Brier score). Better-calibrated
+                # models get higher weight, clamped to [ML_MIN, ML_MAX].
+                ml_brier = ml_preds.get("ml_brier_score")
+                if ml_brier is not None and ml_brier > 0:
+                    # Good Brier < 0.20 → more ML weight; poor > 0.25 → less
+                    # Linear interpolation: 0.18 → ML_MAX, 0.28 → ML_MIN
+                    w_ml = WEIGHT_ML_MAX - (ml_brier - 0.18) * (WEIGHT_ML_MAX - WEIGHT_ML_MIN) / 0.10
+                    w_ml = max(WEIGHT_ML_MIN, min(WEIGHT_ML_MAX, w_ml))
+                else:
+                    w_ml = WEIGHT_ML  # Default 0.40
+                w_stats = 1.0 - w_ml
+                context["ml_weight_dynamic"] = round(w_ml, 3)
+
                 final_home = final_home * w_stats + ml_preds["ml_home"] * w_ml
                 final_draw = final_draw * w_stats + ml_preds["ml_draw"] * w_ml
                 final_away = 100 - final_home - final_draw
 
             if ml_preds.get("ml_btts") is not None:
                 poisson_probs["proba_btts"] = (
-                    poisson_probs["proba_btts"] * 0.6 + ml_preds["ml_btts"] * 0.4
+                    poisson_probs["proba_btts"] * (1 - w_ml) + ml_preds["ml_btts"] * w_ml
                 )
             if ml_preds.get("ml_over25") is not None:
                 poisson_probs["proba_over_25"] = (
-                    poisson_probs["proba_over_25"] * 0.6 + ml_preds["ml_over25"] * 0.4
+                    poisson_probs["proba_over_25"] * (1 - w_ml) + ml_preds["ml_over25"] * w_ml
                 )
             if ml_preds.get("ml_over15") is not None:
                 poisson_probs["proba_over_15"] = (
-                    poisson_probs["proba_over_15"] * 0.6 + ml_preds["ml_over15"] * 0.4
+                    poisson_probs["proba_over_15"] * (1 - w_ml) + ml_preds["ml_over15"] * w_ml
                 )
             if ml_preds.get("ml_over05") is not None:
                 poisson_probs["proba_over_05"] = (
-                    poisson_probs["proba_over_05"] * 0.6 + ml_preds["ml_over05"] * 0.4
+                    poisson_probs["proba_over_05"] * (1 - w_ml) + ml_preds["ml_over05"] * w_ml
                 )
 
             context["ml_active"] = True

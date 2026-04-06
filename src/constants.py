@@ -136,12 +136,14 @@ H2H_SENSITIVITY: float = 0.15  # coefficient de conversion winrate → factor
 #  PONDÉRATIONS — COMBINAISON FINALE
 # ═══════════════════════════════════════════════════════════════════
 
-# Poisson + ELO + Marché
-WEIGHT_POISSON: float = 0.55
-WEIGHT_ELO: float = 0.25
-WEIGHT_MARKET: float = 0.20
+# Poisson + ELO (pure model — market excluded from combination
+# to keep model predictions independent from the benchmark we
+# compare against for value bet detection)
+WEIGHT_POISSON: float = 0.65
+WEIGHT_ELO: float = 0.35
+WEIGHT_MARKET: float = 0.0  # Kept for backward compat; unused in combination
 
-# Poisson + ELO (sans marché)
+# Poisson + ELO (sans marché — same as above now)
 WEIGHT_POISSON_NO_MARKET: float = 0.65
 WEIGHT_ELO_NO_MARKET: float = 0.35
 
@@ -149,9 +151,11 @@ WEIGHT_ELO_NO_MARKET: float = 0.35
 WEIGHT_STATS: float = 0.70
 WEIGHT_AI: float = 0.30
 
-# Stats vs ML XGBoost
+# Stats vs ML XGBoost — base weights (can be overridden dynamically)
 WEIGHT_STATS_VS_ML: float = 0.60
 WEIGHT_ML: float = 0.40
+WEIGHT_ML_MIN: float = 0.25  # Floor when ML model has poor Brier score
+WEIGHT_ML_MAX: float = 0.55  # Ceiling when ML model is well-calibrated
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -188,7 +192,7 @@ XG_FALLBACK_AWAY: float = 1.1
 #  CALIBRATION
 # ═══════════════════════════════════════════════════════════════════
 
-MIN_CALIBRATION_SAMPLES: int = 20
+MIN_CALIBRATION_SAMPLES: int = 50  # 20 was too low, Platt scaling overfits with few samples
 
 
 # ═══════════════════════════════════════════════════════════════════

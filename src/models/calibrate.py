@@ -23,7 +23,7 @@ from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss
 
-MIN_SAMPLES: int = 20  # Minimum de matchs pour calibrer
+MIN_SAMPLES: int = 50  # Minimum de matchs pour calibrer (20 was too low, Platt overfits)
 
 
 # ═══════════════════════════════════════════════════════════════════

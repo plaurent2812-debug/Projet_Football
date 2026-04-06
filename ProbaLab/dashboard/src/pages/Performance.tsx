@@ -2,9 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     BarChart3, Target, TrendingUp, Percent,
     CheckCircle2, XCircle, Trophy, Zap, Activity, Swords, Info,
+    ShieldCheck, ShieldOff, ArrowUpRight, ArrowDownRight,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import type { MarketROIResponse, MarketROIEntry } from "@/types/api"
 
 import { StatTile, MarketCard, InfoTooltip } from "@/components/performance/ui"
 import { BrierCard } from "@/components/performance/BrierCard"
@@ -13,11 +15,61 @@ import { BenchmarksSection } from "@/components/performance/BenchmarksSection"
 import { DailyChart } from "@/components/performance/DailyChart"
 
 
+/* ── Market strategy row ──────────────────────────────────── */
+function MarketStrategyRow({ data }: { data: MarketROIEntry }) {
+    const isActive = data.active
+    const isProfitable = data.roi > 0
+    return (
+        <div className={cn(
+            "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+            isActive
+                ? "bg-card/50 border-border/40"
+                : "bg-red-500/5 border-red-500/20 opacity-70"
+        )}>
+            <div className={cn(
+                "p-1.5 rounded-md",
+                isProfitable ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
+            )}>
+                {isActive ? <ShieldCheck className="w-4 h-4" /> : <ShieldOff className="w-4 h-4" />}
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{data.label}</p>
+                <p className="text-[11px] text-muted-foreground">
+                    {data.total} paris · {data.winrate}% winrate
+                </p>
+            </div>
+            <div className="text-right">
+                <div className={cn(
+                    "flex items-center gap-0.5 text-sm font-bold tabular-nums",
+                    isProfitable ? "text-emerald-400" : "text-red-400"
+                )}>
+                    {isProfitable
+                        ? <ArrowUpRight className="w-3.5 h-3.5" />
+                        : <ArrowDownRight className="w-3.5 h-3.5" />
+                    }
+                    {data.roi > 0 ? "+" : ""}{data.roi}%
+                </div>
+                <p className="text-[10px] text-muted-foreground">ROI</p>
+            </div>
+            <div className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                isActive
+                    ? (isProfitable ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400")
+                    : "bg-red-500/15 text-red-400"
+            )}>
+                {isActive ? (isProfitable ? "Actif" : "Surveil.") : "Off"}
+            </div>
+        </div>
+    )
+}
+
+
 /* ═══════════════════════════════════════════════════════════
    Performance Page
    ═══════════════════════════════════════════════════════════ */
 export default function PerformancePage() {
     const [data, setData] = useState<any>(null)
+    const [marketROI, setMarketROI] = useState<MarketROIResponse | null>(null)
     const [jours, setJours] = useState(90)
     const [sport, setSport] = useState("football")
     const [loading, setLoading] = useState(true)
@@ -28,10 +80,19 @@ export default function PerformancePage() {
         setLoading(true)
         setError(null)
 
-        import('@/lib/api').then(({ fetchPerformance, fetchNHLPerformance }) => {
+        import('@/lib/api').then(({ fetchPerformance, fetchNHLPerformance, fetchMarketROI }) => {
             const fetcher = sport === 'nhl' ? fetchNHLPerformance : fetchPerformance
-            fetcher(jours)
-                .then(setData)
+
+            const promises: Promise<any>[] = [fetcher(jours)]
+            if (sport === 'football') {
+                promises.push(fetchMarketROI(jours).catch(() => null))
+            }
+
+            Promise.all(promises)
+                .then(([perfData, roiData]) => {
+                    setData(perfData)
+                    if (roiData) setMarketROI(roiData)
+                })
                 .catch((err: Error) => {
                     console.error(err)
                     setError(err.message)
@@ -313,6 +374,44 @@ export default function PerformancePage() {
 
             {/* Chart: Daily accuracy + volume */}
             <DailyChart chartData={chartData} />
+
+            {/* Value Betting Strategy — Market Performance */}
+            {sport === 'football' && marketROI && marketROI.markets && Object.keys(marketROI.markets).length > 0 && (
+                <Card className="bg-card/50 border-border/50">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                            <Trophy className="w-4 h-4 text-primary" />
+                            Strategie Value Betting — Performance par marche
+                        </CardTitle>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                            Les marches avec un ROI &lt; -5% sont automatiquement desactives dans la detection des value bets.
+                        </p>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {Object.entries(marketROI.markets).map(([key, mkt]) => (
+                                <MarketStrategyRow key={key} data={mkt} />
+                            ))}
+                        </div>
+
+                        {/* Summary stats */}
+                        <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border/30">
+                            <div className="flex items-center gap-1.5">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                <span className="text-xs text-muted-foreground">
+                                    <span className="font-semibold text-foreground">{marketROI.active_markets?.length || 0}</span> marches actifs
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <ShieldOff className="w-3.5 h-3.5 text-red-400" />
+                                <span className="text-xs text-muted-foreground">
+                                    <span className="font-semibold text-foreground">{marketROI.disabled_markets?.length || 0}</span> desactives
+                                </span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

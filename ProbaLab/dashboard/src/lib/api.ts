@@ -3,6 +3,7 @@ import type {
   PredictionsListResponse,
   PredictionDetailResponse,
   PerformanceResponse,
+  MarketROIResponse,
   NewsResponse,
   MonitoringResponse,
   FootballMetaAnalysisResponse,
@@ -60,6 +61,10 @@ export const api = {
 
   getNHLPerformance(days = 30): Promise<PerformanceResponse> {
     return fetchApi<PerformanceResponse>(`${NHL_BASE}/nhl/performance?days=${days}`)
+  },
+
+  getMarketROI(days = 30): Promise<MarketROIResponse> {
+    return fetchApi<MarketROIResponse>(`${API_BASE}/market-roi?days=${days}`)
   },
 
   // ── Teams ────────────────────────────────────────────────────
@@ -196,6 +201,11 @@ export function fetchPerformance(days = 30): Promise<PerformanceResponse> {
 /** @deprecated Use useNHLPerformance() hook from @/lib/queries */
 export function fetchNHLPerformance(days = 30): Promise<PerformanceResponse> {
   return api.getNHLPerformance(days)
+}
+
+/** @deprecated Use useMarketROI() hook from @/lib/queries */
+export function fetchMarketROI(days = 30): Promise<MarketROIResponse> {
+  return api.getMarketROI(days)
 }
 
 /** @deprecated Use useTeamHistory() hook from @/lib/queries */

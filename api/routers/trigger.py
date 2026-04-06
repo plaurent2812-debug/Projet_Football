@@ -979,10 +979,18 @@ def detect_value_bets():
                         if home_odd <= 0 or draw_odd <= 0 or away_odd <= 0:
                             continue
 
-                        # Implied probabilities (with margin)
-                        implied_home = round(100 / home_odd)
-                        implied_draw = round(100 / draw_odd)
-                        implied_away = round(100 / away_odd)
+                        # FIX: Remove bookmaker margin (overround) before
+                        # computing implied probabilities. Raw 1/odds sums
+                        # to >100% due to the vig — dividing by the overround
+                        # gives fair probabilities, consistent with how the
+                        # model incorporates market odds in stats_engine.
+                        raw_h = 1 / home_odd
+                        raw_d = 1 / draw_odd
+                        raw_a = 1 / away_odd
+                        overround = raw_h + raw_d + raw_a
+                        implied_home = round(raw_h / overround * 100)
+                        implied_draw = round(raw_d / overround * 100)
+                        implied_away = round(raw_a / overround * 100)
 
                         # Our probabilities
                         our_home = fix.get("proba_home", 0) or 0

@@ -125,15 +125,13 @@ def poisson_grid(
         likely correct score, and the adjusted xG values used.
     """
     # B1: Dynamic rho — stronger negative correlation for lower-scoring matches
-    # This captures the bivariate dependency between home/away goals
-    base_rho = -0.13  # Empirical baseline for top European leagues
+    # Uses smooth linear interpolation instead of hard step function to avoid
+    # discontinuities at the boundaries (e.g. xG 1.99 vs 2.01)
+    base_rho = DIXON_COLES_RHO  # -0.13 empirical baseline for top European leagues
     xg_total = xg_home + xg_away
-    if xg_total < 2.0:
-        rho = base_rho * 1.3  # Stronger correlation for defensive matches
-    elif xg_total > 3.5:
-        rho = base_rho * 0.7  # Weaker for high-scoring matches
-    else:
-        rho = base_rho
+    # Scale factor: 1.3 at xG_total=1.5 (defensive), 1.0 at 2.75, 0.7 at xG_total=4.0
+    rho_scale = max(0.7, min(1.3, 1.3 - (xg_total - 1.5) * 0.24))
+    rho = base_rho * rho_scale
 
     # ── Vectorized Poisson grid (replaces double-loop) ────────
     goals = np.arange(max_goals)
@@ -193,34 +191,36 @@ def poisson_grid(
     proba_cs_away = float(grid[0, :].sum())  # Home scores 0
     proba_btts_over25 = float(grid[1:, 1:][total_goals[1:, 1:] > 2].sum())
 
+    # Return float percentages — rounding deferred to final output
+    # to avoid cascading rounding errors through combination steps
     return {
-        "proba_home": round(home_win * 100),
-        "proba_draw": round(draw * 100),
-        "proba_away": round(away_win * 100),
-        "proba_btts": round(btts * 100),
-        "proba_btts_over25": round(proba_btts_over25 * 100),
-        "proba_cs_home": round(proba_cs_home * 100),
-        "proba_cs_away": round(proba_cs_away * 100),
-        "proba_over_05": round(over_05 * 100),
-        "proba_over_15": round(over_15 * 100),
-        "proba_over_25": round(over_25 * 100),
-        "proba_over_35": round(over_35 * 100),
-        "proba_dc_1x": round((home_win + draw) * 100),
-        "proba_dc_x2": round((draw + away_win) * 100),
-        "proba_dc_12": round((home_win + away_win) * 100),
-        "proba_dc1x_over15": round(dc1x_over15 * 100),
-        "proba_dcx2_over15": round(dcx2_over15 * 100),
+        "proba_home": home_win * 100,
+        "proba_draw": draw * 100,
+        "proba_away": away_win * 100,
+        "proba_btts": btts * 100,
+        "proba_btts_over25": proba_btts_over25 * 100,
+        "proba_cs_home": proba_cs_home * 100,
+        "proba_cs_away": proba_cs_away * 100,
+        "proba_over_05": over_05 * 100,
+        "proba_over_15": over_15 * 100,
+        "proba_over_25": over_25 * 100,
+        "proba_over_35": over_35 * 100,
+        "proba_dc_1x": (home_win + draw) * 100,
+        "proba_dc_x2": (draw + away_win) * 100,
+        "proba_dc_12": (home_win + away_win) * 100,
+        "proba_dc1x_over15": dc1x_over15 * 100,
+        "proba_dcx2_over15": dcx2_over15 * 100,
         "xg_home": round(xg_home, 2),
         "xg_away": round(xg_away, 2),
         "correct_score": correct_score,
         "proba_correct_score": round(correct_score_prob * 100, 1),
         # Handicaps asiatiques
-        "ah_home_minus_05": round(ah_home_minus_05 * 100),
-        "ah_home_minus_10": round(ah_home_minus_10_effective * 100),
-        "ah_home_minus_15": round(ah_home_minus_15 * 100),
-        "ah_away_plus_05": round((1 - ah_home_minus_05) * 100),
-        "ah_away_plus_10": round((1 - ah_home_minus_10_effective) * 100),
-        "ah_away_plus_15": round((1 - ah_home_minus_15) * 100),
+        "ah_home_minus_05": ah_home_minus_05 * 100,
+        "ah_home_minus_10": ah_home_minus_10_effective * 100,
+        "ah_home_minus_15": ah_home_minus_15 * 100,
+        "ah_away_plus_05": (1 - ah_home_minus_05) * 100,
+        "ah_away_plus_10": (1 - ah_home_minus_10_effective) * 100,
+        "ah_away_plus_15": (1 - ah_home_minus_15) * 100,
     }
 
 
@@ -448,8 +448,8 @@ def get_elo_probs(home_elo: float, away_elo: float, league_id: int | None = None
     p_away /= total
 
     return {
-        "elo_home": round(p_home * 100),
-        "elo_away": round(p_away * 100),
+        "elo_home": p_home * 100,
+        "elo_away": p_away * 100,
     }
 
 
@@ -1130,10 +1130,13 @@ def odds_to_probs(fixture_api_id: int) -> dict | None:
     overround = raw_h + raw_d + raw_a
 
     return {
-        "market_home": round(raw_h / overround * 100),
-        "market_draw": round(raw_d / overround * 100),
-        "market_away": round(raw_a / overround * 100),
+        "market_home": raw_h / overround * 100,
+        "market_draw": raw_d / overround * 100,
+        "market_away": raw_a / overround * 100,
         "overround": round(overround, 3),
+        "raw_odds_home": o["home_win_odds"],
+        "raw_odds_draw": o.get("draw_odds"),
+        "raw_odds_away": o["away_win_odds"],
     }
 
 
@@ -1490,9 +1493,11 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     away_base = form_factor_a * rest_a * h2h_a * weather_per_side
 
     # xG_home = force offensive dom × faiblesse défensive adverse (blessures ext)
-    xg_home_adj = xg_home * home_base * atk_h * def_a
+    # Compound floor: prevent multiplicative factors from crushing xG below 60%
+    # of base (extreme stacking of form+rest+h2h+weather+injuries is unrealistic)
+    xg_home_adj = max(xg_home * 0.60, xg_home * home_base * atk_h * def_a)
     # xG_away = force offensive ext × faiblesse défensive dom (blessures dom)
-    xg_away_adj = xg_away * away_base * atk_a * def_h
+    xg_away_adj = max(xg_away * 0.60, xg_away * away_base * atk_a * def_h)
 
     # Si l'arbitre siffle beaucoup de pénaltys, léger boost aux buts
     if ref_impact and ref_impact["penalty_bias"] > 1.3:
@@ -1558,6 +1563,8 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     context["market"] = market
 
     # ── 7. Combinaison finale ────────────────────────────────────
+    # All probabilities stay as floats until final output to avoid
+    # cascading rounding errors (each round() step adds ±0.5% error).
     # Pondération dynamique :
     w_poisson = WEIGHT_POISSON
     w_elo = WEIGHT_ELO
@@ -1596,22 +1603,22 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         final_draw = poisson_probs["proba_draw"] * (w_p + w_e)
         final_away = poisson_probs["proba_away"] * w_p + elo_probs["elo_away"] * w_e
 
-    # Normaliser à 100%
+    # Normaliser à 100% (float, no rounding yet)
     total = final_home + final_draw + final_away
     if total > 0:
-        final_home = round(final_home / total * 100)
-        final_draw = round(final_draw / total * 100)
-        final_away = 100 - final_home - final_draw
+        final_home = final_home / total * 100
+        final_draw = final_draw / total * 100
+        final_away = final_away / total * 100
 
     # ── 7b. Stakes draw boost ──────────────────────────────────
     # When both teams have high stakes (>1.0), boost draw prob
     # and redistribute from home/away proportionally
     if stakes_h > 1.0 and stakes_a > 1.0:
         draw_boost = STAKES_DRAW_BOOST * 100  # e.g. 3%
-        final_draw = round(final_draw + draw_boost)
+        final_draw += draw_boost
         # Redistribute boost proportionally from home and away
         home_share = final_home / max(final_home + final_away, 1)
-        final_home = round(final_home - draw_boost * home_share)
+        final_home -= draw_boost * home_share
         final_away = 100 - final_home - final_draw
 
     # ── 8. Probabilité de penalty ────────────────────────────────
@@ -1700,27 +1707,27 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
             context["ml_predictions"] = ml_preds
 
             if ml_preds.get("ml_home") is not None:
-                # Pondération : 60% modèle stats, 40% ML XGBoost
+                # Pondération : 60% modèle stats, 40% ML XGBoost (floats, no rounding)
                 w_stats = WEIGHT_STATS_VS_ML
                 w_ml = WEIGHT_ML
-                final_home = round(final_home * w_stats + ml_preds["ml_home"] * w_ml)
-                final_draw = round(final_draw * w_stats + ml_preds["ml_draw"] * w_ml)
+                final_home = final_home * w_stats + ml_preds["ml_home"] * w_ml
+                final_draw = final_draw * w_stats + ml_preds["ml_draw"] * w_ml
                 final_away = 100 - final_home - final_draw
 
             if ml_preds.get("ml_btts") is not None:
-                poisson_probs["proba_btts"] = round(
+                poisson_probs["proba_btts"] = (
                     poisson_probs["proba_btts"] * 0.6 + ml_preds["ml_btts"] * 0.4
                 )
             if ml_preds.get("ml_over25") is not None:
-                poisson_probs["proba_over_25"] = round(
+                poisson_probs["proba_over_25"] = (
                     poisson_probs["proba_over_25"] * 0.6 + ml_preds["ml_over25"] * 0.4
                 )
             if ml_preds.get("ml_over15") is not None:
-                poisson_probs["proba_over_15"] = round(
+                poisson_probs["proba_over_15"] = (
                     poisson_probs["proba_over_15"] * 0.6 + ml_preds["ml_over15"] * 0.4
                 )
             if ml_preds.get("ml_over05") is not None:
-                poisson_probs["proba_over_05"] = round(
+                poisson_probs["proba_over_05"] = (
                     poisson_probs["proba_over_05"] * 0.6 + ml_preds["ml_over05"] * 0.4
                 )
 
@@ -1733,43 +1740,54 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     if CALIBRATION_AVAILABLE:
         try:
             lid = league_id
-            cal_home = apply_calibration(final_home, "1x2_home", lid)
-            cal_draw = apply_calibration(final_draw, "1x2_draw", lid)
-            cal_away = apply_calibration(final_away, "1x2_away", lid)
-            # Renormaliser à 100%
+            cal_home = apply_calibration(round(final_home), "1x2_home", lid)
+            cal_draw = apply_calibration(round(final_draw), "1x2_draw", lid)
+            cal_away = apply_calibration(round(final_away), "1x2_away", lid)
+            # Renormaliser à 100% (stay as floats)
             cal_total = cal_home + cal_draw + cal_away
             if cal_total > 0:
-                final_home = round(cal_home / cal_total * 100)
-                final_draw = round(cal_draw / cal_total * 100)
+                final_home = cal_home / cal_total * 100
+                final_draw = cal_draw / cal_total * 100
                 final_away = 100 - final_home - final_draw
 
             poisson_probs["proba_btts"] = apply_calibration(
-                poisson_probs["proba_btts"], "btts", lid
+                round(poisson_probs["proba_btts"]), "btts", lid
             )
             poisson_probs["proba_over_05"] = apply_calibration(
-                poisson_probs["proba_over_05"], "over_05", lid
+                round(poisson_probs["proba_over_05"]), "over_05", lid
             )
             poisson_probs["proba_over_15"] = apply_calibration(
-                poisson_probs["proba_over_15"], "over_15", lid
+                round(poisson_probs["proba_over_15"]), "over_15", lid
             )
             poisson_probs["proba_over_25"] = apply_calibration(
-                poisson_probs["proba_over_25"], "over_25", lid
+                round(poisson_probs["proba_over_25"]), "over_25", lid
             )
 
             context["ml_calibrated"] = True
         except Exception:
             context["ml_calibrated"] = False  # Non-critical: predictions work without calibration
 
-    # ── 10. Résultat final ────────────────────────────────────────
-    result = {
+    # ── 11. Single rounding pass — all probabilities rounded here ─
+    final_home = round(final_home)
+    final_draw = round(final_draw)
+    final_away = 100 - final_home - final_draw
+
+    proba_btts = round(poisson_probs["proba_btts"])
+    proba_over_05 = round(poisson_probs["proba_over_05"])
+    proba_over_15 = round(poisson_probs["proba_over_15"])
+    proba_over_25 = round(poisson_probs["proba_over_25"])
+    proba_over_35 = round(poisson_probs["proba_over_35"])
+
+    # ── 12. Résultat final ────────────────────────────────────────
+    result: dict[str, Any] = {
         "proba_home": final_home,
         "proba_draw": final_draw,
         "proba_away": final_away,
-        "proba_btts": poisson_probs["proba_btts"],
-        "proba_over_05": poisson_probs["proba_over_05"],
-        "proba_over_15": poisson_probs["proba_over_15"],
-        "proba_over_25": poisson_probs["proba_over_25"],
-        "proba_over_35": poisson_probs["proba_over_35"],
+        "proba_btts": proba_btts,
+        "proba_over_05": proba_over_05,
+        "proba_over_15": proba_over_15,
+        "proba_over_25": proba_over_25,
+        "proba_over_35": proba_over_35,
         "proba_penalty": pen_proba,
         "proba_dc_1x": final_home + final_draw,
         "proba_dc_x2": final_draw + final_away,
@@ -1782,60 +1800,99 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         if context.get("ml_active")
         else ("hybrid_v2_calibrated" if context.get("ml_calibrated") else "hybrid_v1"),
         "context": context,
-        # Handicaps asiatiques (calculés par poisson_grid)
-        "ah_home_minus_05": poisson_probs.get("ah_home_minus_05"),
-        "ah_home_minus_10": poisson_probs.get("ah_home_minus_10"),
-        "ah_home_minus_15": poisson_probs.get("ah_home_minus_15"),
-        "ah_away_plus_05": poisson_probs.get("ah_away_plus_05"),
-        "ah_away_plus_10": poisson_probs.get("ah_away_plus_10"),
-        "ah_away_plus_15": poisson_probs.get("ah_away_plus_15"),
+        # Handicaps asiatiques (calculés par poisson_grid, rounded here)
+        "ah_home_minus_05": round(poisson_probs.get("ah_home_minus_05", 0)),
+        "ah_home_minus_10": round(poisson_probs.get("ah_home_minus_10", 0)),
+        "ah_home_minus_15": round(poisson_probs.get("ah_home_minus_15", 0)),
+        "ah_away_plus_05": round(poisson_probs.get("ah_away_plus_05", 0)),
+        "ah_away_plus_10": round(poisson_probs.get("ah_away_plus_10", 0)),
+        "ah_away_plus_15": round(poisson_probs.get("ah_away_plus_15", 0)),
     }
 
-    # B3: Pari recommandé — Priorité à la probabilité la plus élevée (seuil min 55%)
-    # Marchés inclus (Over 0.5 exclu car cote quasi nulle)
-
-    dc_1x = poisson_probs.get("proba_dc_1x", 0)
-    dc_x2 = poisson_probs.get("proba_dc_x2", 0)
-    over_15 = poisson_probs["proba_over_15"]
+    # ── 13. Pari recommandé — Sélection par EXPECTED VALUE, pas probabilité seule ──
+    # FIX: Previously picked highest probability market. For value betting,
+    # we must select by highest edge (our_prob vs implied_prob) × odds = expected value.
+    dc_1x = round(poisson_probs.get("proba_dc_1x", 0))
+    dc_x2 = round(poisson_probs.get("proba_dc_x2", 0))
+    over_15_prob = proba_over_15
     COMBO_THRESHOLD = 65  # Both legs must clear this to recommend combined bet
 
-    # Priority rule: if both DC and Over 1.5 are individually strong → recommend combined
-    if dc_1x >= COMBO_THRESHOLD and over_15 >= COMBO_THRESHOLD:
+    # Build candidate list with associated odds for edge/EV calculation
+    candidate_bets: list[tuple[str, float, float | None]] = [
+        ("Plus de 1.5 buts", over_15_prob, None),
+        ("Plus de 2.5 buts", proba_over_25, None),
+        ("BTTS Oui", proba_btts, None),
+        ("Victoire Domicile", final_home, market.get("raw_odds_home") if market else None),
+        ("Victoire Extérieur", final_away, market.get("raw_odds_away") if market else None),
+        ("Match Nul", final_draw, market.get("raw_odds_draw") if market else None),
+        ("Double Chance 1X", dc_1x, None),
+        ("Double Chance X2", dc_x2, None),
+        ("1X + Plus de 1.5 buts", round(poisson_probs.get("proba_dc1x_over15", 0)), None),
+        ("X2 + Plus de 1.5 buts", round(poisson_probs.get("proba_dcx2_over15", 0)), None),
+    ]
+
+    def _compute_edge_ev(prob: float, odds: float | None) -> tuple[float, float]:
+        """Compute (edge, expected_value) for a bet. Edge = ROI = prob*odds - 1."""
+        if odds and odds > 1:
+            edge = calculate_roi(prob, odds)
+            ev = edge * odds  # Expected profit per unit at these odds
+            return edge, ev
+        # No odds available — use probability distance from 50% as rough proxy
+        return (prob - 50) / 100, 0.0
+
+    # Priority rule: combined bets when both legs are strong
+    if dc_1x >= COMBO_THRESHOLD and over_15_prob >= COMBO_THRESHOLD:
+        combo_prob = round(poisson_probs.get("proba_dc1x_over15", dc_1x))
+        edge, _ = _compute_edge_ev(combo_prob, None)
         result["recommended_bet"] = "1X + Plus de 1.5 buts"
-        result["kelly_edge"] = round((poisson_probs.get("proba_dc1x_over15", dc_1x) - 50) / 100, 3)
+        result["kelly_edge"] = round(edge, 3)
         result["kelly_fraction"] = 0
         result["value_bet"] = True
-    elif dc_x2 >= COMBO_THRESHOLD and over_15 >= COMBO_THRESHOLD:
+    elif dc_x2 >= COMBO_THRESHOLD and over_15_prob >= COMBO_THRESHOLD:
+        combo_prob = round(poisson_probs.get("proba_dcx2_over15", dc_x2))
+        edge, _ = _compute_edge_ev(combo_prob, None)
         result["recommended_bet"] = "X2 + Plus de 1.5 buts"
-        result["kelly_edge"] = round((poisson_probs.get("proba_dcx2_over15", dc_x2) - 50) / 100, 3)
+        result["kelly_edge"] = round(edge, 3)
         result["kelly_fraction"] = 0
         result["value_bet"] = True
     else:
-        candidate_bets: list[tuple[str, float]] = [
-            ("Plus de 1.5 buts", over_15),
-            ("Plus de 2.5 buts", poisson_probs["proba_over_25"]),
-            ("BTTS Oui", poisson_probs["proba_btts"]),
-            ("Victoire Domicile", final_home),
-            ("Victoire Extérieur", final_away),
-            ("Match Nul", final_draw),
-            ("Double Chance 1X", dc_1x),
-            ("Double Chance X2", dc_x2),
-            ("1X + Plus de 1.5 buts", poisson_probs.get("proba_dc1x_over15", 0)),
-            ("X2 + Plus de 1.5 buts", poisson_probs.get("proba_dcx2_over15", 0)),
-        ]
-
         MIN_PROBA = 55
-        eligible = [(name, prob) for name, prob in candidate_bets if prob >= MIN_PROBA]
+        eligible = [(n, p, o) for n, p, o in candidate_bets if p >= MIN_PROBA]
+        pool = eligible if eligible else candidate_bets
 
-        if eligible:
-            best_name, best_prob = max(eligible, key=lambda x: x[1])
-        else:
-            best_name, best_prob = max(candidate_bets, key=lambda x: x[1])
+        # Select best bet by expected value when odds available, else by probability
+        best_name, best_prob, best_odds = max(
+            pool,
+            key=lambda x: _compute_edge_ev(x[1], x[2])[0] if x[2] else x[1],
+        )
 
+        # FIX: kelly_edge now uses actual ROI vs bookmaker odds (not prob - 50)
+        edge, _ = _compute_edge_ev(best_prob, best_odds)
         result["recommended_bet"] = best_name
-        result["kelly_edge"] = round((best_prob - 50) / 100, 3)
+        result["kelly_edge"] = round(edge, 3)
+
+        # FIX: value_bet compares against implied probability, not absolute threshold
+        # A bet is a value bet only when our probability exceeds the market's implied probability
+        if best_odds and best_odds > 1:
+            implied_prob = 100.0 / best_odds
+            result["value_bet"] = best_prob > implied_prob and edge >= MIN_VALUE_EDGE
+        elif market:
+            # For markets without direct odds, compare against market implied probs
+            market_implied = {
+                "Victoire Domicile": market["market_home"],
+                "Match Nul": market["market_draw"],
+                "Victoire Extérieur": market["market_away"],
+            }
+            implied = market_implied.get(best_name)
+            if implied:
+                result["value_bet"] = (best_prob - implied) / 100 >= MIN_VALUE_EDGE
+            else:
+                result["value_bet"] = best_prob >= 65
+        else:
+            # No market data — fall back to absolute probability threshold
+            result["value_bet"] = best_prob >= 65
+
         result["kelly_fraction"] = 0
-        result["value_bet"] = best_prob >= 65
 
     # Score de confiance redesigné (1–10)
     # Combine : (a) accord inter-modèles, (b) qualité données, (c) spread 1X2
@@ -1869,8 +1926,8 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     if context.get("ml_calibrated"):
         data_quality += 1
 
-    # 3. Spread 1X2 (0–2 pts)
-    spread_pts = min(2, spread // 10)
+    # 3. Spread 1X2 (0–2 pts) — use int() for clean thresholds
+    spread_pts = min(2, int(spread // 10))
 
     confidence = max(1, min(10, agreement_pts + data_quality + spread_pts))
     result["confidence_score"] = confidence

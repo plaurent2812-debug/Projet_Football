@@ -297,4 +297,7 @@ FEATURE_COLS: list[str] = [
     "league_avg_over25_rate",
     "elo_diff_squared",
     "form_diff",
+    # ── Phase Audit — Luck regression ──
+    "home_luck_index",
+    "away_luck_index",
 ]

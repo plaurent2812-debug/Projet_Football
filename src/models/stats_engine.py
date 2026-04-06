@@ -1836,6 +1836,9 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
                 "away_result_variance": None,
                 "home_clean_sheet_rate": None,
                 "away_clean_sheet_rate": None,
+                # Phase Audit features
+                "home_luck_index": None,
+                "away_luck_index": None,
             }
 
             ml_preds = get_ml_predictions(ml_context)

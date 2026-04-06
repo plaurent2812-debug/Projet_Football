@@ -631,6 +631,67 @@ def _advanced_features_from_mem(
         else:
             result[f"{prefix}_xg_momentum"] = 0.0
 
+    # ── xPts Luck Regression (per team) ────────────────────────
+    # Expected points from xG (via Poisson) vs actual points.
+    # A team consistently outperforming its xPts is "lucky" and
+    # should regress. Negative luck_index = overperforming (will regress down).
+    for prefix, team in [("home", home_team), ("away", away_team)]:
+        team_fixtures = data["fixtures_by_team"].get(team, [])
+        recent = [f for f in team_fixtures if f["date"] < match_date]
+        recent_10 = recent[-10:] if len(recent) > 10 else recent
+
+        actual_pts = 0.0
+        xpts = 0.0
+        xpts_count = 0
+        for r in recent_10:
+            is_home = r["home_team"] == team
+            gf = r["home_goals"] if is_home else r["away_goals"]
+            ga = r["away_goals"] if is_home else r["home_goals"]
+            if gf is None or ga is None:
+                continue
+            # Actual points
+            if gf > ga:
+                actual_pts += 3
+            elif gf == ga:
+                actual_pts += 1
+
+            # Expected points from xG (use stats_json if available)
+            sj = r.get("stats_json")
+            xg_for = xg_against = None
+            if sj and isinstance(sj, dict):
+                side = "home" if is_home else "away"
+                opp_side = "away" if is_home else "home"
+                xg_for = sj.get(f"{side}_xg")
+                xg_against = sj.get(f"{opp_side}_xg")
+
+            if xg_for and xg_against and xg_for > 0:
+                # Simple Poisson-based win probability from xG
+                from scipy.stats import poisson as _poisson_dist
+
+                max_g = 6
+                p_win = 0.0
+                p_draw = 0.0
+                for gi in range(max_g):
+                    for gj in range(max_g):
+                        p = _poisson_dist.pmf(gi, xg_for) * _poisson_dist.pmf(gj, xg_against)
+                        if gi > gj:
+                            p_win += p
+                        elif gi == gj:
+                            p_draw += p
+                xpts += p_win * 3 + p_draw * 1
+                xpts_count += 1
+            else:
+                # Fallback: assume even xPts contribution
+                xpts += 1.3  # league average ~1.3 pts/game
+                xpts_count += 1
+
+        if xpts_count >= 5:
+            # luck_index > 0 means underperforming (will regress UP)
+            # luck_index < 0 means overperforming (will regress DOWN)
+            result[f"{prefix}_luck_index"] = round((xpts - actual_pts) / xpts_count, 3)
+        else:
+            result[f"{prefix}_luck_index"] = 0.0
+
     # ── League-level features ────────────────────────────────
     # League average BTTS + Over 2.5 rates (from all finished matches)
     all_league_fixes = []
@@ -732,6 +793,7 @@ def build_features_fast(fixture: dict, data: dict, league_cache: dict) -> dict |
     # 3. Forme
     features["home_form"] = round(_form_from_mem(data, home_team, match_date, home_only=True), 3)
     features["away_form"] = round(_form_from_mem(data, away_team, match_date, home_only=False), 3)
+    features["form_diff"] = round(features["home_form"] - features["away_form"], 3)
 
     # 4. Repos
     rest_h, cong_h = _rest_from_mem(data, home_team, match_date)

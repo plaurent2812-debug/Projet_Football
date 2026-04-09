@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom"
 import { lazy, Suspense, useState, useEffect, Component } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { Zap, Trophy, Shield, User, LayoutGrid, Target, BarChart2 } from "lucide-react"
+import { Trophy, Shield, User, LayoutGrid, Target, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -117,13 +117,19 @@ function Header() {
         <div className="flex items-center justify-between h-11">
 
           {/* Logo */}
-          <NavLink to="/" className="flex items-center gap-1.5 shrink-0">
-            <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
-              <Zap className="w-3 h-3 text-primary-foreground" />
+          <NavLink to="/" className="flex items-center shrink-0">
+            <div className="logo-container">
+              <svg className="logo-border" viewBox="0 0 280 64" preserveAspectRatio="none">
+                <rect x="1" y="1" width="278" height="62" rx="10" ry="10" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-primary/30" />
+                <rect x="1" y="1" width="278" height="62" rx="10" ry="10" fill="none" stroke="currentColor" strokeWidth="6" strokeDasharray="50 630" strokeLinecap="round" className="text-primary/20 logo-energy" filter="url(#logo-blur)" />
+                <defs>
+                  <filter id="logo-blur"><feGaussianBlur stdDeviation="4"/></filter>
+                </defs>
+              </svg>
+              <span className="text-sm font-black tracking-tighter text-foreground">proba</span>
+              <span className="logo-bar" />
+              <span className="text-sm font-black tracking-tighter text-primary">lab</span>
             </div>
-            <span className="text-sm font-black tracking-tight text-foreground hidden sm:inline">
-              Proba<span className="text-primary">Lab</span>
-            </span>
           </NavLink>
 
           {/* Center: Sport tabs (hidden on mobile, bottom nav replaces) */}
@@ -279,8 +285,9 @@ function Footer() {
       <div className="w-full mx-auto px-4 md:px-8 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
-            <Zap className="w-3 h-3 text-primary" />
-            <span className="text-xs font-bold text-foreground">ProbaLab</span>
+            <span className="text-xs font-black tracking-tighter text-foreground">proba</span>
+            <span className="inline-block w-px h-3 bg-primary/70 mx-0.5" />
+            <span className="text-xs font-black tracking-tighter text-primary">lab</span>
           </div>
           <p className="disclaimer-text text-center max-w-md">
             Analyses statistiques à titre informatif. Pas un conseil en paris. 18+

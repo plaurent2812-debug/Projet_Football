@@ -1419,7 +1419,14 @@ def get_best_bets_stats(request: Request):
         # Combined streak (last 10)
         all_resolved = [b for b in all_rows if b["result"] in ("WIN", "LOSS")]
         all_resolved.sort(key=lambda b: b.get("date", ""), reverse=True)
-        combined_last_10 = [b["result"] for b in all_resolved[:10]]
+        combined_last_10 = [
+            {
+                "result": b["result"],
+                "label": b.get("bet_label") or b.get("match_label") or b.get("market", ""),
+                "odds": float(b.get("odds") or 0),
+            }
+            for b in all_resolved[:10]
+        ]
 
         # Combined cumulative P&L
         combined_pl = {}

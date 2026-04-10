@@ -6,6 +6,7 @@ resolution, stats, and history.
 """
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -15,6 +16,14 @@ from api.auth import verify_cron_auth, verify_internal_auth
 from api.metrics import bets_resolved
 from api.rate_limit import _rate_limit
 from api.response_models import BestBetsResponse, SaveBetResponse, UpdateBetResultResponse
+from api.routers.best_bets_logic import (
+    build_market_breakdown,
+    calc_stats,
+    evaluate_football_combo,
+    evaluate_nhl_player_market,
+    evaluate_single_football_market,
+    extract_nhl_market_from_label,
+)
 from api.schemas import (
     ResolveBetsRequest,
     ResolveExpertPicksRequest,
@@ -889,29 +898,6 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
             key = f"{f['home_team']} vs {f['away_team']}"
             fx_by_teams[key] = f
 
-        def _evaluate_single_football_market(market_name: str, h: int, a: int) -> str | None:
-            """Evaluate a single football market. Returns WIN/LOSS or None if unknown."""
-            total = h + a
-            if market_name == "Victoire domicile":
-                return "WIN" if h > a else "LOSS"
-            elif market_name == "Victoire extérieur":
-                return "WIN" if a > h else "LOSS"
-            elif market_name == "Match nul":
-                return "WIN" if h == a else "LOSS"
-            elif market_name == "Double Chance 1N" or market_name == "Double Chance 1X":
-                return "WIN" if h >= a else "LOSS"
-            elif market_name == "Double Chance X2":
-                return "WIN" if a >= h else "LOSS"
-            elif market_name == "Over 2.5 buts":
-                return "WIN" if total > 2.5 else "LOSS"
-            elif market_name == "Over 1.5 buts":
-                return "WIN" if total > 1.5 else "LOSS"
-            elif market_name == "Over 3.5 buts":
-                return "WIN" if total > 3.5 else "LOSS"
-            elif market_name in ("BTTS — Les deux équipes marquent", "BTTS", "BTTS Oui"):
-                return "WIN" if (h > 0 and a > 0) else "LOSS"
-            return None
-
         for bet in bets:
             try:
                 label = bet["bet_label"]   # e.g. "PSG vs Lyon — Victoire domicile"
@@ -953,39 +939,12 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
                 a = fx.get("away_goals") or 0
 
                 # Handle combo markets (e.g. "Victoire domicile + BTTS Oui")
-                result_val = None
                 if " + " in actual_market:
-                    parts = [p.strip() for p in actual_market.split(" + ")]
-                    has_loss = False
-                    has_unknown = False
-                    all_void = True
-                    non_void_all_win = True
-                    for part in parts:
-                        part_result = _evaluate_single_football_market(part, h, a)
-                        if part_result is None:
-                            has_unknown = True
-                            all_void = False
-                            continue
-                        if part_result == "VOID":
-                            continue  # Leg VOID ignoré — ne compte ni WIN ni LOSS
-                        all_void = False
-                        if part_result == "LOSS":
-                            has_loss = True
-                            non_void_all_win = False
-                            break  # Un leg LOSS → combo LOSS
-                        # part_result == "WIN" — continue
-                    if has_loss:
-                        result_val = "LOSS"
-                    elif has_unknown:
-                        continue  # Legs inconnus : laisser PENDING
-                    elif all_void:
-                        result_val = "VOID"
-                    elif non_void_all_win:
-                        result_val = "WIN"
-                    else:
-                        continue  # Cas résiduel inattendu
+                    result_val = evaluate_football_combo(actual_market, h, a)
+                    if result_val is None:
+                        continue  # Pending (unknown leg) or unexpected state
                 else:
-                    result_val = _evaluate_single_football_market(actual_market, h, a)
+                    result_val = evaluate_single_football_market(actual_market, h, a)
                     if result_val is None:
                         continue  # Unknown market
 
@@ -1095,28 +1054,15 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
                 # If market is a category, extract actual market from label
                 market = bet.get("market", "player_points_over_0.5")
                 if market in ("safe_nhl", "fun_nhl"):
-                    if "Marquer un but" in label:
-                        market = "player_goals_over_0.5"
-                    elif "Faire une passe" in label:
-                        market = "player_assists_over_0.5"
-                    elif "Over 0.5 Points" in label:
-                        market = "player_points_over_0.5"
-                    elif "Tirs" in label or "tirs" in label:
-                        market = "player_shots_over_2.5"
-                    else:
-                        market = "player_points_over_0.5"
+                    market = extract_nhl_market_from_label(label)
 
-                # Determine result based on market
-                if market == "player_points_over_0.5":
-                    result_val = "WIN" if actual_points >= 1 else "LOSS"
-                elif market == "player_goals_over_0.5":
-                    result_val = "WIN" if actual_goals >= 1 else "LOSS"
-                elif market == "player_assists_over_0.5":
-                    result_val = "WIN" if actual_assists >= 1 else "LOSS"
-                elif market == "player_shots_over_2.5":
-                    result_val = "WIN" if actual_shots >= 3 else "LOSS"
-                else:
-                    result_val = "WIN" if actual_points >= 1 else "LOSS"
+                result_val = evaluate_nhl_player_market(
+                    market,
+                    points=actual_points,
+                    goals=actual_goals,
+                    assists=actual_assists,
+                    shots=actual_shots,
+                )
 
                 note = (
                     f"Auto-résolu: {p_stats['player_name']} — "
@@ -1163,160 +1109,7 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
 def get_best_bets_stats(request: Request):
     """Return win rate and ROI stats for both model predictions (best_bets) and expert picks."""
     try:
-        from collections import defaultdict
-
         cutoff_30d = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-
-        def calc_stats(raw_bets):
-            # Group FUN bets as combos
-            grouped_bets = []
-            fun_groups = {}
-            for b in raw_bets:
-                if b["market"] in ("fun_football", "fun_nhl"):
-                    key = (b["date"], b["market"])
-                    if key not in fun_groups:
-                        fun_groups[key] = []
-                    fun_groups[key].append(b)
-                else:
-                    grouped_bets.append(b)
-
-            for key, legs in fun_groups.items():
-                date, market = key
-                # VOID legs are ignored in combo resolution — only WIN/LOSS/unknown matter
-                non_void_legs = [l for l in legs if l["result"] != "VOID"]
-                has_loss = any(l["result"] == "LOSS" for l in non_void_legs)
-                all_non_void_win = bool(non_void_legs) and all(l["result"] == "WIN" for l in non_void_legs)
-                is_void = len(non_void_legs) == 0  # All legs VOID
-
-                res = "PENDING"
-                if has_loss:
-                    res = "LOSS"
-                elif is_void:
-                    res = "VOID"
-                elif all_non_void_win:
-                    res = "WIN"
-
-                # Combine odds
-                total_odds = 1.0
-                for l in legs:
-                    o = l.get("odds")
-                    if o:
-                        total_odds *= float(o)
-                # Fun bets often have estimated total odds ~20 if not precisely calculated
-                if total_odds == 1.0:
-                    total_odds = 20.0
-
-                grouped_bets.append({
-                    "date": date,
-                    "market": market,
-                    "result": res,
-                    "odds": total_odds
-                })
-
-            resolved = [b for b in grouped_bets if b["result"] in ("WIN", "LOSS")]
-            wins = sum(1 for b in resolved if b["result"] == "WIN")
-            losses = sum(1 for b in resolved if b["result"] == "LOSS")
-            voids = sum(1 for b in grouped_bets if b["result"] == "VOID")
-            total = wins + losses
-            win_rate = round(wins / total * 100, 1) if total else 0
-
-            roi = 0             # Full ROI (all bets)
-            roi_singles = 0     # ROI singles only (odds <= 3.0)
-            singles_count = 0
-            combines_count = 0
-            odds_estimated = 0
-
-            for b in resolved:
-                odds_val = b.get("odds")
-                if not odds_val:
-                    odds_val = 1.85
-                    odds_estimated += 1
-                else:
-                    odds_val = float(odds_val)
-
-                # Full ROI
-                if b["result"] == "WIN":
-                    roi += (odds_val - 1)
-                else:
-                    roi -= 1
-
-                # Singles ROI (odds <= 3.0 = paris simples)
-                if odds_val <= 3.0:
-                    singles_count += 1
-                    if b["result"] == "WIN":
-                        roi_singles += (odds_val - 1)
-                    else:
-                        roi_singles -= 1
-                else:
-                    combines_count += 1
-
-            roi_pct = round(roi / total * 100, 1) if total else 0
-            roi_singles_pct = round(roi_singles / singles_count * 100, 1) if singles_count else 0
-
-            result = {
-                "wins": wins, "losses": losses, "voids": voids,
-                "total": total, "win_rate": win_rate,
-                "roi_pct": roi_pct,
-                "roi_singles_pct": roi_singles_pct,
-                "singles_count": singles_count,
-                "combines_count": combines_count,
-            }
-            if odds_estimated > 0:
-                result["odds_estimated_count"] = odds_estimated
-            if total > 0 and total < 10:
-                result["sample_warning"] = f"Basé sur seulement {total} paris résolus"
-            return result
-
-        # ── Normalize market names (merge duplicates) ─────────────
-        CATEGORY_MARKETS = {"fun_football", "fun_nhl", "safe_football", "safe_nhl"}
-        MARKET_NORMALIZE = {
-            # BTTS duplicates
-            "BTTS — Les deux équipes marquent": "BTTS",
-            "BTTS Oui": "BTTS",
-            # NHL player markets → clean French names
-            "player_points_over_0.5": "Points (NHL)",
-            "player_goals_over_0.5": "Buts (NHL)",
-            "player_assists_over_0.5": "Passes (NHL)",
-            "player_shots_over_2.5": "Tirs (NHL)",
-            # Expert enrichment duplicates
-            "Points du joueur : 1 ou plus": "Points (NHL)",
-            "Passes décisives du joueur : 1 ou plus": "Passes (NHL)",
-            "Buts du joueur : 1 ou plus": "Buts (NHL)",
-            # Double Chance variants
-            "Double chance 1N": "Double Chance 1N",
-            "Double Chance 1X": "Double Chance 1N",
-        }
-
-        def normalize_market(raw, bet_label=""):
-            """Normalize market name. For category meta-tags, extract real market from bet_label."""
-            if raw in CATEGORY_MARKETS and bet_label:
-                for sep in (" — ", "—"):
-                    if sep in bet_label:
-                        actual = bet_label.split(sep, 1)[1].strip()
-                        # Skip if extracted value looks like a match name
-                        if " vs " in actual.lower():
-                            return "__skip__"
-                        return MARKET_NORMALIZE.get(actual, actual)
-                return "__skip__"
-            # Skip if the raw market itself is a match name (malformed expert picks)
-            if " vs " in raw.lower() or " vs. " in raw.lower():
-                return "__skip__"
-            return MARKET_NORMALIZE.get(raw, raw)
-
-        def build_market_breakdown(rows):
-            grouped = defaultdict(list)
-            for b in rows:
-                label = b.get("bet_label") or b.get("match_label") or ""
-                key = normalize_market(b.get("market", "unknown"), label)
-                if key == "__skip__":
-                    continue
-                grouped[key].append(b)
-            breakdown = {}
-            for market, bets in grouped.items():
-                s = calc_stats(bets)
-                if s["total"] > 0:
-                    breakdown[market] = s
-            return breakdown
 
         # ── 1. Expert picks stats (Paris de l'Expert) ─────────────
         expert_resp = (

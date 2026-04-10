@@ -76,10 +76,12 @@ def fetch_schedule() -> tuple[list[dict], str]:
         return [], datetime.utcnow().strftime("%Y-%m-%d")
 
     today = datetime.utcnow().strftime("%Y-%m-%d")
+    # 1. Préfère today s'il a effectivement des matchs
     for day in data["gameWeek"]:
-        if day["date"] == today:
-            return day.get("games", []), day["date"]
-    # Fallback: find the closest day with games (handles timezone edge cases)
+        if day["date"] == today and day.get("games"):
+            return day["games"], day["date"]
+    # 2. Sinon, prochain jour avec matchs (fin de saison, jours off,
+    #    ou edge case timezone où "today" UTC est déjà "hier" côté NHL)
     for day in data["gameWeek"]:
         if day.get("games"):
             return day["games"], day["date"]

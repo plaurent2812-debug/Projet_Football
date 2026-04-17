@@ -41,6 +41,7 @@ def _nhl_fetch(endpoint: str) -> dict | None:
 #  FOOTBALL — scores + events
 # ═══════════════════════════════════════════════════════════════════
 
+
 def _upsert_football_event(fixture_api_id: int, ev: dict) -> None:
     """Insert or ignore a single match event."""
     event_type = ev.get("type", "")
@@ -111,12 +112,7 @@ def update_football_live() -> dict:
 
         # Find internal fixture id
         try:
-            db_fix = (
-                supabase.table("fixtures")
-                .select("id")
-                .eq("api_fixture_id", fid)
-                .execute()
-            )
+            db_fix = supabase.table("fixtures").select("id").eq("api_fixture_id", fid).execute()
             if not db_fix.data:
                 continue
             internal_id = db_fix.data[0]["id"]
@@ -125,12 +121,14 @@ def update_football_live() -> dict:
 
         # Update score + status + elapsed minute
         try:
-            supabase.table("fixtures").update({
-                "home_goals": goals.get("home"),
-                "away_goals": goals.get("away"),
-                "status": status,
-                "elapsed": elapsed,
-            }).eq("id", internal_id).execute()
+            supabase.table("fixtures").update(
+                {
+                    "home_goals": goals.get("home"),
+                    "away_goals": goals.get("away"),
+                    "status": status,
+                    "elapsed": elapsed,
+                }
+            ).eq("id", internal_id).execute()
             updated += 1
         except Exception as e:
             logger.debug(f"[Live/Football] score update error fid={fid}: {e}")
@@ -150,14 +148,16 @@ def update_football_live() -> dict:
                 if not team_id:
                     continue
                 parsed = {}
-                for stat in (team_stats.get("statistics") or []):
+                for stat in team_stats.get("statistics") or []:
                     key = (stat.get("type") or "").lower().replace(" ", "_")
                     parsed[key] = stat.get("value")
                 stats_payload[str(team_id)] = parsed
             try:
-                supabase.table("fixtures").update({
-                    "live_stats_json": stats_payload,
-                }).eq("id", internal_id).execute()
+                supabase.table("fixtures").update(
+                    {
+                        "live_stats_json": stats_payload,
+                    }
+                ).eq("id", internal_id).execute()
             except Exception as e:
                 logger.warning("Failed to update live_stats_json for fixture %s: %s", fid, e)
 
@@ -168,6 +168,7 @@ def update_football_live() -> dict:
 # ═══════════════════════════════════════════════════════════════════
 #  NHL — scores + buts
 # ═══════════════════════════════════════════════════════════════════
+
 
 def update_nhl_live() -> dict:
     """Fetch NHL scoreboard and update live scores + goals."""
@@ -191,8 +192,8 @@ def update_nhl_live() -> dict:
         if not game_id:
             continue
 
-        home = (game.get("homeTeam") or {})
-        away = (game.get("awayTeam") or {})
+        home = game.get("homeTeam") or {}
+        away = game.get("awayTeam") or {}
         home_score = home.get("score", 0)
         away_score = away.get("score", 0)
         state = game.get("gameState", "")
@@ -200,18 +201,20 @@ def update_nhl_live() -> dict:
         clock = (game.get("clock") or {}).get("timeRemaining", "")
 
         try:
-            supabase.table("nhl_fixtures").update({
-                "home_score": home_score,
-                "away_score": away_score,
-                "status": state,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "stats_json": {
-                    "period": period,
-                    "clock": clock,
-                    "home_sog": home.get("sog"),
-                    "away_sog": away.get("sog"),
-                },
-            }).eq("api_fixture_id", game_id).execute()
+            supabase.table("nhl_fixtures").update(
+                {
+                    "home_score": home_score,
+                    "away_score": away_score,
+                    "status": state,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "stats_json": {
+                        "period": period,
+                        "clock": clock,
+                        "home_sog": home.get("sog"),
+                        "away_sog": away.get("sog"),
+                    },
+                }
+            ).eq("api_fixture_id", game_id).execute()
             updated += 1
         except Exception as e:
             logger.debug(f"[Live/NHL] update error game={game_id}: {e}")
@@ -233,12 +236,18 @@ def _update_nhl_goals(game_id: int) -> None:
     goals = (data.get("summary") or {}).get("scoring") or []
     for period_data in goals:
         period = period_data.get("periodDescriptor", {}).get("number", 0)
-        for goal in (period_data.get("goals") or []):
-            scorer = goal.get("firstName", {}).get("default", "") + " " + goal.get("lastName", {}).get("default", "")
+        for goal in period_data.get("goals") or []:
+            scorer = (
+                goal.get("firstName", {}).get("default", "")
+                + " "
+                + goal.get("lastName", {}).get("default", "")
+            )
             scorer = scorer.strip()
             time_str = goal.get("timeInPeriod", "")
             assists = [
-                a.get("firstName", {}).get("default", "") + " " + a.get("lastName", {}).get("default", "")
+                a.get("firstName", {}).get("default", "")
+                + " "
+                + a.get("lastName", {}).get("default", "")
                 for a in (goal.get("assists") or [])
             ]
 
@@ -271,6 +280,7 @@ def _update_nhl_goals(game_id: int) -> None:
 # ═══════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════
+
 
 def run() -> None:
     start = time.time()

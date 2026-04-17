@@ -1,6 +1,7 @@
 """
 Fixtures pytest partagées pour tous les tests du projet Football IA.
 """
+
 # ── Env stubs — must be set BEFORE any project import ────────────
 # src/config.py calls supabase.create_client() at module-import time.
 # Without these stubs, running a single test file that imports src.config
@@ -16,7 +17,6 @@ os.environ.setdefault("CRON_SECRET", "test-cron-secret")
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ═══════════════════════════════════════════════════════════════════
 #  HELPER : MOCK SUPABASE
@@ -124,10 +124,25 @@ def _build_offline_supabase_mock() -> MagicMock:
     execute_result.count = 0
     chain.execute.return_value = execute_result
     for method in (
-        "select", "eq", "neq", "gte", "lte", "gt", "lt",
-        "in_", "or_", "order", "limit", "range",
-        "insert", "upsert", "update", "delete", "filter",
-        "single", "desc",
+        "select",
+        "eq",
+        "neq",
+        "gte",
+        "lte",
+        "gt",
+        "lt",
+        "in_",
+        "or_",
+        "order",
+        "limit",
+        "range",
+        "insert",
+        "upsert",
+        "update",
+        "delete",
+        "filter",
+        "single",
+        "desc",
     ):
         getattr(chain, method).return_value = chain
 

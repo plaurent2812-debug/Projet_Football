@@ -60,7 +60,12 @@ def get_predictions(
 
     # Get predictions for those fixtures
     predictions = (
-        supabase.table("predictions").select("*").in_("fixture_id", fixture_ids).order("created_at").execute().data
+        supabase.table("predictions")
+        .select("*")
+        .in_("fixture_id", fixture_ids)
+        .order("created_at")
+        .execute()
+        .data
         or []
     )
 
@@ -70,7 +75,11 @@ def get_predictions(
         # Avoid Supabase URL length limits by fetching in chunks or just taking top N.
         # Usually day schedule < 100
         odds_data = (
-            supabase.table("fixture_odds").select("*").in_("fixture_api_id", api_fixture_ids).execute().data
+            supabase.table("fixture_odds")
+            .select("*")
+            .in_("fixture_api_id", api_fixture_ids)
+            .execute()
+            .data
             or []
         )
     odds_by_api_id = {str(o["fixture_api_id"]): o for o in odds_data}
@@ -109,7 +118,7 @@ def get_predictions(
         stats = _ensure_dict(pred.get("stats_json") if pred else None)
 
         # Helper to get value from top-level OR stats_json
-        def get_val(key, default=None):
+        def get_val(key, default=None, pred=pred, stats=stats):
             if not pred:
                 return default
             val = pred.get(key)
@@ -119,28 +128,37 @@ def get_predictions(
 
         # Compute value edges (model prob vs bookmaker odds)
         _market_labels = {
-            "home": "Victoire Domicile", "draw": "Match Nul", "away": "Victoire Extérieur",
-            "over_25": "Plus de 2.5 buts", "under_25": "Moins de 2.5 buts",
-            "btts_yes": "BTTS Oui", "btts_no": "BTTS Non",
+            "home": "Victoire Domicile",
+            "draw": "Match Nul",
+            "away": "Victoire Extérieur",
+            "over_25": "Plus de 2.5 buts",
+            "under_25": "Moins de 2.5 buts",
+            "btts_yes": "BTTS Oui",
+            "btts_no": "BTTS Non",
         }
         _odds_row = odds_by_api_id.get(str(f.get("api_fixture_id"))) or {}
-        _edges = _get_ev_edges(
-            {
-                "proba_home": get_val("proba_home"),
-                "proba_draw": get_val("proba_draw"),
-                "proba_away": get_val("proba_away"),
-                "proba_btts": get_val("proba_btts"),
-                "proba_over_2_5": get_val("proba_over_2_5") or get_val("proba_over_25"),
-            },
-            _odds_row,
-        ) if pred else {}
+        _edges = (
+            _get_ev_edges(
+                {
+                    "proba_home": get_val("proba_home"),
+                    "proba_draw": get_val("proba_draw"),
+                    "proba_away": get_val("proba_away"),
+                    "proba_btts": get_val("proba_btts"),
+                    "proba_over_2_5": get_val("proba_over_2_5") or get_val("proba_over_25"),
+                },
+                _odds_row,
+            )
+            if pred
+            else {}
+        )
         # Best value: highest edge with its odds
         # Exclude low-quality predictions from value bets:
         # - Fallback 40-30-30 (stats engine failed)
         # - Low confidence (< 5) → model is uncertain
         _conf = get_val("confidence_score", 0) or 0
         _is_fallback = (
-            pred and get_val("proba_home") == 40
+            pred
+            and get_val("proba_home") == 40
             and get_val("proba_draw") == 30
             and get_val("proba_away") == 30
             and _conf <= 3
@@ -149,9 +167,13 @@ def get_predictions(
         if _edges and not _is_fallback:
             _best_key = max(_edges, key=_edges.get)
             _odds_keys = {
-                "home": "home_win_odds", "draw": "draw_odds", "away": "away_win_odds",
-                "over_25": "over_25_odds", "under_25": "under_25_odds",
-                "btts_yes": "btts_yes_odds", "btts_no": "btts_no_odds",
+                "home": "home_win_odds",
+                "draw": "draw_odds",
+                "away": "away_win_odds",
+                "over_25": "over_25_odds",
+                "under_25": "under_25_odds",
+                "btts_yes": "btts_yes_odds",
+                "btts_no": "btts_no_odds",
             }
             _best_odds = _odds_row.get(_odds_keys.get(_best_key, ""), None)
             if _edges[_best_key] >= 5.0:  # MIN_VALUE_EDGE = 5%
@@ -387,7 +409,14 @@ def get_prediction_detail(fixture_id: str):
     odds = None
     if fixture and fixture.get("api_fixture_id"):
         try:
-            odds_res = supabase.table("fixture_odds").select("*").eq("fixture_api_id", fixture["api_fixture_id"]).limit(1).execute().data
+            odds_res = (
+                supabase.table("fixture_odds")
+                .select("*")
+                .eq("fixture_api_id", fixture["api_fixture_id"])
+                .limit(1)
+                .execute()
+                .data
+            )
             if odds_res:
                 odds = odds_res[0]
         except Exception:

@@ -9,6 +9,7 @@ from src.models.stats_engine import analyze_match
 
 logger = logging.getLogger(__name__)
 
+
 def run_historical_backfill(limit=500):
     logger.info(f"🚀 Début du backfill complet V2 (Stats + IA) pour {limit} matchs...")
 
@@ -19,12 +20,14 @@ def run_historical_backfill(limit=500):
 
     # 1. Trouver les fixtures terminées
     logger.info("📡 Récupération des matchs de football terminés dans la table 'fixtures'...")
-    res = supabase.table("fixtures")\
-        .select("*")\
-        .in_("status", ["FT", "AET", "PEN"])\
-        .order("date", desc=True)\
-        .limit(2000)\
+    res = (
+        supabase.table("fixtures")
+        .select("*")
+        .in_("status", ["FT", "AET", "PEN"])
+        .order("date", desc=True)
+        .limit(2000)
         .execute()
+    )
 
     fixtures = res.data or []
     if not fixtures:
@@ -39,7 +42,9 @@ def run_historical_backfill(limit=500):
             if len(to_backfill) >= limit:
                 break
 
-    logger.info(f"🔍 {len(to_backfill)} matchs de football vont être processés et insérés dans predictions.")
+    logger.info(
+        f"🔍 {len(to_backfill)} matchs de football vont être processés et insérés dans predictions."
+    )
 
     if not to_backfill:
         return
@@ -50,7 +55,7 @@ def run_historical_backfill(limit=500):
 
     for i, fixture in enumerate(to_backfill):
         fix_id = fixture["api_fixture_id"]
-        logger.info(f"[{i+1}/{len(to_backfill)}] Génération V2 complète pour Fixture {fix_id}...")
+        logger.info(f"[{i + 1}/{len(to_backfill)}] Génération V2 complète pour Fixture {fix_id}...")
 
         try:
             # Reconstruire les stats (avec le nouveau modèle VORP/xG)
@@ -83,7 +88,7 @@ def run_historical_backfill(limit=500):
                 "ai_features": final_features,
                 "analysis_text": final_features.get("analysis_text", ""),
                 "model_version": "v2",
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat(),
             }
 
             # Insertion Supabase
@@ -100,6 +105,7 @@ def run_historical_backfill(limit=500):
         time.sleep(4)
 
     logger.info(f"🏁 Backfill terminé ! {success_count} insérés, {error_count} erreurs.")
+
 
 if __name__ == "__main__":
     # Commençons le vrai backfill (long process in background)

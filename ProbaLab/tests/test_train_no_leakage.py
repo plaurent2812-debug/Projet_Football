@@ -1,4 +1,5 @@
 """Test that training pipeline never passes test set as eval_set."""
+
 import ast
 import pathlib
 
@@ -10,7 +11,11 @@ def _find_fit_calls_with_eval_set(source: str) -> list[tuple[int, str]]:
     tree = ast.parse(source)
     results = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "fit":
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "fit"
+        ):
             for kw in node.keywords:
                 if kw.arg == "eval_set":
                     # eval_set=[(X_eval, y_eval)] — extract variable names

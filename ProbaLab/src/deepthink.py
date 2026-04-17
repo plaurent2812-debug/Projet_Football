@@ -48,7 +48,8 @@ def generate_football_deepthink(matches: list[dict], league_names: dict[int, str
             .order("confidence_score", desc=True)
             .limit(60)
             .execute()
-            .data or []
+            .data
+            or []
         )
     except Exception:
         preds = []
@@ -70,7 +71,8 @@ def generate_football_deepthink(matches: list[dict], league_names: dict[int, str
                 .gte("date", now_str)
                 .lt("date", cutoff_str)
                 .execute()
-                .data or []
+                .data
+                or []
             )
             fixtures_map = {f["id"]: f for f in fx_data}
         except Exception:
@@ -128,8 +130,7 @@ def generate_football_deepthink(matches: list[dict], league_names: dict[int, str
 
     user_prompt = (
         f"Football — {now.strftime('%d/%m/%Y %Hh%M')} UTC — "
-        f"Prochaines 24h — {len(summaries)} matchs à analyser :\n\n"
-        + "\n\n".join(summaries)
+        f"Prochaines 24h — {len(summaries)} matchs à analyser :\n\n" + "\n\n".join(summaries)
     )
 
     try:
@@ -180,13 +181,15 @@ def generate_football_deepthink(matches: list[dict], league_names: dict[int, str
             except Exception:
                 pass
             try:
-                supabase.table("predictions").insert({
-                    "fixture_id": "00000000-0000-0000-0000-000000000000",
-                    "model_version": "deepthink_meta",
-                    "analysis_text": result,
-                    "confidence_score": 10,
-                    "recommended_bet": f"DeepThink {today}",
-                }).execute()
+                supabase.table("predictions").insert(
+                    {
+                        "fixture_id": "00000000-0000-0000-0000-000000000000",
+                        "model_version": "deepthink_meta",
+                        "analysis_text": result,
+                        "confidence_score": 10,
+                        "recommended_bet": f"DeepThink {today}",
+                    }
+                ).execute()
                 logger.info("[Football] DeepThink saved (fallback to predictions)")
             except Exception:
                 logger.exception("[Football] Error saving meta-analysis")

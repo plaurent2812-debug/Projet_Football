@@ -128,9 +128,7 @@ class TestPnlSummary:
 
     @patch("src.bankroll.get_current_bankroll", return_value=500.0)
     @patch("src.bankroll.supabase")
-    def test_pnl_by_type_win_rate_and_roi(
-        self, mock_sb: MagicMock, mock_bankroll: MagicMock
-    ):
+    def test_pnl_by_type_win_rate_and_roi(self, mock_sb: MagicMock, mock_bankroll: MagicMock):
         mock_sb.table.return_value.select.return_value.in_.return_value.execute.return_value.data = [
             {"status": "won", "stake": 10, "actual_gain": 15, "ticket_type": "safe"},
             {"status": "won", "stake": 10, "actual_gain": 10, "ticket_type": "safe"},
@@ -189,18 +187,14 @@ class TestPlaceBetAtomicPath:
 
     @patch("src.bankroll.supabase")
     def test_rpc_error_dict_returned_as_is(self, mock_sb: MagicMock):
-        mock_sb.rpc.return_value.execute.return_value.data = {
-            "error": "Stake exceeds bankroll"
-        }
+        mock_sb.rpc.return_value.execute.return_value.data = {"error": "Stake exceeds bankroll"}
         result = place_bet("safe", 1000.0, 2.0)
         assert "error" in result
         assert result["error"] == "Stake exceeds bankroll"
 
     @patch("src.bankroll._place_bet_legacy")
     @patch("src.bankroll.supabase")
-    def test_rpc_exception_falls_back_to_legacy(
-        self, mock_sb: MagicMock, mock_legacy: MagicMock
-    ):
+    def test_rpc_exception_falls_back_to_legacy(self, mock_sb: MagicMock, mock_legacy: MagicMock):
         # RPC raises → must invoke the legacy fallback path
         mock_sb.rpc.side_effect = Exception("RPC function not found")
         mock_legacy.return_value = {"id": 99, "status": "pending"}
@@ -211,9 +205,7 @@ class TestPlaceBetAtomicPath:
 
     @patch("src.bankroll._place_bet_legacy")
     @patch("src.bankroll.supabase")
-    def test_rpc_none_data_falls_back(
-        self, mock_sb: MagicMock, mock_legacy: MagicMock
-    ):
+    def test_rpc_none_data_falls_back(self, mock_sb: MagicMock, mock_legacy: MagicMock):
         # When the RPC returns no data, the code falls through to legacy
         mock_sb.rpc.return_value.execute.return_value.data = None
         mock_legacy.return_value = {"id": 11, "status": "pending"}
@@ -228,9 +220,7 @@ class TestPlaceBetLegacyPath:
 
     @patch("src.bankroll.get_current_bankroll", return_value=100.0)
     @patch("src.bankroll.supabase")
-    def test_legacy_success_on_first_attempt(
-        self, mock_sb: MagicMock, mock_br: MagicMock
-    ):
+    def test_legacy_success_on_first_attempt(self, mock_sb: MagicMock, mock_br: MagicMock):
         mock_sb.table.return_value.insert.return_value.execute.return_value.data = [
             {"id": 5, "status": "pending", "stake": 10.0, "bankroll_after": 90.0}
         ]
@@ -245,9 +235,7 @@ class TestPlaceBetLegacyPath:
 
     @patch("src.bankroll.get_current_bankroll", return_value=100.0)
     @patch("src.bankroll.supabase")
-    def test_legacy_handles_insert_exception(
-        self, mock_sb: MagicMock, mock_br: MagicMock
-    ):
+    def test_legacy_handles_insert_exception(self, mock_sb: MagicMock, mock_br: MagicMock):
         mock_sb.table.return_value.insert.return_value.execute.side_effect = Exception(
             "Insert failed"
         )
@@ -322,9 +310,7 @@ class TestResolveBetExtraBranches:
         assert "Network error" in result["error"]
 
     @patch("src.bankroll.supabase")
-    def test_resolve_bet_update_returns_empty_data_uses_update_dict(
-        self, mock_sb: MagicMock
-    ):
+    def test_resolve_bet_update_returns_empty_data_uses_update_dict(self, mock_sb: MagicMock):
         # If the .update().execute() call returns no data, fall back to the
         # update dict we sent.
         mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
@@ -337,7 +323,9 @@ class TestResolveBetExtraBranches:
                 "bankroll_after": 480.0,
             }
         ]
-        mock_sb.table.return_value.update.return_value.eq.return_value.execute.return_value.data = None
+        mock_sb.table.return_value.update.return_value.eq.return_value.execute.return_value.data = (
+            None
+        )
         result = resolve_bet(2, won=True)
         assert result["status"] == "won"
         # When data is None, function returns the update dict directly

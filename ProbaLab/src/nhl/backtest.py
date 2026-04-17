@@ -53,11 +53,17 @@ def run_nhl_backtest() -> dict:
     # ── 1. Accuracy par marché ───────────────────────────────────
     _section("1. ACCURACY PAR MARCHÉ")
 
-    by_market: dict[str, dict] = defaultdict(lambda: {
-        "wins": 0, "total": 0, "brier_sum": 0.0,
-        "probs": [], "outcomes": [],
-        "roi_sum": 0.0, "roi_bets": 0,
-    })
+    by_market: dict[str, dict] = defaultdict(
+        lambda: {
+            "wins": 0,
+            "total": 0,
+            "brier_sum": 0.0,
+            "probs": [],
+            "outcomes": [],
+            "roi_sum": 0.0,
+            "roi_bets": 0,
+        }
+    )
 
     for r in rows:
         market = r.get("pari", "?")
@@ -117,7 +123,7 @@ def run_nhl_backtest() -> dict:
         n_bins = 10
         bin_size = 1.0 / n_bins
         logger.info(f"  {'Bin':>12s} {'Prédit':>8s} {'Réel':>8s} {'Écart':>7s} {'N':>6s}")
-        logger.info(f"  {'─'*12} {'─'*8} {'─'*8} {'─'*7} {'─'*6}")
+        logger.info(f"  {'─' * 12} {'─' * 8} {'─' * 8} {'─' * 7} {'─' * 6}")
 
         total_gap = 0
         total_n = 0
@@ -131,28 +137,28 @@ def run_nhl_backtest() -> dict:
             mean_actual = sum(o for _, o in in_bin) / len(in_bin)
             gap = abs(mean_pred - mean_actual)
             logger.info(
-                f"  {round(lo*100):>4d}-{round(hi*100):>3d}% "
-                f"{mean_pred*100:>7.1f}% {mean_actual*100:>7.1f}% "
-                f"{gap*100:>6.1f}% {len(in_bin):>5d}"
+                f"  {round(lo * 100):>4d}-{round(hi * 100):>3d}% "
+                f"{mean_pred * 100:>7.1f}% {mean_actual * 100:>7.1f}% "
+                f"{gap * 100:>6.1f}% {len(in_bin):>5d}"
             )
             total_gap += gap * len(in_bin)
             total_n += len(in_bin)
 
         avg_gap = total_gap / total_n if total_n > 0 else 0
-        logger.info(f"  Écart moyen pondéré : {avg_gap*100:.1f}%")
+        logger.info(f"  Écart moyen pondéré : {avg_gap * 100:.1f}%")
 
     # ── 3. Performance par seuil de probabilité ──────────────────
     _section("3. ACCURACY PAR SEUIL DE PROBABILITÉ")
 
     thresholds = [(0, 20), (20, 30), (30, 40), (40, 50), (50, 60), (60, 80), (80, 100)]
     logger.info(f"  {'Seuil':>12s} {'Accuracy':>10s} {'N':>6s} {'Brier':>8s}")
-    logger.info(f"  {'─'*12} {'─'*10} {'─'*6} {'─'*8}")
+    logger.info(f"  {'─' * 12} {'─' * 10} {'─' * 6} {'─' * 8}")
 
     for lo, hi in thresholds:
         bucket_rows = [
-            r for r in rows
-            if r.get("proba_predite") is not None
-            and lo <= float(r["proba_predite"]) < hi
+            r
+            for r in rows
+            if r.get("proba_predite") is not None and lo <= float(r["proba_predite"]) < hi
         ]
         if not bucket_rows:
             continue
@@ -172,8 +178,7 @@ def run_nhl_backtest() -> dict:
     if rows_with_odds:
         total_staked = len(rows_with_odds)
         total_return = sum(
-            float(r["cote"]) if r.get("résultat") == "GAGNÉ" else 0
-            for r in rows_with_odds
+            float(r["cote"]) if r.get("résultat") == "GAGNÉ" else 0 for r in rows_with_odds
         )
         profit = total_return - total_staked
         roi = round(profit / total_staked * 100, 1) if total_staked > 0 else 0
@@ -181,7 +186,9 @@ def run_nhl_backtest() -> dict:
         avg_odds = round(sum(float(r["cote"]) for r in rows_with_odds) / total_staked, 2)
 
         logger.info(f"  Paris avec cotes : {total_staked}")
-        logger.info(f"  Win rate         : {round(wins_odds/total_staked*100,1)}% ({wins_odds}/{total_staked})")
+        logger.info(
+            f"  Win rate         : {round(wins_odds / total_staked * 100, 1)}% ({wins_odds}/{total_staked})"
+        )
         logger.info(f"  Cote moyenne     : {avg_odds}")
         logger.info(f"  ROI              : {roi:+.1f}%")
         logger.info(f"  Profit (units)   : {profit:+.1f}")
@@ -279,8 +286,10 @@ def run_nhl_backtest() -> dict:
     return {
         "total": n,
         "global_accuracy": global_pct,
-        "by_market": {k: {"accuracy": round(v["wins"]/v["total"]*100, 1) if v["total"] else 0}
-                      for k, v in by_market.items()},
+        "by_market": {
+            k: {"accuracy": round(v["wins"] / v["total"] * 100, 1) if v["total"] else 0}
+            for k, v in by_market.items()
+        },
         "grade": grade,
     }
 

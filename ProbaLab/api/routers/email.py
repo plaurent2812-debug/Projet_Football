@@ -54,7 +54,9 @@ def send_welcome_email(payload: Annotated[EmailPayload, Body()], authorization: 
 
 
 @router.post("/premium-confirm")
-def send_premium_confirm_email(payload: Annotated[EmailPayload, Body()], authorization: str = Header(None)):
+def send_premium_confirm_email(
+    payload: Annotated[EmailPayload, Body()], authorization: str = Header(None)
+):
     """Send premium confirmation email after payment (internal/admin only)."""
     verify_internal_auth(authorization)
     email = payload.email

@@ -6,6 +6,7 @@ Ils testent les calculs de Poisson, ELO, météo, régression.
 """
 
 import pytest
+
 from src.models.stats_engine import (
     calculate_roi,
     calculate_xg,
@@ -103,10 +104,13 @@ class TestEloExpected:
     def test_equal_elos_give_50_percent(self):
         assert abs(elo_expected(1500, 1500) - 0.5) < 0.01
 
-    @pytest.mark.parametrize("home_elo,away_elo,expected_relation", [
-        (1700, 1500, "greater"),
-        (1500, 1700, "less"),
-    ])
+    @pytest.mark.parametrize(
+        "home_elo,away_elo,expected_relation",
+        [
+            (1700, 1500, "greater"),
+            (1500, 1700, "less"),
+        ],
+    )
     def test_elo_advantage_direction(self, home_elo, away_elo, expected_relation):
         prob = elo_expected(home_elo, away_elo)
         if expected_relation == "greater":
@@ -213,12 +217,15 @@ class TestWeatherImpact:
         factor = get_weather_impact({"rain_mm": 0, "wind_speed": 3, "temp": 18})
         assert factor == 1.0
 
-    @pytest.mark.parametrize("weather,label", [
-        ({"rain_mm": 10, "wind_speed": 0, "temp": 15}, "heavy_rain"),
-        ({"rain_mm": 0, "wind_speed": 15, "temp": 15}, "strong_wind"),
-        ({"rain_mm": 0, "wind_speed": 0, "temp": -5}, "extreme_cold"),
-        ({"rain_mm": 0, "wind_speed": 0, "temp": 40}, "extreme_heat"),
-    ])
+    @pytest.mark.parametrize(
+        "weather,label",
+        [
+            ({"rain_mm": 10, "wind_speed": 0, "temp": 15}, "heavy_rain"),
+            ({"rain_mm": 0, "wind_speed": 15, "temp": 15}, "strong_wind"),
+            ({"rain_mm": 0, "wind_speed": 0, "temp": -5}, "extreme_cold"),
+            ({"rain_mm": 0, "wind_speed": 0, "temp": 40}, "extreme_heat"),
+        ],
+    )
     def test_adverse_weather_reduces_goals(self, weather, label):
         factor = get_weather_impact(weather)
         assert factor < 1.0, f"{label}: expected factor < 1.0, got {factor}"
@@ -274,29 +281,38 @@ class TestCalculateXg:
 class TestDixonColes:
     """Tests for the Dixon-Coles correction factor."""
 
-    @pytest.mark.parametrize("home_goals,away_goals,label", [
-        (0, 0, "0-0"),
-        (1, 1, "1-1"),
-    ])
+    @pytest.mark.parametrize(
+        "home_goals,away_goals,label",
+        [
+            (0, 0, "0-0"),
+            (1, 1, "1-1"),
+        ],
+    )
     def test_low_draw_score_increases_with_negative_rho(self, home_goals, away_goals, label):
         # With negative rho, 0-0 and 1-1 become MORE likely (Poisson under-estimates draws)
         factor = dixon_coles_correction(home_goals, away_goals, 1.5, 1.2, rho=-0.13)
         assert factor > 1.0, f"{label}: expected factor > 1.0 with negative rho, got {factor}"
 
-    @pytest.mark.parametrize("home_goals,away_goals,label", [
-        (0, 1, "0-1"),
-        (1, 0, "1-0"),
-    ])
+    @pytest.mark.parametrize(
+        "home_goals,away_goals,label",
+        [
+            (0, 1, "0-1"),
+            (1, 0, "1-0"),
+        ],
+    )
     def test_one_sided_low_score_decreases_with_negative_rho(self, home_goals, away_goals, label):
         # 0-1 and 1-0 become LESS likely with negative rho
         factor = dixon_coles_correction(home_goals, away_goals, 1.5, 1.2, rho=-0.13)
         assert factor < 1.0, f"{label}: expected factor < 1.0 with negative rho, got {factor}"
 
-    @pytest.mark.parametrize("home_goals,away_goals", [
-        (2, 1),
-        (3, 0),
-        (2, 3),
-    ])
+    @pytest.mark.parametrize(
+        "home_goals,away_goals",
+        [
+            (2, 1),
+            (3, 0),
+            (2, 3),
+        ],
+    )
     def test_high_score_no_correction(self, home_goals, away_goals):
         """For scorelines > 1, correction should be 1.0."""
         assert dixon_coles_correction(home_goals, away_goals, 1.5, 1.2) == 1.0
@@ -326,10 +342,13 @@ class TestEloDecay:
     def test_no_decay_when_zero_days(self):
         assert elo_with_decay(1600, 0) == 1600
 
-    @pytest.mark.parametrize("initial_elo,days,expected_direction,bound", [
-        (1700, 60, "down", (1500, 1700)),
-        (1300, 60, "up", (1300, 1500)),
-    ])
+    @pytest.mark.parametrize(
+        "initial_elo,days,expected_direction,bound",
+        [
+            (1700, 60, "down", (1500, 1700)),
+            (1300, 60, "up", (1300, 1500)),
+        ],
+    )
     def test_decay_pulls_toward_baseline(self, initial_elo, days, expected_direction, bound):
         """Teams above 1500 decay down; teams below 1500 decay up."""
         decayed = elo_with_decay(initial_elo, days)
@@ -356,11 +375,14 @@ class TestEloDecay:
 class TestKellyAndROI:
     """Tests for value betting functions."""
 
-    @pytest.mark.parametrize("proba,odds,expected_roi,label", [
-        (60, 2.0, 0.2, "positive value bet"),
-        (30, 2.0, -0.4, "negative bad bet"),
-        (50, 2.0, 0.0, "break even"),
-    ])
+    @pytest.mark.parametrize(
+        "proba,odds,expected_roi,label",
+        [
+            (60, 2.0, 0.2, "positive value bet"),
+            (30, 2.0, -0.4, "negative bad bet"),
+            (50, 2.0, 0.0, "break even"),
+        ],
+    )
     def test_roi_calculation(self, proba, odds, expected_roi, label):
         roi = calculate_roi(proba, odds)
         assert abs(roi - expected_roi) < 0.001, f"{label}: expected {expected_roi}, got {roi}"

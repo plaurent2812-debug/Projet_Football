@@ -685,7 +685,7 @@ def _print_ticket_stats() -> None:
 
         completed_tickets = 0
         won_tickets = 0
-        for date, date_picks in tickets_by_date.items():
+        for date_picks in tickets_by_date.values():
             if all(p["is_won"] is not None for p in date_picks):
                 completed_tickets += 1
                 if all(p["is_won"] for p in date_picks):

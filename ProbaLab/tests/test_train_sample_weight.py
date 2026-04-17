@@ -1,4 +1,5 @@
 """Test that sample_weight is passed via fit_params to cross_val_score."""
+
 import ast
 import pathlib
 

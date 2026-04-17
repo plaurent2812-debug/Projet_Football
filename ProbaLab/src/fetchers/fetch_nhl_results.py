@@ -128,7 +128,9 @@ def evaluate_nhl_predictions(days_back: int = 3) -> dict:
     try:
         fixtures = (
             supabase.table("nhl_fixtures")
-            .select("id, api_fixture_id, date, home_team, away_team, status, home_score, away_score, stats_json")
+            .select(
+                "id, api_fixture_id, date, home_team, away_team, status, home_score, away_score, stats_json"
+            )
             .gte("date", f"{start_date}T00:00:00Z")
             .in_("status", list(FINISHED_STATUSES))
             .execute()
@@ -219,20 +221,22 @@ def evaluate_nhl_predictions(days_back: int = 3) -> dict:
                 # Use real odds for point market, 0 otherwise
                 cote = player_odds if stat_name == "point" and player_odds > 0 else 0
 
-                evaluations.append({
-                    "date": date_str,
-                    "match": match_str,
-                    "type": "Performance Joueur",
-                    "joueur": p_name,
-                    "pari": pari_label,
-                    "résultat": resultat,
-                    "score_reel": str(actual_val),
-                    "proba_predite": round(float(prob), 1),
-                    "python_prob": round(float(prob), 1),
-                    "model_version": "v2",
-                    "cote": round(cote, 3) if cote else None,
-                    "id_ref": str(api_id),
-                })
+                evaluations.append(
+                    {
+                        "date": date_str,
+                        "match": match_str,
+                        "type": "Performance Joueur",
+                        "joueur": p_name,
+                        "pari": pari_label,
+                        "résultat": resultat,
+                        "score_reel": str(actual_val),
+                        "proba_predite": round(float(prob), 1),
+                        "python_prob": round(float(prob), 1),
+                        "model_version": "v2",
+                        "cote": round(cote, 3) if cote else None,
+                        "id_ref": str(api_id),
+                    }
+                )
 
                 match_total += 1
                 if is_winner:
@@ -252,7 +256,7 @@ def evaluate_nhl_predictions(days_back: int = 3) -> dict:
         if evaluations:
             # Batch insert (upsert by unique constraint)
             for batch_start in range(0, len(evaluations), 100):
-                batch = evaluations[batch_start:batch_start + 100]
+                batch = evaluations[batch_start : batch_start + 100]
                 try:
                     supabase.table("nhl_suivi_algo_clean").upsert(
                         batch, on_conflict="date,match,type,joueur,pari"

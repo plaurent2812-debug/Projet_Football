@@ -28,7 +28,23 @@ _PICKLE_ALLOWED_MODULES: dict[str, set[str]] = {
     "numpy.core.multiarray": {"scalar", "_reconstruct"},
     "numpy.core.numeric": {"*"},
     "collections": {"OrderedDict", "defaultdict"},
-    "builtins": {"dict", "list", "tuple", "set", "frozenset", "str", "int", "float", "bool", "bytes", "type", "NoneType", "complex", "slice", "range"},
+    "builtins": {
+        "dict",
+        "list",
+        "tuple",
+        "set",
+        "frozenset",
+        "str",
+        "int",
+        "float",
+        "bool",
+        "bytes",
+        "type",
+        "NoneType",
+        "complex",
+        "slice",
+        "range",
+    },
     "copy_reg": {"*"},
     "copyreg": {"_reconstructor"},
     "lightgbm.sklearn": {"LGBMClassifier"},
@@ -40,9 +56,16 @@ _PICKLE_ALLOWED_MODULES: dict[str, set[str]] = {
 # Allowed numpy/sklearn sub-module prefixes (tighter than blanket startswith)
 _NUMPY_ALLOWED_PREFIXES = ("numpy.core", "numpy._core", "numpy.dtypes", "numpy.random", "numpy")
 _SKLEARN_ALLOWED_PREFIXES = (
-    "sklearn.linear_model", "sklearn.preprocessing", "sklearn.impute",
-    "sklearn.isotonic", "sklearn.utils", "sklearn.tree", "sklearn.ensemble",
-    "sklearn.base", "sklearn.calibration", "sklearn.model_selection",
+    "sklearn.linear_model",
+    "sklearn.preprocessing",
+    "sklearn.impute",
+    "sklearn.isotonic",
+    "sklearn.utils",
+    "sklearn.tree",
+    "sklearn.ensemble",
+    "sklearn.base",
+    "sklearn.calibration",
+    "sklearn.model_selection",
 )
 
 
@@ -67,6 +90,7 @@ class RestrictedUnpickler(pickle.Unpickler):
 def _safe_loads(data: bytes) -> Any:
     """Deserialize bytes using RestrictedUnpickler."""
     return RestrictedUnpickler(io.BytesIO(data)).load()
+
 
 # Cache des modèles chargés
 _model_cache: dict[str, dict[str, Any]] = {}
@@ -111,13 +135,16 @@ def load_models() -> bool:
                 # New format: XGBoost stored via save_model(), not pickle
                 if "xgb_model_bytes" in payload:
                     import xgboost as xgb
+
                     is_classifier = name != "xgb_total_goals"
                     model_cls = xgb.XGBClassifier if is_classifier else xgb.XGBRegressor
                     xgb_model = model_cls()
                     xgb_model.load_model(base64.b64decode(payload["xgb_model_bytes"]))
                     payload["model"] = xgb_model
                 if "model" not in payload:
-                    logger.warning(f"  ⚠️ Modèle {name}: pas de clé 'model' après désérialisation, ignoré")
+                    logger.warning(
+                        f"  ⚠️ Modèle {name}: pas de clé 'model' après désérialisation, ignoré"
+                    )
                     continue
                 _model_cache[name] = payload
             except Exception as e:
@@ -189,8 +216,14 @@ def _impute(X: NDArray[np.float32], model_name: str) -> NDArray[np.float32]:
     else:
         # No imputer — use sensible defaults instead of destructive 0.0
         # Market features imputed to ~33% (uniform prior), others to 0.0
-        _MARKET_COLS = {"market_home_prob", "market_draw_prob", "market_away_prob",
-                        "market_btts_prob", "market_over25_prob", "market_over15_prob"}
+        _MARKET_COLS = {
+            "market_home_prob",
+            "market_draw_prob",
+            "market_away_prob",
+            "market_btts_prob",
+            "market_over25_prob",
+            "market_over15_prob",
+        }
         for i, col_name in enumerate(FEATURE_COLS):
             if i < X.shape[1] and np.isnan(X[0, i]):
                 if col_name in _MARKET_COLS:
@@ -234,9 +267,9 @@ def predict_1x2(context: dict) -> dict[str, int] | None:
     calibrators = _model_cache["xgb_1x2"].get("calibrators")
     if calibrators and len(calibrators) == len(probas):
         try:
-            calibrated = np.array([
-                calibrators[k].predict([probas[k]])[0] for k in range(len(probas))
-            ])
+            calibrated = np.array(
+                [calibrators[k].predict([probas[k]])[0] for k in range(len(probas))]
+            )
             total = calibrated.sum()
             if total > 0:
                 probas = calibrated / total  # Renormalize to sum to 1.0
@@ -249,7 +282,9 @@ def predict_1x2(context: dict) -> dict[str, int] | None:
     else:
         # LabelEncoder required — sklearn sorts classes alphabetically ['A','D','H'],
         # so probas order is [p_away, p_draw, p_home]. Without le, we can't guarantee order.
-        logger.error("No LabelEncoder found — cannot map probabilities safely. Falling back to alphabetical order.")
+        logger.error(
+            "No LabelEncoder found — cannot map probabilities safely. Falling back to alphabetical order."
+        )
         proba_map = {"A": probas[0], "D": probas[1], "H": probas[2]}
 
     ml_home = round(proba_map.get("H", 0.33) * 100)
@@ -335,9 +370,7 @@ def get_ml_predictions(context: dict) -> dict[str, int | float]:
     n_total = len(FEATURE_COLS)
     n_missing = sum(1 for col in FEATURE_COLS if context.get(col) is None)
     if n_missing > n_total * 0.40:
-        logger.warning(
-            f"  ⚠️ ML skipped: {n_missing}/{n_total} features missing (>{40}% threshold)"
-        )
+        logger.warning(f"  ⚠️ ML skipped: {n_missing}/{n_total} features missing (>{40}% threshold)")
         return {}
 
     result: dict[str, int | float] = {}

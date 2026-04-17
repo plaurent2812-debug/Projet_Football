@@ -107,9 +107,7 @@ def evaluate_single_football_market(
     return None
 
 
-def evaluate_football_combo(
-    combo_market: str, home_goals: int, away_goals: int
-) -> str | None:
+def evaluate_football_combo(combo_market: str, home_goals: int, away_goals: int) -> str | None:
     """Resolve a football combo market (legs joined by " + ").
 
     Rules (mirror the inline logic in ``resolve_best_bets``):
@@ -276,12 +274,14 @@ def calc_stats(raw_bets: list[dict[str, Any]]) -> dict[str, Any]:
         if total_odds == 1.0:
             total_odds = 20.0
 
-        grouped_bets.append({
-            "date": date,
-            "market": market,
-            "result": res,
-            "odds": total_odds,
-        })
+        grouped_bets.append(
+            {
+                "date": date,
+                "market": market,
+                "result": res,
+                "odds": total_odds,
+            }
+        )
 
     resolved = [b for b in grouped_bets if b["result"] in ("WIN", "LOSS")]
     wins = sum(1 for b in resolved if b["result"] == "WIN")
@@ -321,9 +321,7 @@ def calc_stats(raw_bets: list[dict[str, Any]]) -> dict[str, Any]:
             combines_count += 1
 
     roi_pct = round(roi / total * 100, 1) if total else 0
-    roi_singles_pct = (
-        round(roi_singles / singles_count * 100, 1) if singles_count else 0
-    )
+    roi_singles_pct = round(roi_singles / singles_count * 100, 1) if singles_count else 0
 
     result: dict[str, Any] = {
         "wins": wins,

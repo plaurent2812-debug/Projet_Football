@@ -1,4 +1,5 @@
 """Unified TTL cache for API endpoints."""
+
 from __future__ import annotations
 
 import asyncio

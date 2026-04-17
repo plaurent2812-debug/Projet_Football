@@ -41,6 +41,7 @@ router = APIRouter(tags=["Best Bets"])
 
 # ─── Best Bets Endpoints ─────────────────────────────────────────
 
+
 @router.get(
     "/api/best-bets",
     summary="Get daily best bets (Paris du Soir)",
@@ -134,15 +135,51 @@ def get_best_bets(
 
                     # All markets with their real odds and model probas
                     markets = [
-                        ("Victoire domicile", real_odds.get("home_win_odds") if real_odds else None, p.get("proba_home") or 0),
-                        ("Match nul", real_odds.get("draw_odds") if real_odds else None, p.get("proba_draw") or 0),
-                        ("Victoire extérieur", real_odds.get("away_win_odds") if real_odds else None, p.get("proba_away") or 0),
-                        ("BTTS Oui", real_odds.get("btts_yes_odds") if real_odds else None, p.get("proba_btts") or 0),
-                        ("Over 1.5 buts", real_odds.get("over_15_odds") if real_odds else None, p.get("proba_over_15") or 0),
-                        ("Over 2.5 buts", real_odds.get("over_25_odds") if real_odds else None, p.get("proba_over_2_5") or 0),
-                        ("Over 3.5 buts", real_odds.get("over_35_odds") if real_odds else None, p.get("proba_over_35") or 0),
-                        ("Double Chance 1N", real_odds.get("dc_1x_odds") if real_odds else None, (p.get("proba_home") or 0) + (p.get("proba_draw") or 0)),
-                        ("Double Chance X2", real_odds.get("dc_x2_odds") if real_odds else None, (p.get("proba_draw") or 0) + (p.get("proba_away") or 0)),
+                        (
+                            "Victoire domicile",
+                            real_odds.get("home_win_odds") if real_odds else None,
+                            p.get("proba_home") or 0,
+                        ),
+                        (
+                            "Match nul",
+                            real_odds.get("draw_odds") if real_odds else None,
+                            p.get("proba_draw") or 0,
+                        ),
+                        (
+                            "Victoire extérieur",
+                            real_odds.get("away_win_odds") if real_odds else None,
+                            p.get("proba_away") or 0,
+                        ),
+                        (
+                            "BTTS Oui",
+                            real_odds.get("btts_yes_odds") if real_odds else None,
+                            p.get("proba_btts") or 0,
+                        ),
+                        (
+                            "Over 1.5 buts",
+                            real_odds.get("over_15_odds") if real_odds else None,
+                            p.get("proba_over_15") or 0,
+                        ),
+                        (
+                            "Over 2.5 buts",
+                            real_odds.get("over_25_odds") if real_odds else None,
+                            p.get("proba_over_2_5") or 0,
+                        ),
+                        (
+                            "Over 3.5 buts",
+                            real_odds.get("over_35_odds") if real_odds else None,
+                            p.get("proba_over_35") or 0,
+                        ),
+                        (
+                            "Double Chance 1N",
+                            real_odds.get("dc_1x_odds") if real_odds else None,
+                            (p.get("proba_home") or 0) + (p.get("proba_draw") or 0),
+                        ),
+                        (
+                            "Double Chance X2",
+                            real_odds.get("dc_x2_odds") if real_odds else None,
+                            (p.get("proba_draw") or 0) + (p.get("proba_away") or 0),
+                        ),
                     ]
 
                     for market_name, bookmaker_odds, model_proba in markets:
@@ -154,7 +191,11 @@ def get_best_bets(
                             odds_source = "real"
                         else:
                             # Only estimate odds for probabilities >= 1% to avoid absurd values
-                            odds_val = round((1 / (model_proba / 100)) * 0.95, 2) if model_proba >= 1 else 0
+                            odds_val = (
+                                round((1 / (model_proba / 100)) * 0.95, 2)
+                                if model_proba >= 1
+                                else 0
+                            )
                             odds_source = "estimated"
 
                         if odds_val < 1.05:
@@ -165,22 +206,26 @@ def get_best_bets(
                         # Edge = model_prob - implied_prob (bookmaker)
                         edge_pct = round(((model_proba / 100) - (1.0 / odds_val)) * 100, 1)
 
-                        all_candidates.append({
-                            "fixture_id": p["fixture_id"],
-                            "label": f"{match_label} — {market_name}",
-                            "match": match_label,
-                            "market": market_name,
-                            "odds": odds_val,
-                            "proba_model": model_proba,
-                            "proba_bookmaker": round(100 / odds_val, 1) if odds_val > 1.0 else None,
-                            "confidence": p.get("confidence_score") or 0,
-                            "ev": ev,
-                            "edge_pct": edge_pct,
-                            "is_value": ev > 0.03,
-                            "odds_source": odds_source,
-                            "result": "PENDING",
-                            "time": fix["date"][11:16] if fix.get("date") else "",
-                        })
+                        all_candidates.append(
+                            {
+                                "fixture_id": p["fixture_id"],
+                                "label": f"{match_label} — {market_name}",
+                                "match": match_label,
+                                "market": market_name,
+                                "odds": odds_val,
+                                "proba_model": model_proba,
+                                "proba_bookmaker": round(100 / odds_val, 1)
+                                if odds_val > 1.0
+                                else None,
+                                "confidence": p.get("confidence_score") or 0,
+                                "ev": ev,
+                                "edge_pct": edge_pct,
+                                "is_value": ev > 0.03,
+                                "odds_source": odds_source,
+                                "result": "PENDING",
+                                "time": fix["date"][11:16] if fix.get("date") else "",
+                            }
+                        )
 
                 # ── Football SAFE: 1 match, 1-2 markets, odds 1.9–2.5 ──
                 SAFE_MIN, SAFE_MAX = 1.90, 2.50
@@ -198,27 +243,41 @@ def get_best_bets(
                     # Option A: Single market in range
                     for c in real_cands:
                         if SAFE_MIN <= c["odds"] <= SAFE_MAX:
-                            safe_options.append({
-                                "fixture_id": fid,
-                                "match": c["match"],
-                                "time": c.get("time", ""),
-                                "picks": [c["market"]],
-                                "label": f"{c['match']} — {c['market']}",
-                                "odds": c["odds"],
-                                "proba_model": c["proba_model"],
-                                "ev": c["ev"],
-                                "odds_source": "real",
-                                "category": "safe_football",
-                                "result": "PENDING",
-                            })
+                            safe_options.append(
+                                {
+                                    "fixture_id": fid,
+                                    "match": c["match"],
+                                    "time": c.get("time", ""),
+                                    "picks": [c["market"]],
+                                    "label": f"{c['match']} — {c['market']}",
+                                    "odds": c["odds"],
+                                    "proba_model": c["proba_model"],
+                                    "ev": c["ev"],
+                                    "odds_source": "real",
+                                    "category": "safe_football",
+                                    "result": "PENDING",
+                                }
+                            )
 
                     # Option B: Combine 2 markets on same match
                     # Compatible pairs: (1X2/DC) + (BTTS/Over)
-                    outcome_markets = [c for c in real_cands if c["market"] in (
-                        "Victoire domicile", "Victoire extérieur", "Match nul",
-                        "Double Chance 1N", "Double Chance X2")]
-                    goal_markets = [c for c in real_cands if c["market"] in (
-                        "BTTS Oui", "Over 1.5 buts", "Over 2.5 buts")]
+                    outcome_markets = [
+                        c
+                        for c in real_cands
+                        if c["market"]
+                        in (
+                            "Victoire domicile",
+                            "Victoire extérieur",
+                            "Match nul",
+                            "Double Chance 1N",
+                            "Double Chance X2",
+                        )
+                    ]
+                    goal_markets = [
+                        c
+                        for c in real_cands
+                        if c["market"] in ("BTTS Oui", "Over 1.5 buts", "Over 2.5 buts")
+                    ]
 
                     # Positive correlation factor for outcome+goal combos (e.g. "Team wins" + "BTTS")
                     # Teams that win tend to score, creating slight positive correlation vs independence
@@ -230,22 +289,28 @@ def get_best_bets(
                             if SAFE_MIN <= combo_odds <= SAFE_MAX:
                                 # Combined proba ≈ P(A) × P(B) × correlation factor
                                 combo_proba = round(
-                                    (om["proba_model"] / 100) * (gm["proba_model"] / 100) * COMBO_CORRELATION_FACTOR * 100, 1
+                                    (om["proba_model"] / 100)
+                                    * (gm["proba_model"] / 100)
+                                    * COMBO_CORRELATION_FACTOR
+                                    * 100,
+                                    1,
                                 )
                                 combo_ev = round((combo_proba / 100) * combo_odds - 1, 3)
-                                safe_options.append({
-                                    "fixture_id": fid,
-                                    "match": om["match"],
-                                    "time": om.get("time", ""),
-                                    "picks": [om["market"], gm["market"]],
-                                    "label": f"{om['match']} — {om['market']} + {gm['market']}",
-                                    "odds": combo_odds,
-                                    "proba_model": combo_proba,
-                                    "ev": combo_ev,
-                                    "odds_source": "real",
-                                    "category": "safe_football",
-                                    "result": "PENDING",
-                                })
+                                safe_options.append(
+                                    {
+                                        "fixture_id": fid,
+                                        "match": om["match"],
+                                        "time": om.get("time", ""),
+                                        "picks": [om["market"], gm["market"]],
+                                        "label": f"{om['match']} — {om['market']} + {gm['market']}",
+                                        "odds": combo_odds,
+                                        "proba_model": combo_proba,
+                                        "ev": combo_ev,
+                                        "odds_source": "real",
+                                        "category": "safe_football",
+                                        "result": "PENDING",
+                                    }
+                                )
 
                 if safe_options:
                     safe_options.sort(key=lambda x: -x["ev"])
@@ -258,8 +323,7 @@ def get_best_bets(
 
                 # ── Football FUN: combined ~20, max success rate ───
                 fun_candidates = [
-                    c for c in all_candidates
-                    if c["odds"] >= 1.50 and c["proba_model"] >= 40
+                    c for c in all_candidates if c["odds"] >= 1.50 and c["proba_model"] >= 40
                 ]
                 # Dedupe by fixture (1 pick per match)
                 seen_fx = set()
@@ -307,8 +371,7 @@ def get_best_bets(
 
                 # Value-first: uniquement des paris qui battent le marché
                 value_candidates = [
-                    c for c in all_candidates
-                    if c["ev"] > 0 and c["odds_source"] == "real"
+                    c for c in all_candidates if c["ev"] > 0 and c["odds_source"] == "real"
                 ]
                 value_candidates.sort(key=lambda x: -x["ev"])
                 seen = set()
@@ -333,7 +396,9 @@ def get_best_bets(
             # Step 1: Real bookmaker odds
             real_odds_resp = (
                 supabase.table("nhl_odds")
-                .select("player_name, bookmaker, over_odds, home_team, away_team, game_id, line, market")
+                .select(
+                    "player_name, bookmaker, over_odds, home_team, away_team, game_id, line, market"
+                )
                 .eq("game_date", date)
                 .gte("over_odds", 1.30)
                 .order("over_odds", desc=True)
@@ -376,8 +441,8 @@ def get_best_bets(
             )
 
             model_map: dict[str, dict] = {}
-            for fx in (fixtures_resp.data or []):
-                for p in ((fx.get("stats_json") or {}).get("top_players") or []):
+            for fx in fixtures_resp.data or []:
+                for p in (fx.get("stats_json") or {}).get("top_players") or []:
                     name = (p.get("player_name") or "").strip()
                     if not name or name in model_map:
                         continue
@@ -420,7 +485,7 @@ def get_best_bets(
 
             # Build individual player point bets with positive EV
             point_bets = []
-            for key, od in player_odds_map.items():
+            for od in player_odds_map.values():
                 if od["market"] != "player_points":
                     continue
                 md = find_model(od["player_name"])
@@ -436,31 +501,35 @@ def get_best_bets(
                 ht = md.get("home_team") or od.get("home_team", "")
                 at = md.get("away_team") or od.get("away_team", "")
 
-                point_bets.append({
-                    "player_name": od["player_name"],
-                    "team": md.get("team", ""),
-                    "label": f"{od['player_name']} Over 0.5 Points — {ht} vs {at}",
-                    "market": "player_points_over_0.5",
-                    "odds": round(od["odds"], 2),
-                    "proba_model": prob,
-                    "ev": ev,
-                    "bookmaker": od.get("bookmaker", ""),
-                    "odds_source": "real",
-                    "game_label": f"{ht} vs {at}",
-                })
+                point_bets.append(
+                    {
+                        "player_name": od["player_name"],
+                        "team": md.get("team", ""),
+                        "label": f"{od['player_name']} Over 0.5 Points — {ht} vs {at}",
+                        "market": "player_points_over_0.5",
+                        "odds": round(od["odds"], 2),
+                        "proba_model": prob,
+                        "ev": ev,
+                        "bookmaker": od.get("bookmaker", ""),
+                        "odds_source": "real",
+                        "game_label": f"{ht} vs {at}",
+                    }
+                )
 
             nhl_safe_options = []
 
             # Option A: Single player in range
             for b in point_bets:
                 if NHL_SAFE_MIN <= b["odds"] <= NHL_SAFE_MAX:
-                    nhl_safe_options.append({
-                        "bets": [b],
-                        "label": b["label"],
-                        "odds": b["odds"],
-                        "ev": b["ev"],
-                        "category": "safe_nhl",
-                    })
+                    nhl_safe_options.append(
+                        {
+                            "bets": [b],
+                            "label": b["label"],
+                            "odds": b["odds"],
+                            "ev": b["ev"],
+                            "category": "safe_nhl",
+                        }
+                    )
 
             # Option B: Combine 2 players (different games preferred)
             for i in range(len(point_bets)):
@@ -469,15 +538,18 @@ def get_best_bets(
                     combo_odds = round(b1["odds"] * b2["odds"], 2)
                     if NHL_SAFE_MIN <= combo_odds <= NHL_SAFE_MAX:
                         combo_ev = round(
-                            (b1["proba_model"] / 100) * (b2["proba_model"] / 100) * combo_odds - 1, 3
+                            (b1["proba_model"] / 100) * (b2["proba_model"] / 100) * combo_odds - 1,
+                            3,
                         )
-                        nhl_safe_options.append({
-                            "bets": [b1, b2],
-                            "label": f"{b1['player_name']} + {b2['player_name']} Over 0.5 Points",
-                            "odds": combo_odds,
-                            "ev": combo_ev,
-                            "category": "safe_nhl",
-                        })
+                        nhl_safe_options.append(
+                            {
+                                "bets": [b1, b2],
+                                "label": f"{b1['player_name']} + {b2['player_name']} Over 0.5 Points",
+                                "odds": combo_odds,
+                                "ev": combo_ev,
+                                "category": "safe_nhl",
+                            }
+                        )
 
             if nhl_safe_options:
                 nhl_safe_options.sort(key=lambda x: -x["ev"])
@@ -500,33 +572,37 @@ def get_best_bets(
                 if prob_goal > 5:
                     odds_goal = round((1 / (prob_goal / 100)) * 0.92, 2)
                     if odds_goal >= 2.0:
-                        nhl_fun_candidates.append({
-                            "label": f"{name} Marquer un but — {ht} vs {at}",
-                            "player_name": name,
-                            "team": md.get("team", ""),
-                            "market": "player_goals_over_0.5",
-                            "odds": odds_goal,
-                            "proba_model": round(prob_goal, 1),
-                            "ev": round((prob_goal / 100) * odds_goal - 1, 3),
-                            "odds_source": "estimated",
-                            "result": "PENDING",
-                        })
+                        nhl_fun_candidates.append(
+                            {
+                                "label": f"{name} Marquer un but — {ht} vs {at}",
+                                "player_name": name,
+                                "team": md.get("team", ""),
+                                "market": "player_goals_over_0.5",
+                                "odds": odds_goal,
+                                "proba_model": round(prob_goal, 1),
+                                "ev": round((prob_goal / 100) * odds_goal - 1, 3),
+                                "odds_source": "estimated",
+                                "result": "PENDING",
+                            }
+                        )
 
                 # Assist prop
                 if prob_assist > 8:
                     odds_assist = round((1 / (prob_assist / 100)) * 0.92, 2)
                     if odds_assist >= 2.0:
-                        nhl_fun_candidates.append({
-                            "label": f"{name} Faire une passe — {ht} vs {at}",
-                            "player_name": name,
-                            "team": md.get("team", ""),
-                            "market": "player_assists_over_0.5",
-                            "odds": odds_assist,
-                            "proba_model": round(prob_assist, 1),
-                            "ev": round((prob_assist / 100) * odds_assist - 1, 3),
-                            "odds_source": "estimated",
-                            "result": "PENDING",
-                        })
+                        nhl_fun_candidates.append(
+                            {
+                                "label": f"{name} Faire une passe — {ht} vs {at}",
+                                "player_name": name,
+                                "team": md.get("team", ""),
+                                "market": "player_assists_over_0.5",
+                                "odds": odds_assist,
+                                "proba_model": round(prob_assist, 1),
+                                "ev": round((prob_assist / 100) * odds_assist - 1, 3),
+                                "odds_source": "estimated",
+                                "result": "PENDING",
+                            }
+                        )
 
             if len(nhl_fun_candidates) >= 3:
                 # Sort by proba (highest success rate)
@@ -564,7 +640,7 @@ def get_best_bets(
 
             # Legacy top 5
             nhl_legacy = []
-            for key, od in player_odds_map.items():
+            for od in player_odds_map.values():
                 if od["market"] != "player_points":
                     continue
                 md = find_model(od["player_name"])
@@ -577,22 +653,24 @@ def get_best_bets(
                     continue
                 ht = md.get("home_team") or od.get("home_team", "")
                 at = md.get("away_team") or od.get("away_team", "")
-                nhl_legacy.append({
-                    "id": None,
-                    "player_name": od["player_name"],
-                    "team": md.get("team", ""),
-                    "label": f"{od['player_name']} Over 0.5 Points — {ht} vs {at}",
-                    "market": "player_points_over_0.5",
-                    "odds": round(od["odds"], 2),
-                    "proba_model": prob,
-                    "proba_bookmaker": round(100 / od["odds"], 1) if od["odds"] > 1.0 else None,
-                    "ev": ev,
-                    "edge_pct": round(((prob / 100) - (1.0 / od["odds"])) * 100, 1),
-                    "bookmaker": od.get("bookmaker", ""),
-                    "is_value": ev > 0.03,
-                    "odds_source": "real",
-                    "result": "PENDING",
-                })
+                nhl_legacy.append(
+                    {
+                        "id": None,
+                        "player_name": od["player_name"],
+                        "team": md.get("team", ""),
+                        "label": f"{od['player_name']} Over 0.5 Points — {ht} vs {at}",
+                        "market": "player_points_over_0.5",
+                        "odds": round(od["odds"], 2),
+                        "proba_model": prob,
+                        "proba_bookmaker": round(100 / od["odds"], 1) if od["odds"] > 1.0 else None,
+                        "ev": ev,
+                        "edge_pct": round(((prob / 100) - (1.0 / od["odds"])) * 100, 1),
+                        "bookmaker": od.get("bookmaker", ""),
+                        "is_value": ev > 0.03,
+                        "odds_source": "real",
+                        "result": "PENDING",
+                    }
+                )
             nhl_legacy.sort(key=lambda x: -x["ev"])
             result["nhl"] = nhl_legacy[:10]
             result["nhl_odds_source"] = "real" if player_odds_map else "pending"
@@ -603,12 +681,7 @@ def get_best_bets(
 
     # ── Auto-save SAFE/FUN bets to best_bets for tracking ─────────
     try:
-        saved = (
-            supabase.table("best_bets")
-            .select("*")
-            .eq("date", date)
-            .execute()
-        )
+        saved = supabase.table("best_bets").select("*").eq("date", date).execute()
         saved_labels = {s["bet_label"]: s for s in (saved.data or [])}
 
         def _auto_save(label, sport_name, category, odds, proba, fid=None, pname=None):
@@ -642,9 +715,12 @@ def get_best_bets(
         if result.get("football_safe"):
             bet = result["football_safe"]["bet"]
             s = _auto_save(
-                bet["label"], "football", "safe_football",
-                bet["odds"], bet.get("proba_model", 0),
-                fid=bet.get("fixture_id")
+                bet["label"],
+                "football",
+                "safe_football",
+                bet["odds"],
+                bet.get("proba_model", 0),
+                fid=bet.get("fixture_id"),
             )
             if s:
                 bet["id"] = s.get("id")
@@ -654,9 +730,12 @@ def get_best_bets(
         if result.get("football_fun"):
             for bet in result["football_fun"]["bets"]:
                 s = _auto_save(
-                    bet["label"], "football", "fun_football",
-                    bet["odds"], bet.get("proba_model", 0),
-                    fid=bet.get("fixture_id")
+                    bet["label"],
+                    "football",
+                    "fun_football",
+                    bet["odds"],
+                    bet.get("proba_model", 0),
+                    fid=bet.get("fixture_id"),
                 )
                 if s:
                     bet["id"] = s.get("id")
@@ -667,9 +746,12 @@ def get_best_bets(
             nhl_safe_data = result["nhl_safe"]["bet"]
             for bet in nhl_safe_data.get("bets", []):
                 s = _auto_save(
-                    bet["label"], "nhl", "safe_nhl",
-                    bet["odds"], bet.get("proba_model", 0),
-                    pname=bet.get("player_name")
+                    bet["label"],
+                    "nhl",
+                    "safe_nhl",
+                    bet["odds"],
+                    bet.get("proba_model", 0),
+                    pname=bet.get("player_name"),
                 )
                 if s:
                     bet["id"] = s.get("id")
@@ -679,9 +761,12 @@ def get_best_bets(
         if result.get("nhl_fun"):
             for bet in result["nhl_fun"]["bets"]:
                 s = _auto_save(
-                    bet["label"], "nhl", "fun_nhl",
-                    bet["odds"], bet.get("proba_model", 0),
-                    pname=bet.get("player_name")
+                    bet["label"],
+                    "nhl",
+                    "fun_nhl",
+                    bet["odds"],
+                    bet.get("proba_model", 0),
+                    pname=bet.get("player_name"),
                 )
                 if s:
                     bet["id"] = s.get("id")
@@ -721,11 +806,13 @@ def update_bet_result(
     try:
         resp = (
             supabase.table("best_bets")
-            .update({
-                "result": result_val,
-                "notes": body.notes,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
+            .update(
+                {
+                    "result": result_val,
+                    "notes": body.notes,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             .eq("id", bet_id)
             .execute()
         )
@@ -774,6 +861,7 @@ def nhl_fetch_game_stats(body: dict, request: Request, authorization: str = Head
 
     try:
         from src.nhl.fetch_game_stats import fetch_and_store_game_stats
+
         result = fetch_and_store_game_stats(date)
         return result
     except Exception:
@@ -795,6 +883,7 @@ def nhl_fetch_odds(body: dict, request: Request, authorization: str = Header(Non
 
     try:
         from src.nhl.fetch_odds import run as fetch_nhl_odds
+
         result = fetch_nhl_odds(date)
         return result
     except Exception:
@@ -817,7 +906,13 @@ def backfill_pending_bets(authorization: str = Header(None)):
         counts = {"best_bets": 0, "expert_picks": 0}
 
         # Check best_bets
-        bb_req = supabase.table("best_bets").select("id", count="exact").eq("date", d).eq("result", "PENDING").execute()
+        bb_req = (
+            supabase.table("best_bets")
+            .select("id", count="exact")
+            .eq("date", d)
+            .eq("result", "PENDING")
+            .execute()
+        )
         if bb_req.count and bb_req.count > 0:
             req_football = ResolveBetsRequest(date=d, sport="football")
             req_nhl = ResolveBetsRequest(date=d, sport="nhl")
@@ -829,11 +924,18 @@ def backfill_pending_bets(authorization: str = Header(None)):
                 logger.warning("backfill resolve_best_bets failed for date=%s", d, exc_info=True)
 
         # Check expert_picks — import locally to avoid circular dependency
-        ep_req = supabase.table("expert_picks").select("id", count="exact").eq("date", d).eq("result", "PENDING").execute()
+        ep_req = (
+            supabase.table("expert_picks")
+            .select("id", count="exact")
+            .eq("date", d)
+            .eq("result", "PENDING")
+            .execute()
+        )
         if ep_req.count and ep_req.count > 0:
             req = ResolveExpertPicksRequest(date=d)
             try:
                 from api.routers.expert_picks import resolve_expert_picks
+
                 res = resolve_expert_picks(req, None, authorization)
                 counts["expert_picks"] += res.get("resolved_count", 0)
             except Exception:
@@ -847,7 +949,9 @@ def backfill_pending_bets(authorization: str = Header(None)):
 
 @router.post("/api/best-bets/resolve")
 @_rate_limit("10/minute")
-def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Request, authorization: str = Header(None)):
+def resolve_best_bets(
+    body: Annotated[ResolveBetsRequest, Body()], request: Request, authorization: str = Header(None)
+):
     """
     Called by Trigger.dev scheduled tasks to auto-resolve PENDING bets.
     Checks match results and updates best_bets table with WIN/LOSS/VOID.
@@ -875,7 +979,13 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
     bets = pending.data or []
 
     if not bets:
-        return {"ok": True, "date": date, "sport": sport, "resolved": 0, "message": "No pending bets"}
+        return {
+            "ok": True,
+            "date": date,
+            "sport": sport,
+            "resolved": 0,
+            "message": "No pending bets",
+        }
 
     # ── Football resolution ───────────────────────────────────────
     if sport == "football":
@@ -894,13 +1004,13 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
 
         # Build a map by team names too (for label matching)
         fx_by_teams = {}
-        for f in (fx_resp.data or []):
+        for f in fx_resp.data or []:
             key = f"{f['home_team']} vs {f['away_team']}"
             fx_by_teams[key] = f
 
         for bet in bets:
             try:
-                label = bet["bet_label"]   # e.g. "PSG vs Lyon — Victoire domicile"
+                label = bet["bet_label"]  # e.g. "PSG vs Lyon — Victoire domicile"
                 market = bet["market"]
                 fixture_id = bet.get("fixture_id")
 
@@ -951,24 +1061,30 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
                 # Update best_bets
                 (
                     supabase.table("best_bets")
-                    .update({
-                        "result": result_val,
-                        "notes": f"Auto-résolu: {h}-{a} ({fx['status']})",
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    })
+                    .update(
+                        {
+                            "result": result_val,
+                            "notes": f"Auto-résolu: {h}-{a} ({fx['status']})",
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
                     .eq("id", bet["id"])
                     .execute()
                 )
-                resolved.append({
-                    "id": bet["id"],
-                    "label": label,
-                    "result": result_val,
-                    "score": f"{h}-{a}",
-                })
+                resolved.append(
+                    {
+                        "id": bet["id"],
+                        "label": label,
+                        "result": result_val,
+                        "score": f"{h}-{a}",
+                    }
+                )
                 bets_resolved.labels(result=result_val.lower()).inc()
 
             except Exception as e:
-                logger.warning("resolve_best_bets football: bet_id=%s failed", bet.get("id"), exc_info=True)
+                logger.warning(
+                    "resolve_best_bets football: bet_id=%s failed", bet.get("id"), exc_info=True
+                )
                 errors.append({"bet_id": bet.get("id"), "error": str(e)})
 
     # ── NHL resolution ────────────────────────────────────────────
@@ -1038,10 +1154,12 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
                     player_team = bet.get("team", "")
                     fx = fx_by_team.get(player_team) if player_team else None
                     if fx and fx.get("home_score") is not None:
-                        errors.append({
-                            "bet_id": bet.get("id"),
-                            "error": f"Stats missing for {player_name} on {date} — will retry",
-                        })
+                        errors.append(
+                            {
+                                "bet_id": bet.get("id"),
+                                "error": f"Stats missing for {player_name} on {date} — will retry",
+                            }
+                        )
                     continue
 
                 p_stats = stats_resp.data[0]
@@ -1072,26 +1190,32 @@ def resolve_best_bets(body: Annotated[ResolveBetsRequest, Body()], request: Requ
 
                 (
                     supabase.table("best_bets")
-                    .update({
-                        "result": result_val,
-                        "notes": note,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    })
+                    .update(
+                        {
+                            "result": result_val,
+                            "notes": note,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
                     .eq("id", bet["id"])
                     .execute()
                 )
-                resolved.append({
-                    "id": bet["id"],
-                    "label": label,
-                    "player": player_name,
-                    "result": result_val,
-                    "goals": actual_goals,
-                    "points": actual_points,
-                })
+                resolved.append(
+                    {
+                        "id": bet["id"],
+                        "label": label,
+                        "player": player_name,
+                        "result": result_val,
+                        "goals": actual_goals,
+                        "points": actual_points,
+                    }
+                )
                 bets_resolved.labels(result=result_val.lower()).inc()
 
             except Exception as e:
-                logger.warning("resolve_best_bets nhl: bet_id=%s failed", bet.get("id"), exc_info=True)
+                logger.warning(
+                    "resolve_best_bets nhl: bet_id=%s failed", bet.get("id"), exc_info=True
+                )
                 errors.append({"bet_id": bet.get("id"), "error": str(e)})
 
     return {
@@ -1128,24 +1252,6 @@ def get_best_bets_stats(request: Request):
         # Expert market breakdown (normalized)
         expert_market_breakdown = build_market_breakdown(expert_rows)
 
-        # Expert streak (last 10)
-        expert_resolved = [b for b in expert_rows if b["result"] in ("WIN", "LOSS")]
-        expert_resolved.sort(key=lambda b: b.get("date", ""), reverse=True)
-        expert_last_10 = [b["result"] for b in expert_resolved[:10]]
-
-        # Expert best pick
-        expert_wins = [b for b in expert_resolved if b["result"] == "WIN"]
-        expert_best_pick = None
-        if expert_wins:
-            best = max(expert_wins, key=lambda b: float(b.get("odds") or 0))
-            expert_best_pick = {
-                "label": best.get("market", ""),
-                "odds": float(best.get("odds") or 0),
-                "date": best.get("date", ""),
-                "market": best.get("market", ""),
-                "sport": best.get("sport", ""),
-            }
-
         # Expert cumulative P&L
         expert_pl = {}
         for b in expert_rows:
@@ -1155,7 +1261,7 @@ def get_best_bets_stats(request: Request):
             if d not in expert_pl:
                 expert_pl[d] = 0
             if b["result"] == "WIN":
-                expert_pl[d] += (float(b.get("odds") or 1.85) - 1)
+                expert_pl[d] += float(b.get("odds") or 1.85) - 1
             else:
                 expert_pl[d] -= 1
         expert_cumulative = []
@@ -1230,7 +1336,7 @@ def get_best_bets_stats(request: Request):
             if d not in combined_pl:
                 combined_pl[d] = 0
             if b["result"] == "WIN":
-                combined_pl[d] += (float(b.get("odds") or 1.85) - 1)
+                combined_pl[d] += float(b.get("odds") or 1.85) - 1
             else:
                 combined_pl[d] -= 1
         combined_cumulative = []
@@ -1334,27 +1440,35 @@ def get_best_bets_history(
             else:
                 grouped_bb.append(b)
 
-        for (d, m), legs in fun_groups.items():
+        for legs in fun_groups.values():
             # VOID legs are ignored in combo resolution — only WIN/LOSS/unknown matter
             non_void_legs = [l for l in legs if l.get("result") != "VOID"]
             has_loss = any(l.get("result") == "LOSS" for l in non_void_legs)
-            all_non_void_win = bool(non_void_legs) and all(l.get("result") == "WIN" for l in non_void_legs)
+            all_non_void_win = bool(non_void_legs) and all(
+                l.get("result") == "WIN" for l in non_void_legs
+            )
             is_void = len(non_void_legs) == 0  # All legs VOID
 
             res = "PENDING"
-            if has_loss: res = "LOSS"
-            elif is_void: res = "VOID"
-            elif all_non_void_win: res = "WIN"
+            if has_loss:
+                res = "LOSS"
+            elif is_void:
+                res = "VOID"
+            elif all_non_void_win:
+                res = "WIN"
 
             tot_odds = 1.0
             labels = []
             for l in legs:
                 o = l.get("odds")
-                if o: tot_odds *= float(o)
+                if o:
+                    tot_odds *= float(o)
                 lb = l.get("bet_label") or l.get("player_name") or ""
-                if lb: labels.append(lb)
+                if lb:
+                    labels.append(lb)
 
-            if tot_odds == 1.0: tot_odds = 20.0
+            if tot_odds == 1.0:
+                tot_odds = 20.0
 
             combo = legs[0].copy()
             combo["result"] = res
@@ -1367,7 +1481,9 @@ def get_best_bets_history(
         # ── 2. Fetch from expert_picks (Telegram expert bets) ────
         ep_query = (
             supabase.table("expert_picks")
-            .select("id, date, sport, market, match_label, odds, confidence, result, player_name, expert_note, notes")
+            .select(
+                "id, date, sport, market, match_label, odds, confidence, result, player_name, expert_note, notes"
+            )
             .gte("date", cutoff)
             .order("date", desc=True)
         )
@@ -1407,7 +1523,7 @@ def get_best_bets_history(
                 odds_val = float(odds_val)
 
             if r["result"] == "WIN":
-                total_pl += (odds_val - 1)
+                total_pl += odds_val - 1
             else:
                 total_pl -= 1
 
@@ -1421,7 +1537,7 @@ def get_best_bets_history(
                 "total_pl": round(total_pl, 2),
                 "win_rate": round(wins / len(resolved) * 100) if len(resolved) > 0 else 0,
                 "odds_estimated": odds_estimated,
-            }
+            },
         }
     except Exception:
         logger.exception("get_best_bets_history failed")

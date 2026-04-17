@@ -19,11 +19,12 @@ import pandas as pd
 
 try:
     import optuna
-    from sklearn.metrics import accuracy_score, brier_score_loss, log_loss, roc_auc_score
+    from sklearn.metrics import accuracy_score, brier_score_loss, roc_auc_score
     from sklearn.model_selection import TimeSeriesSplit
     from xgboost import XGBClassifier
 except ImportError:
     import logging as _logging
+
     _logging.getLogger(__name__).error("Install: pip install xgboost scikit-learn pandas optuna")
     sys.exit(1)
 
@@ -34,11 +35,11 @@ from src.config import logger, supabase
 # ═══════════════════════════════════════════════════════════════
 
 MATCH_FEATURES = [
-    "proba_home",          # Proba heuristique Poisson: home win %
-    "proba_away",          # Proba heuristique Poisson: away win %
-    "proba_over_55",       # Proba heuristique Poisson: Over 5.5 %
-    "ai_home_factor",      # Facteur IA Gemini pour home
-    "ai_away_factor",      # Facteur IA Gemini pour away
+    "proba_home",  # Proba heuristique Poisson: home win %
+    "proba_away",  # Proba heuristique Poisson: away win %
+    "proba_over_55",  # Proba heuristique Poisson: Over 5.5 %
+    "ai_home_factor",  # Facteur IA Gemini pour home
+    "ai_away_factor",  # Facteur IA Gemini pour away
 ]
 
 MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "models" / "nhl"
@@ -50,9 +51,11 @@ def build_match_dataset() -> pd.DataFrame:
 
     res = (
         supabase.table("nhl_fixtures")
-        .select("id, date, home_team, away_team, home_score, away_score, "
-                "proba_home, proba_away, proba_over_55, "
-                "predictions_json, ai_home_factor, ai_away_factor, status")
+        .select(
+            "id, date, home_team, away_team, home_score, away_score, "
+            "proba_home, proba_away, proba_over_55, "
+            "predictions_json, ai_home_factor, ai_away_factor, status"
+        )
         .in_("status", ["Final", "FINAL", "FT", "OFF"])
         .order("date")
         .execute()
@@ -101,30 +104,36 @@ def build_match_dataset() -> pd.DataFrame:
         total_goals = int(home_score) + int(away_score)
         home_win = 1 if int(home_score) > int(away_score) else 0
 
-        rows.append({
-            "date": fix.get("date", ""),
-            "home_team": fix.get("home_team", ""),
-            "away_team": fix.get("away_team", ""),
-            # Features
-            "proba_home": float(proba_home),
-            "proba_away": float(proba_away),
-            "proba_over_55": float(proba_over_55 or 50),
-            "ai_home_factor": float(ai_home or 1.0),
-            "ai_away_factor": float(ai_away or 1.0),
-            # Labels
-            "label_home_win": home_win,
-            "label_over_55": 1 if total_goals > 5 else 0,
-            # Metadata
-            "total_goals": total_goals,
-        })
+        rows.append(
+            {
+                "date": fix.get("date", ""),
+                "home_team": fix.get("home_team", ""),
+                "away_team": fix.get("away_team", ""),
+                # Features
+                "proba_home": float(proba_home),
+                "proba_away": float(proba_away),
+                "proba_over_55": float(proba_over_55 or 50),
+                "ai_home_factor": float(ai_home or 1.0),
+                "ai_away_factor": float(ai_away or 1.0),
+                # Labels
+                "label_home_win": home_win,
+                "label_over_55": 1 if total_goals > 5 else 0,
+                # Metadata
+                "total_goals": total_goals,
+            }
+        )
 
     df = pd.DataFrame(rows)
     logger.info(f"  ✅ Dataset: {len(df)} échantillons")
     if not df.empty:
-        logger.info(f"     Home wins: {df['label_home_win'].sum()}/{len(df)} "
-                     f"({df['label_home_win'].mean():.1%})")
-        logger.info(f"     Over 5.5: {df['label_over_55'].sum()}/{len(df)} "
-                     f"({df['label_over_55'].mean():.1%})")
+        logger.info(
+            f"     Home wins: {df['label_home_win'].sum()}/{len(df)} "
+            f"({df['label_home_win'].mean():.1%})"
+        )
+        logger.info(
+            f"     Over 5.5: {df['label_over_55'].sum()}/{len(df)} "
+            f"({df['label_over_55'].mean():.1%})"
+        )
     return df
 
 
@@ -168,7 +177,7 @@ def train_model(df: pd.DataFrame, target: str, model_name: str) -> dict | None:
             "scale_pos_weight": scale_pos_weight,
             "eval_metric": "logloss",
             "random_state": 42,
-            "n_jobs": -1
+            "n_jobs": -1,
         }
 
         scores = []
@@ -196,8 +205,9 @@ def train_model(df: pd.DataFrame, target: str, model_name: str) -> dict | None:
     logger.info(f"✅ Meilleurs paramètres: {best_params}")
 
     # FIXED: Honest evaluation on held-out last fold (model trained on train only)
-    for fold, (train_idx, test_idx) in enumerate(tscv.split(X)):
-        pass
+    splits = list(tscv.split(X))
+    fold = len(splits) - 1
+    train_idx, test_idx = splits[-1]
 
     X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
     y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
@@ -213,8 +223,10 @@ def train_model(df: pd.DataFrame, target: str, model_name: str) -> dict | None:
     except Exception:
         auc = 0.5
 
-    logger.info(f"  Honest Test (fold {fold}, {len(y_test)} samples): "
-                f"Brier={brier:.4f} Acc={acc:.1%} AUC={auc:.3f}")
+    logger.info(
+        f"  Honest Test (fold {fold}, {len(y_test)} samples): "
+        f"Brier={brier:.4f} Acc={acc:.1%} AUC={auc:.3f}"
+    )
 
     # Retrain on ALL data for production deployment
     final_model = XGBClassifier(**best_params)
@@ -233,7 +245,7 @@ def train_model(df: pd.DataFrame, target: str, model_name: str) -> dict | None:
             "n_samples": len(df),
         },
         "training_date": datetime.now(timezone.utc).isoformat(),
-        "serialization": "ubj"
+        "serialization": "ubj",
     }
 
     # Save metadata as pickle
@@ -281,7 +293,9 @@ def train_nhl_match_models() -> dict:
     logger.info("\n" + "=" * 50)
     logger.info("🎯 Récapitulatif NHL ML:")
     for name, m in results.items():
-        logger.info(f"  {name}: Acc={m['accuracy']:.1%} | Brier={m['brier_score']:.4f} | AUC={m['roc_auc']:.3f}")
+        logger.info(
+            f"  {name}: Acc={m['accuracy']:.1%} | Brier={m['brier_score']:.4f} | AUC={m['roc_auc']:.3f}"
+        )
 
     return {
         "success": True,

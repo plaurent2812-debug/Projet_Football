@@ -43,6 +43,7 @@ from src.constants import FEATURE_COLS
 def _safe_loads(data: bytes) -> Any:
     """Deserialize bytes using RestrictedUnpickler from ml_predictor."""
     from src.models.ml_predictor import RestrictedUnpickler
+
     return RestrictedUnpickler(io.BytesIO(data)).load()
 
 
@@ -111,6 +112,7 @@ def train_stacking_ensemble(
 
     # Fit imputer on train split ONLY to prevent data leakage
     from sklearn.impute import SimpleImputer
+
     fold_imputer = SimpleImputer(strategy="median")
     X_train = fold_imputer.fit_transform(X_train)
     X_test = fold_imputer.transform(X_test)
@@ -124,6 +126,7 @@ def train_stacking_ensemble(
     # Entraîner les base learners sur tout le train set
     # Class balancing: compute sample weights to correct H/D/A imbalance (~40/25/35)
     from sklearn.utils.class_weight import compute_sample_weight
+
     sample_weight_train = compute_sample_weight(class_weight="balanced", y=y_train)
 
     # Split a validation set from train for XGBoost early stopping
@@ -141,8 +144,7 @@ def train_stacking_ensemble(
             model.fit(X_scaled, y_train, sample_weight=sample_weight_train)
             fitted_base[name] = {"model": model, "scaler": scaler}
         elif name == "xgboost":
-            model.fit(X_tr, y_tr, sample_weight=sw_tr,
-                      eval_set=[(X_val, y_val)], verbose=False)
+            model.fit(X_tr, y_tr, sample_weight=sw_tr, eval_set=[(X_val, y_val)], verbose=False)
             fitted_base[name] = {"model": model}
         else:
             model.fit(X_train, y_train, sample_weight=sample_weight_train)
@@ -181,10 +183,7 @@ def train_stacking_ensemble(
     # Comparer avec chaque base learner individuel
     for name, item in fitted_base.items():
         model = item["model"]
-        if name == "logreg":
-            X_eval = item["scaler"].transform(X_test)
-        else:
-            X_eval = X_test
+        X_eval = item["scaler"].transform(X_test) if name == "logreg" else X_test
         y_pred_base = model.predict(X_eval)
         base_acc = accuracy_score(y_test, y_pred_base)
         logger.info(f"    vs {name:10s} seul : {base_acc:.4f}")
@@ -193,9 +192,11 @@ def train_stacking_ensemble(
     serialized_base: dict[str, Any] = {}
     for bname, bitem in fitted_base.items():
         if bname == "xgboost":
-                serialized_base[bname] = {
+            serialized_base[bname] = {
                 **{k: v for k, v in bitem.items() if k != "model"},
-                "xgb_model_bytes": base64.b64encode(bitem["model"].get_booster().save_raw("ubj")).decode("utf-8"),
+                "xgb_model_bytes": base64.b64encode(
+                    bitem["model"].get_booster().save_raw("ubj")
+                ).decode("utf-8"),
                 "xgb_model_format": "ubj",
             }
         else:
@@ -514,7 +515,9 @@ def predict_ensemble(
         if n_classes == 3:
             # LabelEncoder required — sklearn sorts alphabetically ['A','D','H'],
             # so probas order is [p_away, p_draw, p_home]. Without le, we can't guarantee order.
-            logger.error("No LabelEncoder found — cannot map probabilities safely. Falling back to alphabetical order.")
+            logger.error(
+                "No LabelEncoder found — cannot map probabilities safely. Falling back to alphabetical order."
+            )
             proba_map = {"A": final_probas[0], "D": final_probas[1], "H": final_probas[2]}
         else:
             proba_map = {1: final_probas[1]}

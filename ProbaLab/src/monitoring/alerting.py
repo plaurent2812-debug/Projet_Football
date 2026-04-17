@@ -11,6 +11,7 @@ Usage:
     from src.monitoring.alerting import check_and_alert
     check_and_alert(supabase, send_telegram_fn=send_telegram)
 """
+
 from __future__ import annotations
 
 import html as _html
@@ -78,9 +79,7 @@ def _check_brier_drift(supabase) -> str | None:
             detect_drift,
         )
 
-        results = (
-            supabase.table("prediction_results").select("*").execute().data or []
-        )
+        results = supabase.table("prediction_results").select("*").execute().data or []
         if len(results) < 40:
             # Not enough data for meaningful drift detection
             return None
@@ -113,9 +112,7 @@ def _check_data_completeness(supabase) -> str | None:
     """Alert if fewer than 80% of yesterday's fixtures have predictions."""
     try:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
-            "%Y-%m-%d"
-        )
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
         # Count predictions created yesterday
         preds = (
@@ -135,9 +132,7 @@ def _check_data_completeness(supabase) -> str | None:
             .lt("date", today)
             .execute()
         )
-        fix_count = (
-            fixtures.count if fixtures.count is not None else len(fixtures.data or [])
-        )
+        fix_count = fixtures.count if fixtures.count is not None else len(fixtures.data or [])
 
         if fix_count > 0 and pred_count < fix_count * 0.8:
             pct = round(pred_count / fix_count * 100)
@@ -165,10 +160,7 @@ def _check_prediction_volume(supabase) -> str | None:
         count = result.count if result.count is not None else len(result.data or [])
 
         if count == 0:
-            return (
-                "\U0001f6a8 <b>Volume pr\u00e9dictions</b>: "
-                "AUCUNE pr\u00e9diction aujourd'hui!"
-            )
+            return "\U0001f6a8 <b>Volume pr\u00e9dictions</b>: AUCUNE pr\u00e9diction aujourd'hui!"
         return None
     except Exception as e:
         logger.error("Prediction volume check failed: %s", e)

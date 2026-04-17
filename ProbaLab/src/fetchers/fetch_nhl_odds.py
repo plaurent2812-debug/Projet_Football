@@ -10,6 +10,7 @@ dashboard/src/pages/NHL/NHLMatchDetail.tsx:192-204 qui calcule les EV.
 
 Coût mensuel typique : 2 runs/jour × 1 req bulk = ~60/500 req/mois.
 """
+
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -65,12 +66,15 @@ def _fetch_bulk_odds(api_key: str) -> list[dict]:
     if resp.status_code != 200:
         logger.error(
             "[NHL Odds] The Odds API HTTP %d (remaining=%s): %s",
-            resp.status_code, remaining, resp.text[:200],
+            resp.status_code,
+            remaining,
+            resp.text[:200],
         )
         return []
     logger.info(
         "[NHL Odds] The Odds API quota remaining: %s (used=%s)",
-        remaining, resp.headers.get("x-requests-used", "?"),
+        remaining,
+        resp.headers.get("x-requests-used", "?"),
     )
     return resp.json() or []
 
@@ -137,11 +141,13 @@ def _build_odds_json(event: dict, home_team: str, away_team: str, fetched_at: st
                     bets.append({"id": 10, "name": f"Over/Under {pt}", "values": lines[pt]})
 
         if bets:
-            bookmakers.append({
-                "key": bm.get("key"),
-                "title": bm.get("title"),
-                "bets": bets,
-            })
+            bookmakers.append(
+                {
+                    "key": bm.get("key"),
+                    "title": bm.get("title"),
+                    "bets": bets,
+                }
+            )
 
     return {
         "bookmakers": bookmakers,
@@ -181,12 +187,15 @@ def fetch_nhl_odds() -> dict:
 
     if not fixtures:
         logger.info(
-            "[NHL Odds] Aucun match NS dans les %dh à venir.", UPCOMING_WINDOW_HOURS,
+            "[NHL Odds] Aucun match NS dans les %dh à venir.",
+            UPCOMING_WINDOW_HOURS,
         )
         return {"status": "ok", "updated": 0, "skipped": 0, "errors": 0}
 
     logger.info(
-        "[NHL Odds] %d matchs NS trouvés (fenêtre %dh)", len(fixtures), UPCOMING_WINDOW_HOURS,
+        "[NHL Odds] %d matchs NS trouvés (fenêtre %dh)",
+        len(fixtures),
+        UPCOMING_WINDOW_HOURS,
     )
 
     # 2. Bulk fetch (1 requête pour tous les events)
@@ -212,7 +221,8 @@ def fetch_nhl_odds() -> dict:
         if not ev:
             logger.warning(
                 "[NHL Odds] Pas d'event matché pour %s vs %s",
-                fix["home_team"], fix["away_team"],
+                fix["home_team"],
+                fix["away_team"],
             )
             skipped += 1
             continue
@@ -222,7 +232,8 @@ def fetch_nhl_odds() -> dict:
             if not odds_json["bookmakers"]:
                 logger.warning(
                     "[NHL Odds] Event matché mais 0 bookmaker exploitable pour %s vs %s",
-                    fix["home_team"], fix["away_team"],
+                    fix["home_team"],
+                    fix["away_team"],
                 )
                 skipped += 1
                 continue
@@ -233,18 +244,24 @@ def fetch_nhl_odds() -> dict:
             updated += 1
             logger.info(
                 "[NHL Odds] ✅ %s vs %s (%d bookmakers)",
-                fix["home_team"], fix["away_team"], len(odds_json["bookmakers"]),
+                fix["home_team"],
+                fix["away_team"],
+                len(odds_json["bookmakers"]),
             )
         except Exception as e:
             logger.error(
                 "[NHL Odds] Échec update %s vs %s: %s",
-                fix["home_team"], fix["away_team"], e,
+                fix["home_team"],
+                fix["away_team"],
+                e,
             )
             errors += 1
 
     logger.info(
         "[NHL Odds] Fin: %d mis à jour, %d skipped, %d erreurs",
-        updated, skipped, errors,
+        updated,
+        skipped,
+        errors,
     )
     return {"status": "ok", "updated": updated, "skipped": skipped, "errors": errors}
 

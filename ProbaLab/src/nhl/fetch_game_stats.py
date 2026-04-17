@@ -40,7 +40,9 @@ def fetch_boxscore(game_id: int) -> dict:
     return {}
 
 
-def parse_players_from_boxscore(boxscore: dict, home_team_abbrev: str, away_team_abbrev: str) -> list[dict]:
+def parse_players_from_boxscore(
+    boxscore: dict, home_team_abbrev: str, away_team_abbrev: str
+) -> list[dict]:
     """Extract per-player goals/assists/points/shots from a boxscore."""
     results = []
     mappings = [("homeTeam", home_team_abbrev), ("awayTeam", away_team_abbrev)]
@@ -53,16 +55,18 @@ def parse_players_from_boxscore(boxscore: dict, home_team_abbrev: str, away_team
                 name = skater.get("name", {}).get("default", "")
                 if not pid or not name:
                     continue
-                results.append({
-                    "player_id": pid,
-                    "player_name": name,
-                    "team": team_abbrev,
-                    "goals": int(skater.get("goals") or 0),
-                    "assists": int(skater.get("assists") or 0),
-                    "points": int(skater.get("points") or 0),
-                    "shots": int(skater.get("sog") or skater.get("shots") or 0),
-                    "toi": skater.get("toi", ""),
-                })
+                results.append(
+                    {
+                        "player_id": pid,
+                        "player_name": name,
+                        "team": team_abbrev,
+                        "goals": int(skater.get("goals") or 0),
+                        "assists": int(skater.get("assists") or 0),
+                        "points": int(skater.get("points") or 0),
+                        "shots": int(skater.get("sog") or skater.get("shots") or 0),
+                        "toi": skater.get("toi", ""),
+                    }
+                )
     return results
 
 
@@ -98,7 +102,9 @@ def fetch_and_store_game_stats(date: str) -> dict:
         home_abbrev = NHL_NAME_TO_ABBREV.get(fx["home_team"], fx["home_team"][:3].upper())
         away_abbrev = NHL_NAME_TO_ABBREV.get(fx["away_team"], fx["away_team"][:3].upper())
 
-        logger.info(f"  Fetching boxscore for game {game_id} ({fx['home_team']} vs {fx['away_team']})")
+        logger.info(
+            f"  Fetching boxscore for game {game_id} ({fx['home_team']} vs {fx['away_team']})"
+        )
         boxscore = fetch_boxscore(game_id)
 
         if not boxscore or "playerByGameStats" not in boxscore:
@@ -146,8 +152,11 @@ def fetch_and_store_game_stats(date: str) -> dict:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch NHL player game stats")
-    parser.add_argument("--date", default=(datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                        help="Game date YYYY-MM-DD (default: yesterday)")
+    parser.add_argument(
+        "--date",
+        default=(datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+        help="Game date YYYY-MM-DD (default: yesterday)",
+    )
     args = parser.parse_args()
     result = fetch_and_store_game_stats(args.date)
     logger.info("Result: %s", result)

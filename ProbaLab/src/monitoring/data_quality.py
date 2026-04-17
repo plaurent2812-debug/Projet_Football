@@ -10,6 +10,7 @@ Checks:
 Usage:
     python -m src.monitoring.data_quality
 """
+
 from __future__ import annotations
 
 import logging
@@ -73,7 +74,8 @@ def _check_odds_coverage() -> dict[str, Any]:
             .order("created_at", desc=True)
             .limit(200)
             .execute()
-            .data or []
+            .data
+            or []
         )
         if not preds:
             return {"status": "NO_DATA", "n_predictions": 0, "n_with_odds": 0}
@@ -91,12 +93,18 @@ def _check_odds_coverage() -> dict[str, Any]:
                 .in_("id", chunk)
                 .not_.is_("api_fixture_id", "null")
                 .execute()
-                .data or []
+                .data
+                or []
             )
             api_ids.extend(r["api_fixture_id"] for r in rows if r.get("api_fixture_id"))
 
         if not api_ids:
-            return {"status": "CRITICAL", "n_predictions": len(preds), "n_with_odds": 0, "coverage_pct": 0}
+            return {
+                "status": "CRITICAL",
+                "n_predictions": len(preds),
+                "n_with_odds": 0,
+                "coverage_pct": 0,
+            }
 
         # Check how many have odds
         n_with_odds = 0
@@ -154,7 +162,6 @@ def _check_events_completeness() -> dict[str, Any]:
             n_with_events += events.count or 0
 
         # Events count is per-event not per-fixture, so approximate
-        coverage = round(min(n_with_events / max(n_finished, 1), 1.0) * 100, 1)
         return {
             "status": "OK" if n_with_events > 0 else "WARNING",
             "n_finished": n_finished,
@@ -186,11 +193,7 @@ def _check_null_probabilities() -> dict[str, Any]:
         )
         n_null_draw = nulls_draw.count or 0
 
-        total = (
-            supabase.table("predictions")
-            .select("id", count="exact")
-            .execute()
-        )
+        total = supabase.table("predictions").select("id", count="exact").execute()
         n_total = total.count or 0
 
         n_null = max(n_null_home, n_null_draw)
@@ -268,9 +271,13 @@ def run() -> dict[str, Any]:
     for check in report["checks"]:
         name = check["name"]
         status = check["status"]
-        icon = {"OK": "OK", "WARNING": "WARN", "CRITICAL": "CRIT", "ERROR": "ERR", "NO_DATA": "N/A"}.get(
-            status, "?"
-        )
+        icon = {
+            "OK": "OK",
+            "WARNING": "WARN",
+            "CRITICAL": "CRIT",
+            "ERROR": "ERR",
+            "NO_DATA": "N/A",
+        }.get(status, "?")
         logger.info(f"  [{icon:4s}] {name}")
         for k, v in check.items():
             if k not in ("name", "status"):

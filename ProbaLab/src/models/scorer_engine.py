@@ -814,9 +814,7 @@ def _rank_scorers(
             syn_count = syn_data[0] if syn_data else 0
             syn_assister_id = syn_data[2] if syn_data else None
 
-            synergy_broken = False
             if syn_assister_id and syn_assister_id in injured_ids:
-                synergy_broken = True
                 score *= 0.65  # Heavy penalty for missing key playmaker
             else:
                 score += min(syn_count * 0.5, 2) * W_SYNERGY
@@ -830,15 +828,6 @@ def _rank_scorers(
                 score += W_STARTER * 2
             elif matches_played == 0:
                 score *= 0.5
-
-            # xG Regression / Puck Luck equivalent
-            # Comparison between conversion rate and expected baseline
-            xg_regression = 1.0
-            if rate["total_shots_on"] >= 5:
-                # Cap the minimum conversion rate to avoid infinite regression
-                clamped_conversion = max(rate["conversion_rate"], 0.05)
-                # > 1.05 = Due for goals, < 0.95 = Overperforming (Sur-régime)
-                xg_regression = round(EXPECTED_CONVERSION_RATE / clamped_conversion, 2)
 
             # ── Facteurs contextuels ──
             score *= defense_factor

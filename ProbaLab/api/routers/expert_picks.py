@@ -8,13 +8,16 @@ submitted via the Telegram bot.
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Header, HTTPException, Query, Request
 
 from api.auth import verify_cron_auth, verify_internal_auth
-from api.response_models import ExpertPicksResponse, LatestExpertPickResponse, ResolveExpertPicksResponse
+from api.response_models import (
+    ExpertPicksResponse,
+    LatestExpertPickResponse,
+    ResolveExpertPicksResponse,
+)
 from api.schemas import ResolveExpertPicksRequest
 from src.config import supabase
 from src.nhl.constants import NHL_FINISHED_STATUSES
@@ -44,7 +47,9 @@ def get_expert_picks(
     try:
         query = (
             supabase.table("expert_picks")
-            .select("id, date, sport, player_name, market, match_label, odds, confidence, expert_note, result, created_at")
+            .select(
+                "id, date, sport, player_name, market, match_label, odds, confidence, expert_note, result, created_at"
+            )
             .eq("date", date)
             .order("created_at", desc=False)
         )
@@ -100,13 +105,15 @@ def get_expert_picks(
                 # Detect if MyMatch (2+ bets from same match)
                 is_mymatch = sel.get("is_mymatch", False)
 
-                enriched_selections.append({
-                    "match": match_raw,
-                    "market": market_type,
-                    "player_name": player_name,
-                    "bet_raw": bet_raw,
-                    "is_mymatch": is_mymatch,
-                })
+                enriched_selections.append(
+                    {
+                        "match": match_raw,
+                        "market": market_type,
+                        "player_name": player_name,
+                        "bet_raw": bet_raw,
+                        "is_mymatch": is_mymatch,
+                    }
+                )
 
             pick["selections"] = enriched_selections
             pick["is_combine"] = len(enriched_selections) > 1
@@ -176,7 +183,9 @@ def backfill_expert_picks(body: dict, request: Request, authorization: str = Hea
     return {"inserted": len(inserted), "errors": errors, "ids": inserted}
 
 
-@router.get("/latest", summary="Get the most recent expert pick", response_model=LatestExpertPickResponse)
+@router.get(
+    "/latest", summary="Get the most recent expert pick", response_model=LatestExpertPickResponse
+)
 def get_latest_expert_pick():
     """Return the most recent expert pick — used by frontend polling for notifications."""
     try:
@@ -195,7 +204,11 @@ def get_latest_expert_pick():
 
 
 @router.post("/resolve", response_model=ResolveExpertPicksResponse)
-def resolve_expert_picks(body: Annotated[ResolveExpertPicksRequest, Body()], request: Request, authorization: str = Header(None)):
+def resolve_expert_picks(
+    body: Annotated[ResolveExpertPicksRequest, Body()],
+    request: Request,
+    authorization: str = Header(None),
+):
     """
     Auto-resolve PENDING expert picks by matching to finished fixtures
     and using Gemini to evaluate WIN/LOSS from free-text bet descriptions.
@@ -212,12 +225,7 @@ def resolve_expert_picks(body: Annotated[ResolveExpertPicksRequest, Body()], req
     errors = []
 
     # ── 1. Load pending expert picks ──────────────────────────────
-    query = (
-        supabase.table("expert_picks")
-        .select("*")
-        .eq("date", date)
-        .eq("result", "PENDING")
-    )
+    query = supabase.table("expert_picks").select("*").eq("date", date).eq("result", "PENDING")
     if sport:
         query = query.eq("sport", sport)
     pending = query.execute()
@@ -240,7 +248,7 @@ def resolve_expert_picks(body: Annotated[ResolveExpertPicksRequest, Body()], req
             .in_("status", ["FT", "AET", "PEN"])
             .execute()
         )
-        for f in (fx_resp.data or []):
+        for f in fx_resp.data or []:
             f["_sport"] = "football"
         finished_fixtures.extend(fx_resp.data or [])
 
@@ -253,7 +261,7 @@ def resolve_expert_picks(body: Annotated[ResolveExpertPicksRequest, Body()], req
             .in_("status", list(NHL_FINISHED_STATUSES))
             .execute()
         )
-        for f in (nhl_resp.data or []):
+        for f in nhl_resp.data or []:
             f["_sport"] = "nhl"
         finished_fixtures.extend(nhl_resp.data or [])
 
@@ -263,14 +271,16 @@ def resolve_expert_picks(body: Annotated[ResolveExpertPicksRequest, Body()], req
     # Build lookup by team names (lowercased for fuzzy matching)
     fx_list_for_search = []
     for f in finished_fixtures:
-        fx_list_for_search.append({
-            "home": f["home_team"],
-            "away": f["away_team"],
-            "home_goals": f.get("home_goals") or 0,
-            "away_goals": f.get("away_goals") or 0,
-            "status": f["status"],
-            "_sport": f.get("_sport", "football"),
-        })
+        fx_list_for_search.append(
+            {
+                "home": f["home_team"],
+                "away": f["away_team"],
+                "home_goals": f.get("home_goals") or 0,
+                "away_goals": f.get("away_goals") or 0,
+                "status": f["status"],
+                "_sport": f.get("_sport", "football"),
+            }
+        )
 
     # ── 3. Setup Gemini for evaluation ────────────────────────────
     import json as _json
@@ -283,7 +293,14 @@ def resolve_expert_picks(body: Annotated[ResolveExpertPicksRequest, Body()], req
         return {"ok": False, "error": "GEMINI_API_KEY missing"}
     gemini_client = genai.Client(api_key=api_key)
 
-    def _evaluate_bet(bet_description: str, match_label: str, score_home: int, score_away: int, home_team: str, away_team: str) -> str | None:
+    def _evaluate_bet(
+        bet_description: str,
+        match_label: str,
+        score_home: int,
+        score_away: int,
+        home_team: str,
+        away_team: str,
+    ) -> str | None:
         """Use Gemini to evaluate if a bet is WIN or LOSS given the final score."""
         prompt = f"""Tu es un expert en paris sportifs. Un pari a été placé et le match est terminé.
 Détermine si le pari est GAGNÉ (WIN) ou PERDU (LOSS).
@@ -378,7 +395,6 @@ Réponds UNIQUEMENT par un JSON: {{"result": "WIN"}} ou {{"result": "LOSS"}}
                 is_loss = False
                 has_unknown = False
                 all_void = True
-                non_void_all_win = True
                 details = []
                 for sel in selections:
                     sel_bet = sel.get("bet", "")
@@ -391,22 +407,30 @@ Réponds UNIQUEMENT par un JSON: {{"result": "WIN"}} ou {{"result": "LOSS"}}
                         continue
 
                     result = _evaluate_bet(
-                        sel_bet, sel_match,
-                        fx["home_goals"], fx["away_goals"],
-                        fx["home"], fx["away"]
+                        sel_bet,
+                        sel_match,
+                        fx["home_goals"],
+                        fx["away_goals"],
+                        fx["home"],
+                        fx["away"],
                     )
                     _time.sleep(0.5)  # Rate limit
 
                     if result == "VOID":
-                        details.append(f"🔄 {sel_bet} ({fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']}): VOID")
+                        details.append(
+                            f"🔄 {sel_bet} ({fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']}): VOID"
+                        )
                     elif result == "WIN":
                         all_void = False
-                        details.append(f"✅ {sel_bet} ({fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']})")
+                        details.append(
+                            f"✅ {sel_bet} ({fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']})"
+                        )
                     elif result == "LOSS":
                         is_loss = True
                         all_void = False
-                        non_void_all_win = False
-                        details.append(f"❌ {sel_bet} ({fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']})")
+                        details.append(
+                            f"❌ {sel_bet} ({fx['home']} {fx['home_goals']}-{fx['away_goals']} {fx['away']})"
+                        )
                     else:
                         has_unknown = True
                         all_void = False
@@ -415,7 +439,13 @@ Réponds UNIQUEMENT par un JSON: {{"result": "WIN"}} ou {{"result": "LOSS"}}
                 if is_loss:
                     final_result = "LOSS"
                 elif has_unknown:
-                    errors.append({"pick_id": pick["id"], "error": "Incomplete evaluation", "details": details})
+                    errors.append(
+                        {
+                            "pick_id": pick["id"],
+                            "error": "Incomplete evaluation",
+                            "details": details,
+                        }
+                    )
                     continue
                 elif all_void:
                     final_result = "VOID"
@@ -439,9 +469,12 @@ Réponds UNIQUEMENT par un JSON: {{"result": "WIN"}} ou {{"result": "LOSS"}}
                     bet_desc = selections[0]["bet"]
 
                 final_result = _evaluate_bet(
-                    bet_desc, match_label,
-                    fx["home_goals"], fx["away_goals"],
-                    fx["home"], fx["away"]
+                    bet_desc,
+                    match_label,
+                    fx["home_goals"],
+                    fx["away_goals"],
+                    fx["home"],
+                    fx["away"],
                 )
                 _time.sleep(0.5)
                 if not final_result:
@@ -453,20 +486,24 @@ Réponds UNIQUEMENT par un JSON: {{"result": "WIN"}} ou {{"result": "LOSS"}}
             # ── Update in DB ──────────────────────────────────────
             (
                 supabase.table("expert_picks")
-                .update({
-                    "result": final_result,
-                    "notes": note,
-                })
+                .update(
+                    {
+                        "result": final_result,
+                        "notes": note,
+                    }
+                )
                 .eq("id", pick["id"])
                 .execute()
             )
-            resolved.append({
-                "id": pick["id"],
-                "market": market,
-                "match": match_label,
-                "result": final_result,
-                "note": note,
-            })
+            resolved.append(
+                {
+                    "id": pick["id"],
+                    "market": market,
+                    "match": match_label,
+                    "result": final_result,
+                    "note": note,
+                }
+            )
 
         except Exception as e:
             logger.warning("resolve_expert_picks: pick_id=%s failed", pick.get("id"), exc_info=True)

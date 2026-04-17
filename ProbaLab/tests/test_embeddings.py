@@ -12,7 +12,6 @@ from src.embeddings import (
     cosine_similarity,
 )
 
-
 # ═══════════════════════════════════════════════════════════════════
 #  COSINE SIMILARITY
 # ═══════════════════════════════════════════════════════════════════
@@ -232,6 +231,7 @@ class TestGetEmbedding:
 
     def test_get_embedding_returns_correct_dims(self, monkeypatch):
         """Mock Gemini API to verify output shape."""
+
         class MockEmbedding:
             values = [0.1] * 768
 
@@ -247,15 +247,18 @@ class TestGetEmbedding:
             models = MockModels()
 
         import src.embeddings as emb_module
+
         monkeypatch.setattr(emb_module, "_embed_client", MockClient())
 
         from src.embeddings import get_embedding
+
         result = get_embedding("test text")
         assert result is not None
         assert len(result) == 768
 
     def test_get_embedding_returns_none_on_error(self, monkeypatch):
         """Verify graceful None return on API failure."""
+
         class MockModels:
             def embed_content(self, **kwargs):
                 raise RuntimeError("API unavailable")
@@ -264,8 +267,10 @@ class TestGetEmbedding:
             models = MockModels()
 
         import src.embeddings as emb_module
+
         monkeypatch.setattr(emb_module, "_embed_client", MockClient())
 
         from src.embeddings import get_embedding
+
         result = get_embedding("test text")
         assert result is None

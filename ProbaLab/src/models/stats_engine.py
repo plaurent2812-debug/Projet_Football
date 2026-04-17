@@ -59,11 +59,8 @@ from src.constants import (
     PROB_OVER25_CEIL,
     PROB_OVER25_FLOOR,
     STAKES_DRAW_BOOST,
-    WEIGHT_ELO,
     WEIGHT_ELO_NO_MARKET,
-    WEIGHT_MARKET,
     WEIGHT_ML,
-    WEIGHT_POISSON,
     WEIGHT_POISSON_NO_MARKET,
     WEIGHT_STATS_VS_ML,
     XG_CEIL,
@@ -204,7 +201,9 @@ def poisson_grid(
     """
     # Per-league base rho (Dixon-Coles correlation parameter)
     # More negative = stronger correction for low-scoring cells (0-0, 1-1…)
-    base_rho = DIXON_COLES_RHO_BY_LEAGUE.get(league_id, DIXON_COLES_RHO) if league_id else DIXON_COLES_RHO
+    base_rho = (
+        DIXON_COLES_RHO_BY_LEAGUE.get(league_id, DIXON_COLES_RHO) if league_id else DIXON_COLES_RHO
+    )
     xg_total = xg_home + xg_away
     # Smooth rho scaling: linear interpolation between 2.0 and 3.5 xG total
     # (avoids discontinuous jumps at the thresholds)
@@ -239,7 +238,9 @@ def poisson_grid(
     # Iterative correction: each pass applies a capped diagonal scaling,
     # renormalizes, then checks if the target is reached. 3 passes suffice
     # because the cap (±20%) is relaxed enough for convergence.
-    target_draw = DRAW_FACTOR_BY_LEAGUE.get(league_id, DRAW_FACTOR) if league_id is not None else None
+    target_draw = (
+        DRAW_FACTOR_BY_LEAGUE.get(league_id, DRAW_FACTOR) if league_id is not None else None
+    )
     if target_draw is not None:
         for _draw_pass in range(3):
             predicted_draw = float(np.trace(grid))
@@ -363,7 +364,7 @@ def calculate_team_strengths(league_id: int) -> dict | None:
     CHUNK_SIZE = 100
     all_mts = []
     for i in range(0, len(fixture_ids), CHUNK_SIZE):
-        chunk = fixture_ids[i:i + CHUNK_SIZE]
+        chunk = fixture_ids[i : i + CHUNK_SIZE]
         chunk_resp = (
             supabase.table("match_team_stats")
             .select("fixture_api_id, team_api_id, expected_goals")
@@ -406,7 +407,13 @@ def calculate_team_strengths(league_id: int) -> dict | None:
 
         for tid in (tid1, tid2):
             if tid not in teams_stats:
-                teams_stats[tid] = {"xg_for": [], "xg_against": [], "opponents": [], "atk": 1.0, "def": 1.0}
+                teams_stats[tid] = {
+                    "xg_for": [],
+                    "xg_against": [],
+                    "opponents": [],
+                    "atk": 1.0,
+                    "def": 1.0,
+                }
 
         teams_stats[tid1]["xg_for"].append(xg1 / max(league_avg_xg_scored, 0.1))
         teams_stats[tid1]["xg_against"].append(xg2 / max(league_avg_xg_scored, 0.1))
@@ -474,7 +481,7 @@ def calculate_team_strengths(league_id: int) -> dict | None:
             "home_defense": regress_to_mean(raw_def, mp, 1.0),
             "away_attack": regress_to_mean(raw_atk, mp, 1.0),
             "away_defense": regress_to_mean(raw_def, mp, 1.0),
-            "home_advantage": HOME_XG_BONUS
+            "home_advantage": HOME_XG_BONUS,
         }
 
     return {
@@ -484,18 +491,19 @@ def calculate_team_strengths(league_id: int) -> dict | None:
         "avg_matches_played": total_matches / max(len(teams_stats) / 2.0, 1.0),
     }
 
-
     # Map cup/cross-league IDs to their domestic league equivalents.
     # The teams table sometimes stores the cup league_id instead of
     # the domestic one, so we normalise here.
+
+
 _CUP_TO_DOMESTIC: dict[int, int] = {
-    2: None,    # Champions League — no single domestic league
-    3: None,    # Europa League
-    45: 39,     # FA Cup → Premier League
-    66: 61,     # Coupe de France → Ligue 1
-    143: 140,   # Copa del Rey → La Liga
-    137: 135,   # Coppa Italia → Serie A
-    81: 78,     # DFB-Pokal → Bundesliga
+    2: None,  # Champions League — no single domestic league
+    3: None,  # Europa League
+    45: 39,  # FA Cup → Premier League
+    66: 61,  # Coupe de France → Ligue 1
+    143: 140,  # Copa del Rey → La Liga
+    137: 135,  # Coppa Italia → Serie A
+    81: 78,  # DFB-Pokal → Bundesliga
 }
 
 
@@ -514,13 +522,7 @@ def _get_domestic_league_id(team_api_id: int) -> int | None:
     Returns:
         The domestic league_id, or None if not found.
     """
-    resp = (
-        supabase.table("teams")
-        .select("league_id")
-        .eq("api_id", team_api_id)
-        .limit(1)
-        .execute()
-    )
+    resp = supabase.table("teams").select("league_id").eq("api_id", team_api_id).limit(1).execute()
     if not resp.data:
         return None
     lid = resp.data[0].get("league_id")
@@ -539,7 +541,10 @@ def _get_domestic_league_id(team_api_id: int) -> int | None:
     # has played the most matches (excluding European comps and cups)
     try:
         from src.config import logger
-        team_name_resp = supabase.table("teams").select("name").eq("api_id", team_api_id).limit(1).execute()
+
+        team_name_resp = (
+            supabase.table("teams").select("name").eq("api_id", team_api_id).limit(1).execute()
+        )
         if not team_name_resp.data:
             return None
         team_name = team_name_resp.data[0]["name"]
@@ -551,14 +556,18 @@ def _get_domestic_league_id(team_api_id: int) -> int | None:
             .not_.in_("league_id", list(CROSS_LEAGUE_IDS))
             .limit(20)
             .execute()
-            .data or []
+            .data
+            or []
         )
         if recent:
             from collections import Counter
+
             league_counts = Counter(f["league_id"] for f in recent if f.get("league_id"))
             if league_counts:
                 best_lid = league_counts.most_common(1)[0][0]
-                logger.info(f"  ↪ Inferred domestic league for {team_name} (id={team_api_id}): {best_lid}")
+                logger.info(
+                    f"  ↪ Inferred domestic league for {team_name} (id={team_api_id}): {best_lid}"
+                )
                 return best_lid
     except Exception:
         pass
@@ -629,9 +638,14 @@ def calculate_xg(
     # instead of flat 1.3/1.1 defaults (which produce undifferentiated probas)
     if not home_s or not away_s:
         try:
-            elos_resp = supabase.table("team_elo").select("team_api_id, elo_rating").in_(
-                "team_api_id", [home_team_id, away_team_id]
-            ).execute().data or []
+            elos_resp = (
+                supabase.table("team_elo")
+                .select("team_api_id, elo_rating")
+                .in_("team_api_id", [home_team_id, away_team_id])
+                .execute()
+                .data
+                or []
+            )
             elo_lookup = {e["team_api_id"]: e["elo_rating"] for e in elos_resp}
             h_elo = elo_lookup.get(home_team_id, DEFAULT_ELO)
             a_elo = elo_lookup.get(away_team_id, DEFAULT_ELO)
@@ -648,12 +662,16 @@ def calculate_xg(
             xg_h = max(XG_FLOOR, min(XG_CEIL, xg_h))
             xg_a = max(XG_FLOOR, min(XG_CEIL, xg_a))
 
-            logger.info(f"  ↪ ELO-based xG for {home_team_id} vs {away_team_id}: "
-                        f"ELO {h_elo:.0f}-{a_elo:.0f} → xG {xg_h:.2f}-{xg_a:.2f}")
+            logger.info(
+                f"  ↪ ELO-based xG for {home_team_id} vs {away_team_id}: "
+                f"ELO {h_elo:.0f}-{a_elo:.0f} → xG {xg_h:.2f}-{xg_a:.2f}"
+            )
             return xg_h, xg_a
         except Exception:
             pass
-        logger.warning(f"  ⚠ xG fallback pour {home_team_id} vs {away_team_id} (données insuffisantes)")
+        logger.warning(
+            f"  ⚠ xG fallback pour {home_team_id} vs {away_team_id} (données insuffisantes)"
+        )
         return XG_FALLBACK_HOME, XG_FALLBACK_AWAY
 
     # ── Determine league context for xG baseline ──────────────────
@@ -674,9 +692,7 @@ def calculate_xg(
     # Avantage domicile spécifique à l'équipe, ou la moyenne de la ligue si manquant
     home_bonus = home_s.get("home_advantage", HOME_XG_BONUS)
 
-    xg_home = (
-        home_s["home_attack"] * away_s["away_defense"] * league_avg_home * home_bonus
-    )
+    xg_home = home_s["home_attack"] * away_s["away_defense"] * league_avg_home * home_bonus
     xg_away = away_s["away_attack"] * home_s["home_defense"] * league_avg_away
 
     # Appliquer les ajustements (forme, repos, etc.)
@@ -773,7 +789,11 @@ def get_elo_probs(home_elo: float, away_elo: float, league_id: int | None = None
         Dictionary with keys ``"elo_home"``, ``"elo_draw"``, ``"elo_away"``
         as rounded integer percentages.
     """
-    home_adv = HOME_ELO_ADVANTAGE_BY_LEAGUE.get(league_id, HOME_ELO_ADVANTAGE) if league_id else HOME_ELO_ADVANTAGE
+    home_adv = (
+        HOME_ELO_ADVANTAGE_BY_LEAGUE.get(league_id, HOME_ELO_ADVANTAGE)
+        if league_id
+        else HOME_ELO_ADVANTAGE
+    )
     p_home = elo_expected(home_elo + home_adv, away_elo)
     p_away = 1.0 - p_home
 
@@ -1431,22 +1451,25 @@ def get_injury_impact(
         mins = s.get("minutes_played", 0)
         is_starter = mins > getattr(team_total_minutes, "real", 0) * 0.03
 
-        missing_players.append({
-            "player_name": name,
-            "position": position,
-            "reason": reason,
-            "rating": rating,
-            "minutes_played": mins,
-            "is_starter": is_starter,
-            "goals": s.get("goals", 0),
-            "assists": s.get("assists", 0),
-        })
+        missing_players.append(
+            {
+                "player_name": name,
+                "position": position,
+                "reason": reason,
+                "rating": rating,
+                "minutes_played": mins,
+                "is_starter": is_starter,
+                "goals": s.get("goals", 0),
+                "assists": s.get("assists", 0),
+            }
+        )
 
     # ── 5. Calcul des facteurs finaux via VORP ──
     from src.models.injury_vorp import calculate_vorp_impact
+
     team_context = {
         "total_goals": getattr(team_total_goals, "real", 1),
-        "total_assists": getattr(team_total_assists, "real", 1)
+        "total_assists": getattr(team_total_assists, "real", 1),
     }
 
     attack_factor, defense_factor = calculate_vorp_impact(missing_players, team_context)
@@ -1757,7 +1780,9 @@ def kelly_criterion(
 # ═══════════════════════════════════════════════════════════════════
 
 
-def compute_advanced_features(team_name: str, n_short: int = 5, n_long: int = 10) -> dict[str, float]:
+def compute_advanced_features(
+    team_name: str, n_short: int = 5, n_long: int = 10
+) -> dict[str, float]:
     """Compute advanced match features for a team from historical fixtures.
 
     Queries the last *n_long* completed matches and derives:
@@ -2052,10 +2077,7 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     # For cross-league competitions (CL, EL, cups), skip league-level
     # strengths (too few matches) — calculate_xg will use each team's
     # domestic league strengths instead.
-    if league_id in CROSS_LEAGUE_IDS:
-        league_data = None
-    else:
-        league_data = calculate_team_strengths(league_id)
+    league_data = None if league_id in CROSS_LEAGUE_IDS else calculate_team_strengths(league_id)
     xg_home, xg_away = calculate_xg(home_id or 0, away_id or 0, league_data)
 
     # ── Competition factor (CL/EL/Cup matches are less high-scoring) ──
@@ -2065,7 +2087,10 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
         xg_away *= comp_factor
         context["competition_xg_factor"] = comp_factor
         from src.config import logger
-        logger.info(f"  🏆 Facteur compétition ({league_id}): ×{comp_factor} → xG {xg_home:.2f}/{xg_away:.2f}")
+
+        logger.info(
+            f"  🏆 Facteur compétition ({league_id}): ×{comp_factor} → xG {xg_home:.2f}/{xg_away:.2f}"
+        )
 
     # ── ELO Préalable (requis pour le calcul de forme SOS) ───────
     elos = supabase.table("team_elo").select("team_api_id, elo_rating").execute().data
@@ -2081,17 +2106,29 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
 
     # Momentum long terme (12 matchs, decay lent) — capture la tendance de fond
     form_long_home, _ = calculate_form(
-        home_team, n=FORM_LOOKBACK_LONG, decay=FORM_DECAY_LONG, home_only=True, name_to_elo=name_to_elo
+        home_team,
+        n=FORM_LOOKBACK_LONG,
+        decay=FORM_DECAY_LONG,
+        home_only=True,
+        name_to_elo=name_to_elo,
     )
     form_long_away, _ = calculate_form(
-        away_team, n=FORM_LOOKBACK_LONG, decay=FORM_DECAY_LONG, home_only=False, name_to_elo=name_to_elo
+        away_team,
+        n=FORM_LOOKBACK_LONG,
+        decay=FORM_DECAY_LONG,
+        home_only=False,
+        name_to_elo=name_to_elo,
     )
     context["form_long_home"] = round(form_long_home, 3)
     context["form_long_away"] = round(form_long_away, 3)
 
     # form_factor = 70% forme courte (6 matchs) + 30% tendance longue (12 matchs)
-    form_factor_h = FORM_WEIGHT_SHORT * (0.85 + form_home * 0.30) + FORM_WEIGHT_LONG * (0.85 + form_long_home * 0.30)
-    form_factor_a = FORM_WEIGHT_SHORT * (0.85 + form_away * 0.30) + FORM_WEIGHT_LONG * (0.85 + form_long_away * 0.30)
+    form_factor_h = FORM_WEIGHT_SHORT * (0.85 + form_home * 0.30) + FORM_WEIGHT_LONG * (
+        0.85 + form_long_home * 0.30
+    )
+    form_factor_a = FORM_WEIGHT_SHORT * (0.85 + form_away * 0.30) + FORM_WEIGHT_LONG * (
+        0.85 + form_long_away * 0.30
+    )
 
     # Repos
     rest_h, rest_days_h, congestion_h, severe_h = calculate_rest_factor(home_team, match_date)
@@ -2368,19 +2405,21 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
             except Exception:
                 adv_home, adv_away = {}, {}
 
-            ml_context.update({
-                # Phase 5 features
-                "home_momentum": adv_home.get("momentum", 0),
-                "away_momentum": adv_away.get("momentum", 0),
-                "home_fatigue_index": context.get("congestion_home", 0),
-                "away_fatigue_index": context.get("congestion_away", 0),
-                "home_goal_diff_avg": adv_home.get("goal_diff_avg", 0),
-                "away_goal_diff_avg": adv_away.get("goal_diff_avg", 0),
-                "home_result_variance": adv_home.get("result_variance", 0),
-                "away_result_variance": adv_away.get("result_variance", 0),
-                "home_clean_sheet_rate": adv_home.get("clean_sheet_rate", 0),
-                "away_clean_sheet_rate": adv_away.get("clean_sheet_rate", 0),
-            })
+            ml_context.update(
+                {
+                    # Phase 5 features
+                    "home_momentum": adv_home.get("momentum", 0),
+                    "away_momentum": adv_away.get("momentum", 0),
+                    "home_fatigue_index": context.get("congestion_home", 0),
+                    "away_fatigue_index": context.get("congestion_away", 0),
+                    "home_goal_diff_avg": adv_home.get("goal_diff_avg", 0),
+                    "away_goal_diff_avg": adv_away.get("goal_diff_avg", 0),
+                    "home_result_variance": adv_home.get("result_variance", 0),
+                    "away_result_variance": adv_away.get("result_variance", 0),
+                    "home_clean_sheet_rate": adv_home.get("clean_sheet_rate", 0),
+                    "away_clean_sheet_rate": adv_away.get("clean_sheet_rate", 0),
+                }
+            )
 
             # Phase A2 features
             try:
@@ -2392,24 +2431,26 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
             except Exception:
                 shot_home, shot_away, league_rates = {}, {}, {}
 
-            ml_context.update({
-                "home_ppg_last5": adv_home.get("ppg_last5", 1.5),
-                "away_ppg_last5": adv_away.get("ppg_last5", 1.5),
-                "home_btts_rate_last10": adv_home.get("btts_rate_last10", 0.5),
-                "away_btts_rate_last10": adv_away.get("btts_rate_last10", 0.5),
-                "home_over25_rate_last10": adv_home.get("over25_rate_last10", 0.5),
-                "away_over25_rate_last10": adv_away.get("over25_rate_last10", 0.5),
-                "home_xg_per_shot": shot_home.get("xg_per_shot"),
-                "away_xg_per_shot": shot_away.get("xg_per_shot"),
-                "league_avg_btts_rate": league_rates.get("league_avg_btts_rate", 0.5),
-                "league_avg_over25_rate": league_rates.get("league_avg_over25_rate", 0.48),
-                "elo_diff_squared": (home_elo - away_elo) ** 2,
-                "form_diff": form_home - form_away,
-                # Momentum long terme (12 matchs)
-                "home_form_long": form_long_home,
-                "away_form_long": form_long_away,
-                "form_long_diff": form_long_home - form_long_away,
-            })
+            ml_context.update(
+                {
+                    "home_ppg_last5": adv_home.get("ppg_last5", 1.5),
+                    "away_ppg_last5": adv_away.get("ppg_last5", 1.5),
+                    "home_btts_rate_last10": adv_home.get("btts_rate_last10", 0.5),
+                    "away_btts_rate_last10": adv_away.get("btts_rate_last10", 0.5),
+                    "home_over25_rate_last10": adv_home.get("over25_rate_last10", 0.5),
+                    "away_over25_rate_last10": adv_away.get("over25_rate_last10", 0.5),
+                    "home_xg_per_shot": shot_home.get("xg_per_shot"),
+                    "away_xg_per_shot": shot_away.get("xg_per_shot"),
+                    "league_avg_btts_rate": league_rates.get("league_avg_btts_rate", 0.5),
+                    "league_avg_over25_rate": league_rates.get("league_avg_over25_rate", 0.48),
+                    "elo_diff_squared": (home_elo - away_elo) ** 2,
+                    "form_diff": form_home - form_away,
+                    # Momentum long terme (12 matchs)
+                    "home_form_long": form_long_home,
+                    "away_form_long": form_long_away,
+                    "form_long_diff": form_long_home - form_long_away,
+                }
+            )
 
             ml_preds = get_ml_predictions(ml_context)
             context["ml_predictions"] = ml_preds
@@ -2476,6 +2517,7 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     # Once MIN_ISOTONIC_SAMPLES (500) is reached, apply_calibration will use Isotonic instead.
     try:
         from src.models.calibrate import calibrate_1x2_bayesian
+
         final_home, final_draw, final_away = calibrate_1x2_bayesian(
             final_home, final_draw, final_away, league_id=league_id
         )
@@ -2486,6 +2528,7 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     if is_calibration_available():
         try:
             from src.models.calibrate import apply_calibration
+
             lid = league_id
             # BTTS and Over markets: binary calibration via Platt/Isotonic
             poisson_probs["proba_btts"] = apply_calibration(
@@ -2629,7 +2672,11 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
     source_winners = []  # Which outcome each source picks
 
     # Poisson winner
-    poisson_vals = [poisson_probs["proba_home"], poisson_probs["proba_draw"], poisson_probs["proba_away"]]
+    poisson_vals = [
+        poisson_probs["proba_home"],
+        poisson_probs["proba_draw"],
+        poisson_probs["proba_away"],
+    ]
     poisson_winner = ["H", "D", "A"][poisson_vals.index(max(poisson_vals))]
     source_winners.append(poisson_winner)
     n_sources += 1
@@ -2648,7 +2695,11 @@ def analyze_match(fixture: dict[str, Any]) -> dict[str, Any]:
 
     # Market winner
     if market:
-        mkt_vals = [market.get("market_home", 0), market.get("market_draw", 0), market.get("market_away", 0)]
+        mkt_vals = [
+            market.get("market_home", 0),
+            market.get("market_draw", 0),
+            market.get("market_away", 0),
+        ]
         if any(mkt_vals):
             mkt_winner = ["H", "D", "A"][mkt_vals.index(max(mkt_vals))]
             source_winners.append(mkt_winner)

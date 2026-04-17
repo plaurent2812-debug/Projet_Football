@@ -7,7 +7,7 @@ def extract_meta_dataset() -> pd.DataFrame:
     """
     Extrait l'historique des prédictions (modèles de base + features IA)
     et les joint aux résultats réels (fixtures) pour l'entraînement du XGBoost.
-    
+
     Version optimisée sans `!inner` join pour éviter les Timeouts Supabase.
     """
     logger.info("📦 Extraction du dataset Meta-Modèle depuis Supabase...")
@@ -18,7 +18,13 @@ def extract_meta_dataset() -> pd.DataFrame:
     page_size = 1000
     offset = 0
     while True:
-        fix_res = supabase.table("fixtures").select("id, status, home_goals, away_goals").in_("status", ["FT", "AET", "PEN"]).range(offset, offset + page_size - 1).execute()
+        fix_res = (
+            supabase.table("fixtures")
+            .select("id, status, home_goals, away_goals")
+            .in_("status", ["FT", "AET", "PEN"])
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
         data = fix_res.data or []
         for f in data:
             fixtures[f["id"]] = f
@@ -38,9 +44,14 @@ def extract_meta_dataset() -> pd.DataFrame:
     offset = 0
 
     while True:
-        res = supabase.table("predictions").select(
-            "fixture_id, proba_home, proba_draw, proba_away, proba_btts, proba_over_15, proba_over_2_5, ai_features"
-        ).range(offset, offset + page_size - 1).execute()
+        res = (
+            supabase.table("predictions")
+            .select(
+                "fixture_id, proba_home, proba_draw, proba_away, proba_btts, proba_over_15, proba_over_2_5, ai_features"
+            )
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
 
         data = res.data or []
         predictions.extend(data)
@@ -83,14 +94,13 @@ def extract_meta_dataset() -> pd.DataFrame:
             "proba_btts": p.get("proba_btts", 0.0),
             "proba_over_15": p.get("proba_over_15", 0.0),
             "proba_over_25": p.get("proba_over_2_5", 0.0) or p.get("proba_over_25", 0.0),
-
             # Target
             "target_1x2": target_1x2,
             "target_btts": target_btts,
             "target_over_15": target_over_15,
             "target_over_25": target_over_25,
             "home_goals": hg,
-            "away_goals": ag
+            "away_goals": ag,
         }
 
         # Extract AI Features if available (Phase 1 structure)
@@ -109,6 +119,7 @@ def extract_meta_dataset() -> pd.DataFrame:
 
     logger.info(f"✅ Dataset extrait: {len(df)} lignes, {len(df.columns)} colonnes.")
     return df
+
 
 if __name__ == "__main__":
     df = extract_meta_dataset()

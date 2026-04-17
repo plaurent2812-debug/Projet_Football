@@ -51,6 +51,7 @@ def update_nhl_fixture_results(days_back: int = 3) -> dict:
     # 1. Get fixtures from recent days
     try:
         from src.nhl.constants import NHL_FINISHED_STATUSES
+
         all_recent = (
             supabase.table("nhl_fixtures")
             .select("id, api_fixture_id, date, home_team, away_team, status")
@@ -83,6 +84,7 @@ def update_nhl_fixture_results(days_back: int = 3) -> dict:
         game_state = boxscore.get("gameState", "")
         # NHL API states: "FUT" (future), "LIVE", "CRIT" (critical), "OFF" (official/final)
         from src.nhl.constants import NHL_FINISHED_STATUSES
+
         if game_state not in NHL_FINISHED_STATUSES:
             continue
 
@@ -95,11 +97,13 @@ def update_nhl_fixture_results(days_back: int = 3) -> dict:
 
         # Update fixture in Supabase
         try:
-            supabase.table("nhl_fixtures").update({
-                "status": "Final",
-                "home_score": int(home_score),
-                "away_score": int(away_score),
-            }).eq("id", fix["id"]).execute()
+            supabase.table("nhl_fixtures").update(
+                {
+                    "status": "Final",
+                    "home_score": int(home_score),
+                    "away_score": int(away_score),
+                }
+            ).eq("id", fix["id"]).execute()
 
             updated += 1
             logger.info(

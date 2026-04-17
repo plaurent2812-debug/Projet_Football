@@ -9,6 +9,7 @@ Usage:
     python -m src.monitoring --quality   # Data quality only
     python -m src.monitoring --alerts    # Run alerting checks (+ send Telegram)
 """
+
 from __future__ import annotations
 
 import json
@@ -34,21 +35,25 @@ def run_all(flags: set[str] | None = None) -> dict[str, Any]:
     # 1. CLV Backtest
     if run_clv:
         from src.monitoring.backtest_clv import run as clv_run
+
         report["clv"] = clv_run()
 
     # 2. Brier Score Monitor
     if run_brier:
         from src.monitoring.brier_monitor import run as brier_run
+
         report["brier"] = brier_run()
 
     # 3. Feature Importance Audit
     if run_features:
         from src.monitoring.feature_audit import run as feature_run
+
         report["features"] = feature_run()
 
     # 4. Data Quality
     if run_quality:
         from src.monitoring.data_quality import run as quality_run
+
         report["data_quality"] = quality_run()
 
     # ── Consolidated verdict ──────────────────────────────────────
@@ -73,28 +78,39 @@ def run_all(flags: set[str] | None = None) -> dict[str, Any]:
         else:
             clv_score = 3
         scores.append(("CLV", clv_score, clv.get("verdict", "?")))
-        logger.info(f"  CLV          : {clv_score}/10 — {clv.get('verdict', '?')} (mean={clv_val:+.4f})")
+        logger.info(
+            f"  CLV          : {clv_score}/10 — {clv.get('verdict', '?')} (mean={clv_val:+.4f})"
+        )
 
     # Brier score (0-10)
     brier = report.get("brier", {})
     health = brier.get("health_score")
     if health is not None:
         scores.append(("Brier", health, brier.get("brier_1x2", {}).get("grade", "?")))
-        logger.info(f"  Calibration  : {health}/10 — Brier={brier.get('brier_1x2', {}).get('brier', '?')}")
+        logger.info(
+            f"  Calibration  : {health}/10 — Brier={brier.get('brier_1x2', {}).get('brier', '?')}"
+        )
 
     # Feature health (0-10)
     features = report.get("features", {})
     if features.get("status"):
-        feat_score = 10 if features["status"] == "HEALTHY" else (6 if features["status"] == "WARNING" else 3)
+        feat_score = (
+            10 if features["status"] == "HEALTHY" else (6 if features["status"] == "WARNING" else 3)
+        )
         scores.append(("Features", feat_score, features["status"]))
         logger.info(f"  ML Features  : {feat_score}/10 — {features['status']}")
 
     # Data quality (0-10)
     dq = report.get("data_quality", {})
     if dq.get("status"):
-        dq_score = {"HEALTHY": 10, "OK": 10, "WARNING": 6, "CRITICAL": 3, "ERROR": 2, "NO_DATA": 5}.get(
-            dq["status"], 5
-        )
+        dq_score = {
+            "HEALTHY": 10,
+            "OK": 10,
+            "WARNING": 6,
+            "CRITICAL": 3,
+            "ERROR": 2,
+            "NO_DATA": 5,
+        }.get(dq["status"], 5)
         scores.append(("DataQuality", dq_score, dq["status"]))
         logger.info(f"  Data Quality : {dq_score}/10 — {dq['status']}")
 

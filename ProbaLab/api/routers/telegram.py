@@ -14,6 +14,7 @@ Flow Combiné (multi-screenshots):
 3. /done <cote> → fusionne tout en un combiné et demande confirmation
 4. 👍 / ❌ pour confirmer/annuler
 """
+
 from __future__ import annotations
 
 import hmac
@@ -40,7 +41,7 @@ router = APIRouter(prefix="/api/telegram", tags=["Telegram"])
 
 # ── Simple in-memory rate limiter for webhook ────────────────────
 _RATE_LIMIT_WINDOW = 60  # seconds
-_RATE_LIMIT_MAX = 30     # max requests per window per IP
+_RATE_LIMIT_MAX = 30  # max requests per window per IP
 _rate_hits: dict[str, list[float]] = defaultdict(list)
 
 
@@ -53,6 +54,7 @@ def _is_rate_limited(client_ip: str) -> bool:
         return True
     _rate_hits[client_ip].append(now)
     return False
+
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_EXPERT_BOT_TOKEN", "")
 TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
@@ -118,7 +120,9 @@ def _save_expert_pick(pick: dict, chat_id: int) -> bool:
             )
         else:
             market = pick.get("market") or (selections[0].get("bet") if selections else "")
-            match_label = pick.get("match_label") or (selections[0].get("match") if selections else None)
+            match_label = pick.get("match_label") or (
+                selections[0].get("match") if selections else None
+            )
 
         # Store selections as JSON in expert_note for combinés; otherwise caption
         if is_combine:
@@ -166,7 +170,9 @@ def _save_expert_pick(pick: dict, chat_id: int) -> bool:
         logger.info("Expert pick saved: %s", record)
         return True
     except Exception as e:
-        logger.error("Supabase insert error: %s | record: %s", e, record if 'record' in dir() else 'N/A')
+        logger.error(
+            "Supabase insert error: %s | record: %s", e, record if "record" in dir() else "N/A"
+        )
         return False
 
 
@@ -285,10 +291,12 @@ def _handle_update(update: dict) -> None:
             new_selections = pick.get("selections") or []
             if not new_selections:
                 # Fallback: create a selection from market/match_label
-                new_selections = [{
-                    "bet": pick.get("market", ""),
-                    "match": pick.get("match_label", ""),
-                }]
+                new_selections = [
+                    {
+                        "bet": pick.get("market", ""),
+                        "match": pick.get("match_label", ""),
+                    }
+                ]
 
             combo["selections"].extend(new_selections)
 
@@ -298,7 +306,7 @@ def _handle_update(update: dict) -> None:
 
             n = len(combo["selections"])
             sel_summary = "\n".join(
-                f"  {i+1}. {s.get('bet', '?')} ({s.get('match', '?')})"
+                f"  {i + 1}. {s.get('bet', '?')} ({s.get('match', '?')})"
                 for i, s in enumerate(combo["selections"])
             )
             _send_message(
@@ -367,7 +375,9 @@ def _handle_update(update: dict) -> None:
             try:
                 value = round(float(value.replace(",", ".")), 2)
             except ValueError:
-                _send_message(chat_id, f"⚠️ Cote invalide : `{value}`. Utilise un nombre, ex: `2.35`")
+                _send_message(
+                    chat_id, f"⚠️ Cote invalide : `{value}`. Utilise un nombre, ex: `2.35`"
+                )
                 return
 
         old_value = pending.get(pick_key)
@@ -453,7 +463,7 @@ def _handle_update(update: dict) -> None:
         if combo:
             n = len(combo["selections"])
             sel_summary = "\n".join(
-                f"  {i+1}. {s.get('bet', '?')} ({s.get('match', '?')})"
+                f"  {i + 1}. {s.get('bet', '?')} ({s.get('match', '?')})"
                 for i, s in enumerate(combo["selections"])
             )
             _send_message(
@@ -515,4 +525,3 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
     except Exception as e:
         logger.error("Webhook error: %s", e)
         return Response(content="ok", status_code=200)  # Always 200 to Telegram
-

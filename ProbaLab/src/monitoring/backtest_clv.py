@@ -13,6 +13,7 @@ CLV = (model_prob / closing_implied_prob) - 1
 Usage:
     python -m src.monitoring.backtest_clv
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -138,22 +139,24 @@ def compute_clv(data: list[dict]) -> dict[str, Any]:
             key=lambda x: x[1],
         )
 
-        clv_records.append({
-            "fixture_api_id": row.get("fixture_api_id"),
-            "league_id": row.get("league_id"),
-            "clv_home": clv_h,
-            "clv_draw": clv_d,
-            "clv_away": clv_a,
-            "clv_best": best_outcome[2],
-            "best_side": best_outcome[0],
-            "actual": actual,
-            "model_h": model_h,
-            "model_d": model_d,
-            "model_a": model_a,
-            "close_h": close_h,
-            "close_d": close_d,
-            "close_a": close_a,
-        })
+        clv_records.append(
+            {
+                "fixture_api_id": row.get("fixture_api_id"),
+                "league_id": row.get("league_id"),
+                "clv_home": clv_h,
+                "clv_draw": clv_d,
+                "clv_away": clv_a,
+                "clv_best": best_outcome[2],
+                "best_side": best_outcome[0],
+                "actual": actual,
+                "model_h": model_h,
+                "model_d": model_d,
+                "model_a": model_a,
+                "close_h": close_h,
+                "close_d": close_d,
+                "close_a": close_a,
+            }
+        )
 
     if not clv_records:
         return {"n_matches": 0, "clv_overall": 0, "daily_clv": [], "status": "NO_DATA"}
@@ -179,15 +182,16 @@ def compute_clv(data: list[dict]) -> dict[str, Any]:
 
     # Daily CLV breakdown (for chart)
     from collections import defaultdict
+
     daily: dict[str, list[float]] = defaultdict(list)
     for row, rec in zip(data, clv_records):
         date_str = (row.get("date") or row.get("created_at") or "")[:10]
         if date_str:
             daily[date_str].append(rec["clv_best"])
-    daily_clv = sorted([
-        {"date": d, "clv": round(sum(vs) / len(vs), 4), "n": len(vs)}
-        for d, vs in daily.items()
-    ], key=lambda x: x["date"])
+    daily_clv = sorted(
+        [{"date": d, "clv": round(sum(vs) / len(vs), 4), "n": len(vs)} for d, vs in daily.items()],
+        key=lambda x: x["date"],
+    )
 
     # CLV on correct predictions only (did we have edge when we were right?)
     correct_clvs = [r["clv_best"] for r in clv_records if r["actual"] == r["best_side"]]
@@ -206,8 +210,10 @@ def compute_clv(data: list[dict]) -> dict[str, Any]:
         "daily_clv": daily_clv,
         "status": "OK" if n >= 30 else "LOW_SAMPLE",
         "verdict": (
-            "BEATING_MARKET" if mean_clv_best > 0.02
-            else "MATCHING_MARKET" if mean_clv_best > -0.02
+            "BEATING_MARKET"
+            if mean_clv_best > 0.02
+            else "MATCHING_MARKET"
+            if mean_clv_best > -0.02
             else "BELOW_MARKET"
         ),
     }
@@ -238,7 +244,9 @@ def run() -> dict[str, Any]:
         n_matched = len(data)
         n_missing = n_total - n_matched
         if n_missing > 0:
-            logger.info(f"  {n_matched}/{n_total} predictions have matching odds ({n_missing} missing)")
+            logger.info(
+                f"  {n_matched}/{n_total} predictions have matching odds ({n_missing} missing)"
+            )
         else:
             logger.info(f"  {n_matched} matchs avec cotes disponibles")
     except Exception:
@@ -253,7 +261,9 @@ def run() -> dict[str, Any]:
 
     if results.get("by_league"):
         logger.info("  Par ligue :")
-        for lid, info in sorted(results["by_league"].items(), key=lambda x: x[1].get("clv_mean", 0), reverse=True):
+        for lid, info in sorted(
+            results["by_league"].items(), key=lambda x: x[1].get("clv_mean", 0), reverse=True
+        ):
             logger.info(f"    League {lid}: CLV={info['clv_mean']:+.4f} (n={info['n']})")
 
     return results

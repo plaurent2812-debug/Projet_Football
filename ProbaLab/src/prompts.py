@@ -18,7 +18,7 @@ def _sanitize_team_name(name: str) -> str:
     """Strip anything that isn't word chars, spaces, hyphens or dots."""
     if not name:
         return "?"
-    return re.sub(r'[^\w\s.\-]', '', str(name))[:80]
+    return re.sub(r"[^\w\s.\-]", "", str(name))[:80]
 
 
 def _format_injuries(side: str, details: list[dict]) -> str:
@@ -55,9 +55,7 @@ def _format_injuries(side: str, details: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def get_active_learnings(
-    sport: str, limit: int = 5, match_context: str | None = None
-) -> list[str]:
+def get_active_learnings(sport: str, limit: int = 5, match_context: str | None = None) -> list[str]:
     """Fetch learnings from AI memory, using semantic search when possible.
 
     If match_context is provided, uses Gemini Embedding 2 to find the
@@ -233,14 +231,12 @@ Marché →  Dom: {market.get("market_home", "?")}%  |  Nul: {market.get("market
         if similar:
             similar_block = "\n\n--- MATCHS HISTORIQUES SIMILAIRES ---\n"
             for sm in similar:
-                sim_score = sm.get('similarity', 0)
-                sm_text = (sm.get('analysis_text') or '')[:150]
-                ph = sm.get('proba_home', '?')
-                pd_ = sm.get('proba_draw', '?')
-                pa = sm.get('proba_away', '?')
-                similar_block += (
-                    f"  • [{sim_score:.0%} similaire] {ph}-{pd_}-{pa} — {sm_text}...\n"
-                )
+                sim_score = sm.get("similarity", 0)
+                sm_text = (sm.get("analysis_text") or "")[:150]
+                ph = sm.get("proba_home", "?")
+                pd_ = sm.get("proba_draw", "?")
+                pa = sm.get("proba_away", "?")
+                similar_block += f"  • [{sim_score:.0%} similaire] {ph}-{pd_}-{pa} — {sm_text}...\n"
     except Exception:
         logger.debug("[Brain] Similar matches unavailable", exc_info=True)
 

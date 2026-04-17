@@ -29,7 +29,9 @@ try:
     from sklearn.model_selection import TimeSeriesSplit
     from xgboost import XGBClassifier
 except ImportError:
-    logger.error("Veuillez installer xgboost, scikit-learn et optuna: pip install xgboost scikit-learn optuna pandas")
+    logger.error(
+        "Veuillez installer xgboost, scikit-learn et optuna: pip install xgboost scikit-learn optuna pandas"
+    )
     sys.exit(1)
 
 # Features utilisées pour l'entraînement.
@@ -81,7 +83,9 @@ def load_data(filepath="nhl_dataset.csv") -> pd.DataFrame:
     # CRITICAL: Sort by date for proper TimeSeriesSplit
     if "date" in df.columns:
         df = df.sort_values("date").reset_index(drop=True)
-        logger.info("  Dataset trie par date: %s -> %s", df["date"].iloc[0][:10], df["date"].iloc[-1][:10])
+        logger.info(
+            "  Dataset trie par date: %s -> %s", df["date"].iloc[0][:10], df["date"].iloc[-1][:10]
+        )
     else:
         logger.warning("  Pas de colonne 'date' — TimeSeriesSplit sera pseudo-aleatoire")
 
@@ -116,7 +120,12 @@ def train_market_model(df: pd.DataFrame, market: str, label_col: str, output_pat
         logger.error("Pas de variance dans la cible. Entrainement impossible.")
         return
 
-    logger.info("  Echantillons: %d | Positifs: %d (%.1f%%)", len(y), int(positives), 100 * positives / len(y))
+    logger.info(
+        "  Echantillons: %d | Positifs: %d (%.1f%%)",
+        len(y),
+        int(positives),
+        100 * positives / len(y),
+    )
 
     # TimeSeriesSplit — data is already sorted by date
     n_splits = min(5, len(df) // 20)
@@ -137,7 +146,7 @@ def train_market_model(df: pd.DataFrame, market: str, label_col: str, output_pat
             "scale_pos_weight": scale_pos_weight,
             "eval_metric": "logloss",
             "random_state": 42,
-            "n_jobs": -1
+            "n_jobs": -1,
         }
 
         scores = []
@@ -167,8 +176,8 @@ def train_market_model(df: pd.DataFrame, market: str, label_col: str, output_pat
 
     # FIXED: Train on TRAIN set only (not all data), evaluate on held-out TEST set
     # Use last fold of TimeSeriesSplit as the final train/test split
-    for train_idx, test_idx in tscv.split(X):
-        pass  # Get the last fold
+    splits = list(tscv.split(X))
+    train_idx, test_idx = splits[-1]
 
     X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
     y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
@@ -213,7 +222,7 @@ def train_market_model(df: pd.DataFrame, market: str, label_col: str, output_pat
         "training_date": datetime.now(timezone.utc).isoformat(),
         "n_samples": len(X),
         "best_params": best_params,
-        "serialization": "ubj"
+        "serialization": "ubj",
     }
 
     with open(output_path, "wb") as f:

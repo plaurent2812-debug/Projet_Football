@@ -292,7 +292,9 @@ class TestCalculateRestFactor:
             count=4
         )
 
-        factor, rest_days, matches_30d, _ = calculate_rest_factor("PSG", "2026-02-15T21:00:00+00:00")
+        factor, rest_days, matches_30d, _ = calculate_rest_factor(
+            "PSG", "2026-02-15T21:00:00+00:00"
+        )
         assert rest_days == 2
         assert factor == pytest.approx(0.92)
         assert matches_30d == 4
@@ -307,7 +309,9 @@ class TestCalculateRestFactor:
             count=3
         )
 
-        factor, rest_days, matches_30d, _ = calculate_rest_factor("PSG", "2026-02-15T21:00:00+00:00")
+        factor, rest_days, matches_30d, _ = calculate_rest_factor(
+            "PSG", "2026-02-15T21:00:00+00:00"
+        )
         assert rest_days == 6
         assert factor == pytest.approx(1.0)
         assert matches_30d == 3
@@ -322,7 +326,9 @@ class TestCalculateRestFactor:
             count=9
         )
 
-        factor, rest_days, matches_30d, _ = calculate_rest_factor("PSG", "2026-02-15T21:00:00+00:00")
+        factor, rest_days, matches_30d, _ = calculate_rest_factor(
+            "PSG", "2026-02-15T21:00:00+00:00"
+        )
         assert rest_days == 7
         # 5-7 days → base 1.0, congestion > 8 → * 0.96
         assert factor == pytest.approx(0.96)

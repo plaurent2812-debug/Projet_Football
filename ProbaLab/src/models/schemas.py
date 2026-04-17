@@ -94,7 +94,7 @@ class APIStandingRow(BaseModel):
     rank: int
     team: APIStandingTeam
     points: int = 0
-    goalsDiff: int = Field(default=0, alias="goalsDiff")
+    goalsDiff: int = Field(default=0, alias="goalsDiff")  # noqa: N815 — matches API-Football field name
     all: APIStandingAll | None = None
     home: APIStandingAll | None = None
     away: APIStandingAll | None = None

@@ -103,7 +103,10 @@ def update_fixture_in_db(fixture_id: int, api_data: dict) -> None:
         supabase.table("fixtures").update(update_payload).eq("id", fixture_id).execute()
         logger.info(
             "  Fixture %s mis a jour : %s-%s (%s)",
-            fixture_id, goals.get("home"), goals.get("away"), status_short,
+            fixture_id,
+            goals.get("home"),
+            goals.get("away"),
+            status_short,
         )
     except Exception as e:
         logger.error("  [DB ERROR] fixture %s: %s", fixture_id, e)
@@ -135,6 +138,7 @@ def fetch_and_update_results(target_date: str | None = None) -> dict:
     # so this window may miss late-night matches or include previous-day ones near midnight.
     # Fenêtre élargie (-12h à +36h) pour s'affranchir des différences de timezone UTC/Paris
     from datetime import timedelta
+
     target_dt = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     date_start = (target_dt - timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%S")
     date_end = (target_dt + timedelta(hours=36)).strftime("%Y-%m-%dT%H:%M:%S")
@@ -193,7 +197,9 @@ def fetch_and_update_results(target_date: str | None = None) -> dict:
         ):
             # Déjà terminé avec score → skip
             skipped += 1
-            logger.debug("  %s vs %s — deja FT (%s-%s)", home_team, away_team, home_goals, away_goals)
+            logger.debug(
+                "  %s vs %s — deja FT (%s-%s)", home_team, away_team, home_goals, away_goals
+            )
             continue
 
         if current_status in FINISHED_STATUSES and (home_goals is None or away_goals is None):

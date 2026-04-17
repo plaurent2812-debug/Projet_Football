@@ -179,7 +179,11 @@ def fetch_odds() -> None:
                         odds_data["dc_x2_odds"] = safe_float(values.get("Draw/Away"))
                         odds_data["dc_12_odds"] = safe_float(values.get("Home/Away"))
 
-        if odds_data.get("home_win_odds") is None or odds_data.get("draw_odds") is None or odds_data.get("away_win_odds") is None:
+        if (
+            odds_data.get("home_win_odds") is None
+            or odds_data.get("draw_odds") is None
+            or odds_data.get("away_win_odds") is None
+        ):
             logger.warning("Incomplete 1X2 odds for fixture %s", fid)
 
         if odds_data.get("home_win_odds"):
@@ -224,7 +228,11 @@ def fetch_h2h() -> None:
         away_id: int | None = name_to_id.get(fix["away_team"])
 
         if not home_id or not away_id:
-            logger.warning("H2H team name mismatch: home=%s away=%s", fix.get("home_team"), fix.get("away_team"))
+            logger.warning(
+                "H2H team name mismatch: home=%s away=%s",
+                fix.get("home_team"),
+                fix.get("away_team"),
+            )
             continue
 
         # Éviter les doublons (même paire)

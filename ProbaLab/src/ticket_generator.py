@@ -22,8 +22,8 @@ from src.config import logger, supabase
 
 SINGLE_ODDS_MIN = 1.50
 SINGLE_ODDS_MAX = 3.00
-MIN_EDGE = 0.05   # 5% edge minimum
-MAX_EDGE = 0.25   # 25% edge max — above this the model is likely wrong
+MIN_EDGE = 0.05  # 5% edge minimum
+MAX_EDGE = 0.25  # 25% edge max — above this the model is likely wrong
 MAX_SINGLES = 4
 DOUBLE_ODDS_MIN = 1.80
 DOUBLE_ODDS_MAX = 2.50
@@ -41,7 +41,9 @@ def calculate_implied_odds(probability: float) -> float:
     if not probability or probability <= 0:
         return 0.0
     if probability > 100:
-        logger.warning("Probability %.1f%% > 100%% in calculate_implied_odds, clamping", probability)
+        logger.warning(
+            "Probability %.1f%% > 100%% in calculate_implied_odds, clamping", probability
+        )
         probability = 100.0
     real_prob = max(0.01, probability / 100.0)
     return round((1 / real_prob) * 0.95, 2)
@@ -53,9 +55,14 @@ def get_market_odds(real_odds: dict, m_name: str, fallback_proba: float) -> floa
         return calculate_implied_odds(fallback_proba)
 
     mapping = {
-        "1": "home_win_odds", "2": "away_win_odds", "N": "draw_odds",
-        "1N": "dc_1x_odds", "N2": "dc_x2_odds",
-        "+1.5": "over_15_odds", "+2.5": "over_25_odds", "BTTS": "btts_yes_odds",
+        "1": "home_win_odds",
+        "2": "away_win_odds",
+        "N": "draw_odds",
+        "1N": "dc_1x_odds",
+        "N2": "dc_x2_odds",
+        "+1.5": "over_15_odds",
+        "+2.5": "over_25_odds",
+        "BTTS": "btts_yes_odds",
     }
     val = real_odds.get(mapping.get(m_name, ""))
     return val if val else calculate_implied_odds(fallback_proba)
@@ -74,7 +81,9 @@ def _compute_edge(proba_model: float, odds: float) -> float:
 
 
 def _build_football_singles(
-    predictions: list, fixture_map: dict, odds_map: dict,
+    predictions: list,
+    fixture_map: dict,
+    odds_map: dict,
 ) -> list[dict]:
     """Evaluate all markets for each match, return top singles by edge."""
     candidates = []
@@ -91,7 +100,9 @@ def _build_football_singles(
 
         stats = pred.get("stats_json") or {}
         p15 = pred.get("proba_over_15") or stats.get("proba_over_15", 0)
-        p25 = pred.get("proba_over_25") or pred.get("proba_over_2_5") or stats.get("proba_over_25", 0)
+        p25 = (
+            pred.get("proba_over_25") or pred.get("proba_over_2_5") or stats.get("proba_over_25", 0)
+        )
         p_btts = pred.get("proba_btts") or stats.get("proba_btts", 0)
 
         match_label = f"{fix['home_team']} - {fix['away_team']}"
@@ -145,17 +156,19 @@ def _build_football_singles(
             edge = _compute_edge(proba, odds)
             if edge < MIN_EDGE or edge > MAX_EDGE:
                 continue
-            candidates.append({
-                "match": match_label,
-                "time": time_str,
-                "pick": pick_label,
-                "proba": round(proba, 1),
-                "odds": round(odds, 2),
-                "edge": round(edge, 4),
-                "sport": "football",
-                "fixture_id": fid,
-                "market_name": market_name,
-            })
+            candidates.append(
+                {
+                    "match": match_label,
+                    "time": time_str,
+                    "pick": pick_label,
+                    "proba": round(proba, 1),
+                    "odds": round(odds, 2),
+                    "edge": round(edge, 4),
+                    "sport": "football",
+                    "fixture_id": fid,
+                    "market_name": market_name,
+                }
+            )
 
     # Deduplicate: 1 pick max per match (best edge)
     by_match: dict[str, dict] = {}
@@ -174,7 +187,9 @@ def _build_football_singles(
 
 
 def _build_football_double(
-    predictions: list, fixture_map: dict, odds_map: dict,
+    predictions: list,
+    fixture_map: dict,
+    odds_map: dict,
     exclude_matches: set[str],
 ) -> dict | None:
     """Find best 2-leg combo from remaining candidates, target odds ~2.00."""
@@ -222,12 +237,17 @@ def _build_football_double(
 
         if markets:
             best = max(markets, key=lambda m: m[1])  # highest proba
-            candidates.append({
-                "match": match_label, "time": time_str,
-                "pick": best[0], "proba": round(best[1], 1),
-                "odds": round(best[2], 2), "sport": "football",
-                "fixture_id": fid,
-            })
+            candidates.append(
+                {
+                    "match": match_label,
+                    "time": time_str,
+                    "pick": best[0],
+                    "proba": round(best[1], 1),
+                    "odds": round(best[2], 2),
+                    "sport": "football",
+                    "fixture_id": fid,
+                }
+            )
 
     if len(candidates) < 2:
         return None
@@ -290,23 +310,29 @@ def _build_nhl_singles(nhl_fixtures: list, odds_map: dict) -> list[dict]:
             for prob, label, market, min_prob in props:
                 if prob < min_prob:
                     continue
-                o = real_odds_player if real_odds_player and label == "Buteur" else calculate_implied_odds(prob)
+                o = (
+                    real_odds_player
+                    if real_odds_player and label == "Buteur"
+                    else calculate_implied_odds(prob)
+                )
                 if not (SINGLE_ODDS_MIN <= o <= SINGLE_ODDS_MAX):
                     continue
                 edge = _compute_edge(prob, o)
                 if edge < MIN_EDGE or edge > MAX_EDGE:
                     continue
-                candidates.append({
-                    "match": match_str,
-                    "time": "",
-                    "pick": f"{name} — {label}",
-                    "proba": round(prob, 1),
-                    "odds": round(o, 2),
-                    "edge": round(edge, 4),
-                    "sport": "nhl",
-                    "player_name": name,
-                    "market_name": market,
-                })
+                candidates.append(
+                    {
+                        "match": match_str,
+                        "time": "",
+                        "pick": f"{name} — {label}",
+                        "proba": round(prob, 1),
+                        "odds": round(o, 2),
+                        "edge": round(edge, 4),
+                        "sport": "nhl",
+                        "player_name": name,
+                        "market_name": market,
+                    }
+                )
 
     # Deduplicate: 1 pick max per player (best edge)
     by_player: dict[str, dict] = {}
@@ -343,11 +369,17 @@ def _build_nhl_double(nhl_fixtures: list, odds_map: dict, exclude_players: set[s
             real = odds_map.get(name, 0)
             o = real if real else calculate_implied_odds(prob_point)
             if DOUBLE_LEG_ODDS_MIN <= o <= DOUBLE_LEG_ODDS_MAX:
-                candidates.append({
-                    "match": match_str, "time": "",
-                    "pick": f"{name} — 1+ Point", "proba": round(prob_point, 1),
-                    "odds": round(o, 2), "sport": "nhl", "player_name": name,
-                })
+                candidates.append(
+                    {
+                        "match": match_str,
+                        "time": "",
+                        "pick": f"{name} — 1+ Point",
+                        "proba": round(prob_point, 1),
+                        "odds": round(o, 2),
+                        "sport": "nhl",
+                        "player_name": name,
+                    }
+                )
 
     if len(candidates) < 2:
         return None
@@ -389,7 +421,6 @@ def _build_football_fun(predictions: list, fixture_map: dict, odds_map: dict) ->
         pa = pred.get("proba_away") or 0
         stats = pred.get("stats_json") or {}
         p25 = pred.get("proba_over_25") or stats.get("proba_over_25", 0)
-        p15 = pred.get("proba_over_15") or stats.get("proba_over_15", 0)
         p_btts = pred.get("proba_btts") or stats.get("proba_btts", 0)
 
         match_label = f"{fix['home_team']} - {fix['away_team']}"
@@ -442,16 +473,23 @@ def _build_football_fun(predictions: list, fixture_map: dict, odds_map: dict) ->
         if correct_score and p_cs >= 12 and p_fav >= 60:
             o_cs = calculate_implied_odds(p_cs)
             if o_cs >= 5.0:
-                match_options.append({"pick": f"Score exact {correct_score}", "proba": p_cs, "odds": o_cs})
+                match_options.append(
+                    {"pick": f"Score exact {correct_score}", "proba": p_cs, "odds": o_cs}
+                )
 
         if match_options:
             match_options.sort(key=lambda m: (m["proba"] / 100) * m["odds"], reverse=True)
             best = match_options[0]
-            candidates.append({
-                "match": match_label, "time": time_str,
-                "pick": best["pick"], "proba": round(best["proba"], 1),
-                "odds": best["odds"], "sport": "football",
-            })
+            candidates.append(
+                {
+                    "match": match_label,
+                    "time": time_str,
+                    "pick": best["pick"],
+                    "proba": round(best["proba"], 1),
+                    "odds": best["odds"],
+                    "sport": "football",
+                }
+            )
 
     candidates.sort(key=lambda x: x["proba"], reverse=True)
     if len(candidates) < 3:
@@ -477,7 +515,12 @@ def _build_football_fun(predictions: list, fixture_map: dict, odds_map: dict) ->
 
     if running_odds < 8 or len(picks) < 3:
         return None
-    return {"type": "FUN", "sport": "football", "picks": picks, "total_odds": round(running_odds, 2)}
+    return {
+        "type": "FUN",
+        "sport": "football",
+        "picks": picks,
+        "total_odds": round(running_odds, 2),
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -505,27 +548,45 @@ def _build_nhl_fun(nhl_fixtures: list) -> dict | None:
             if prob_goal >= 25:
                 o = calculate_implied_odds(prob_goal)
                 if o >= 2.5:
-                    all_picks.append({
-                        "match": match_str, "pick": f"{name} — Buteur",
-                        "proba": round(prob_goal, 1), "odds": round(o, 2),
-                        "sport": "nhl", "player": name, "market": "goal",
-                    })
+                    all_picks.append(
+                        {
+                            "match": match_str,
+                            "pick": f"{name} — Buteur",
+                            "proba": round(prob_goal, 1),
+                            "odds": round(o, 2),
+                            "sport": "nhl",
+                            "player": name,
+                            "market": "goal",
+                        }
+                    )
             if prob_assist >= 28:
                 o = calculate_implied_odds(prob_assist)
                 if o >= 2.0:
-                    all_picks.append({
-                        "match": match_str, "pick": f"{name} — Passeur",
-                        "proba": round(prob_assist, 1), "odds": round(o, 2),
-                        "sport": "nhl", "player": name, "market": "assist",
-                    })
+                    all_picks.append(
+                        {
+                            "match": match_str,
+                            "pick": f"{name} — Passeur",
+                            "proba": round(prob_assist, 1),
+                            "odds": round(o, 2),
+                            "sport": "nhl",
+                            "player": name,
+                            "market": "assist",
+                        }
+                    )
             if prob_shot >= 30:
                 o = calculate_implied_odds(prob_shot)
                 if o >= 2.0:
-                    all_picks.append({
-                        "match": match_str, "pick": f"{name} — 3+ Tirs",
-                        "proba": round(prob_shot, 1), "odds": round(o, 2),
-                        "sport": "nhl", "player": name, "market": "shot",
-                    })
+                    all_picks.append(
+                        {
+                            "match": match_str,
+                            "pick": f"{name} — 3+ Tirs",
+                            "proba": round(prob_shot, 1),
+                            "odds": round(o, 2),
+                            "sport": "nhl",
+                            "player": name,
+                            "market": "shot",
+                        }
+                    )
 
     if len(all_picks) < 2:
         return None
@@ -582,12 +643,18 @@ def _load_football_data(date: str) -> tuple[list, dict, dict]:
         fixtures = (
             supabase.table("fixtures")
             .select("id, api_fixture_id, home_team, away_team, date, league_id")
-            .gte("date", start).lte("date", end)
-            .neq("status", "PST").neq("status", "CANC")
+            .gte("date", start)
+            .lte("date", end)
+            .neq("status", "PST")
+            .neq("status", "CANC")
             .execute()
         ).data or []
     except Exception:
-        logger.warning("_load_football_data: fixtures fetch failed for date=%s", locals().get("start"), exc_info=True)
+        logger.warning(
+            "_load_football_data: fixtures fetch failed for date=%s",
+            locals().get("start"),
+            exc_info=True,
+        )
         return [], {}, {}
 
     fixture_map = {f["id"]: f for f in fixtures}
@@ -598,7 +665,8 @@ def _load_football_data(date: str) -> tuple[list, dict, dict]:
     if fixtures:
         try:
             predictions = (
-                supabase.table("predictions").select("*")
+                supabase.table("predictions")
+                .select("*")
                 .in_("fixture_id", [f["id"] for f in fixtures])
                 .execute()
             ).data or []
@@ -606,7 +674,8 @@ def _load_football_data(date: str) -> tuple[list, dict, dict]:
             logger.warning("_load_football_data: predictions fetch failed", exc_info=True)
         try:
             odds_rows = (
-                supabase.table("fixture_odds").select("*")
+                supabase.table("fixture_odds")
+                .select("*")
                 .in_("fixture_api_id", [f["api_fixture_id"] for f in fixtures])
                 .execute()
             ).data or []
@@ -629,7 +698,8 @@ def _load_nhl_data(date: str) -> tuple[list, dict]:
         nhl_fixtures = (
             supabase.table("nhl_fixtures")
             .select("id, api_fixture_id, home_team, away_team, date, stats_json, status")
-            .gte("date", start).lte("date", end)
+            .gte("date", start)
+            .lte("date", end)
             .eq("status", "NS")
             .execute()
         ).data or []
@@ -723,22 +793,28 @@ def _save_to_best_bets(date: str, sport: str, picks: list[dict], bet_type: str) 
 
         proba = pick.get("proba", 0)
         odds_val = pick["odds"]
-        edge = round(((proba / 100.0) - (1.0 / odds_val)) * 100, 2) if odds_val > 1 and proba > 0 else None
+        edge = (
+            round(((proba / 100.0) - (1.0 / odds_val)) * 100, 2)
+            if odds_val > 1 and proba > 0
+            else None
+        )
 
-        rows.append({
-            "date": date,
-            "sport": sport,
-            "bet_label": f"{pick['match']} — {pick['pick']}",
-            "market": market,
-            "odds": odds_val,
-            "confidence": confidence,
-            "proba_model": proba,
-            "edge_pct": edge,
-            "player_name": player_name or None,
-            "fixture_id": str(pick.get("fixture_id", "")) or None,
-            "result": "PENDING",
-            "notes": f"Auto — {bet_type}",
-        })
+        rows.append(
+            {
+                "date": date,
+                "sport": sport,
+                "bet_label": f"{pick['match']} — {pick['pick']}",
+                "market": market,
+                "odds": odds_val,
+                "confidence": confidence,
+                "proba_model": proba,
+                "edge_pct": edge,
+                "player_name": player_name or None,
+                "fixture_id": str(pick.get("fixture_id", "")) or None,
+                "result": "PENDING",
+                "notes": f"Auto — {bet_type}",
+            }
+        )
 
     if not rows:
         return 0
@@ -770,9 +846,13 @@ def generate_football_picks(date: str | None = None) -> dict:
 
     # Delete previous auto-picks for this date+sport (idempotent re-run)
     try:
-        supabase.table("best_bets").delete().eq("date", date).eq("sport", "football").like("notes", "Auto —%").execute()
+        supabase.table("best_bets").delete().eq("date", date).eq("sport", "football").like(
+            "notes", "Auto —%"
+        ).execute()
     except Exception:
-        logger.warning("Failed to delete previous football auto-picks for date=%s", date, exc_info=True)
+        logger.warning(
+            "Failed to delete previous football auto-picks for date=%s", date, exc_info=True
+        )
 
     # 1. Singles (max 4)
     singles = _build_football_singles(predictions, fixture_map, odds_map)
@@ -794,12 +874,19 @@ def generate_football_picks(date: str | None = None) -> dict:
     total = n_singles + n_double + n_fun
     logger.info(
         "[Picks Foot] %s: %d singles + %d double + %d fun = %d picks",
-        date, n_singles, n_double, n_fun, total,
+        date,
+        n_singles,
+        n_double,
+        n_fun,
+        total,
     )
 
     return {
-        "date": date, "sport": "football",
-        "singles": n_singles, "double": n_double, "fun": n_fun,
+        "date": date,
+        "sport": "football",
+        "singles": n_singles,
+        "double": n_double,
+        "fun": n_fun,
         "total": total,
         "singles_detail": singles,
         "double_detail": double,
@@ -826,7 +913,9 @@ def generate_nhl_picks(date: str | None = None) -> dict:
 
     # Delete previous auto-picks for this date+sport
     try:
-        supabase.table("best_bets").delete().eq("date", date).eq("sport", "nhl").like("notes", "Auto —%").execute()
+        supabase.table("best_bets").delete().eq("date", date).eq("sport", "nhl").like(
+            "notes", "Auto —%"
+        ).execute()
     except Exception:
         logger.warning("Failed to delete previous NHL auto-picks for date=%s", date, exc_info=True)
 
@@ -852,12 +941,19 @@ def generate_nhl_picks(date: str | None = None) -> dict:
     total = n_singles + n_double + n_fun
     logger.info(
         "[Picks NHL] %s: %d singles + %d double + %d fun = %d picks",
-        date, n_singles, n_double, n_fun, total,
+        date,
+        n_singles,
+        n_double,
+        n_fun,
+        total,
     )
 
     return {
-        "date": date, "sport": "nhl",
-        "singles": n_singles, "double": n_double, "fun": n_fun,
+        "date": date,
+        "sport": "nhl",
+        "singles": n_singles,
+        "double": n_double,
+        "fun": n_fun,
         "total": total,
         "singles_detail": singles,
         "double_detail": double,
@@ -884,8 +980,18 @@ def generate_daily_tickets() -> tuple[dict | None, dict | None]:
 if __name__ == "__main__":
     logger.info("=== Football Picks ===")
     result_foot = generate_football_picks()
-    logger.info("  Singles: %d, Double: %d, Fun: %d", result_foot["singles"], result_foot["double"], result_foot["fun"])
+    logger.info(
+        "  Singles: %d, Double: %d, Fun: %d",
+        result_foot["singles"],
+        result_foot["double"],
+        result_foot["fun"],
+    )
 
     logger.info("=== NHL Picks ===")
     result_nhl = generate_nhl_picks()
-    logger.info("  Singles: %d, Double: %d, Fun: %d", result_nhl["singles"], result_nhl["double"], result_nhl["fun"])
+    logger.info(
+        "  Singles: %d, Double: %d, Fun: %d",
+        result_nhl["singles"],
+        result_nhl["double"],
+        result_nhl["fun"],
+    )

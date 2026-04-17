@@ -635,7 +635,9 @@ def _save_and_print(rows: list[dict]) -> None:
         try:
             supabase.table("calibration").upsert(row, on_conflict="bet_type,league_id").execute()
         except Exception:
-            logger.warning("Calibration save failed for bet_type=%s", row.get("bet_type"), exc_info=True)
+            logger.warning(
+                "Calibration save failed for bet_type=%s", row.get("bet_type"), exc_info=True
+            )
 
         bias = row.get("bias")
         bias_str = f"+{bias}" if bias is not None and bias > 0 else str(bias)
@@ -682,9 +684,7 @@ def recalibrate_draw_factors(months: int = 6) -> dict[int, float]:
     """
     from src.constants import DRAW_FACTOR_BY_LEAGUE
 
-    cutoff = datetime.now(_tz.utc).replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0
-    )
+    cutoff = datetime.now(_tz.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     # Step back `months` months
     year = cutoff.year
     month = cutoff.month - months
@@ -740,12 +740,22 @@ def recalibrate_draw_factors(months: int = 6) -> dict[int, float]:
     logger.info("=" * 60)
     logger.info("  DRAW FACTOR RECALIBRATION — derniers %d mois", months)
     logger.info("=" * 60)
-    logger.info("  %-8s  %-8s  %-10s  %-12s  %-12s  %s", "league", "matches", "draw_rate", "current_df", "recommended", "delta")
+    logger.info(
+        "  %-8s  %-8s  %-10s  %-12s  %-12s  %s",
+        "league",
+        "matches",
+        "draw_rate",
+        "current_df",
+        "recommended",
+        "delta",
+    )
 
     for lid, stats in sorted(league_stats.items()):
         total = stats["total"]
         if total < MIN_MATCHES:
-            logger.debug("  Ligue %d: seulement %d matchs — ignorée (min=%d)", lid, total, MIN_MATCHES)
+            logger.debug(
+                "  Ligue %d: seulement %d matchs — ignorée (min=%d)", lid, total, MIN_MATCHES
+            )
             continue
 
         observed_rate = round(stats["draws"] / total, 2)
@@ -761,14 +771,24 @@ def recalibrate_draw_factors(months: int = 6) -> dict[int, float]:
         change_marker = " <-- UPDATE RECOMMENDED" if abs(delta) >= 0.02 else ""
         logger.info(
             "  %-8d  %-8d  %-10.2f  %-12.2f  %-12.2f  %s%s",
-            lid, total, observed_rate, current_df, recommended, delta_str, change_marker
+            lid,
+            total,
+            observed_rate,
+            current_df,
+            recommended,
+            delta_str,
+            change_marker,
         )
 
     logger.info("=" * 60)
     logger.info(
         "  %d ligues analysées, %d mises à jour recommandées (delta >= 0.02)",
         len(recommendations),
-        sum(1 for lid, rec in recommendations.items() if abs(rec - DRAW_FACTOR_BY_LEAGUE.get(lid, 0.28)) >= 0.02),
+        sum(
+            1
+            for lid, rec in recommendations.items()
+            if abs(rec - DRAW_FACTOR_BY_LEAGUE.get(lid, 0.28)) >= 0.02
+        ),
     )
     logger.info("  Pour appliquer, mettre à jour DRAW_FACTOR_BY_LEAGUE dans src/constants.py")
     logger.info("=" * 60)

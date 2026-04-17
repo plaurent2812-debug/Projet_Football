@@ -29,11 +29,7 @@ def get_football_meta_analysis(
     # Try dedicated table first
     try:
         resp = (
-            supabase.table("football_meta_analysis")
-            .select("*")
-            .eq("date", date)
-            .limit(1)
-            .execute()
+            supabase.table("football_meta_analysis").select("*").eq("date", date).limit(1).execute()
         )
         if resp.data and len(resp.data) > 0:
             row = resp.data[0]
@@ -58,7 +54,12 @@ def get_football_meta_analysis(
             analysis = row.get("analysis_text", "")
             bet_date = (row.get("recommended_bet") or "").replace("DeepThink ", "")
             if analysis and len(analysis) > 50 and bet_date == date:
-                return {"ok": True, "date": date, "analysis": analysis, "source": "deepthink_fallback"}
+                return {
+                    "ok": True,
+                    "date": date,
+                    "analysis": analysis,
+                    "source": "deepthink_fallback",
+                }
     except Exception:
         pass
 

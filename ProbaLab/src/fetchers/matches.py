@@ -87,7 +87,9 @@ def fetch_and_store(date_from: str = None, date_to: str = None) -> None:
             league = item.get("league") or {}
 
             if not fixture or not teams:
-                logger.warning("Malformed fixture item: %s", item.get("fixture", {}).get("id", "unknown"))
+                logger.warning(
+                    "Malformed fixture item: %s", item.get("fixture", {}).get("id", "unknown")
+                )
                 continue
 
             # Upsert Ligue

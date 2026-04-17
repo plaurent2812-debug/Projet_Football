@@ -7,16 +7,15 @@ Coverage: Health, News, Predictions, Monitoring, Performance,
 All Supabase calls are intercepted by the session-scoped `client` fixture
 defined in conftest.py — no real network traffic occurs.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-
 # ════════════════════════════════════════════════════════════════════
 #  HEALTH
 # ════════════════════════════════════════════════════════════════════
+
 
 class TestHealth:
     def test_health_returns_ok(self, client):
@@ -34,6 +33,7 @@ class TestHealth:
 #  NEWS
 # ════════════════════════════════════════════════════════════════════
 
+
 class TestNews:
     def test_news_returns_200_with_news_array(self, client):
         """GET /api/news must return 200 with a 'news' list."""
@@ -47,10 +47,17 @@ class TestNews:
 
     def test_news_returns_cached_data_on_second_call(self, client):
         """Second call should hit TTL cache, not re-fetch RSS."""
-        fake_news = [{"title": "Test headline", "link": "https://example.com",
-                      "source": "Test", "pub_date": "Mon, 01 Jan 2026 00:00:00 +0000"}]
+        fake_news = [
+            {
+                "title": "Test headline",
+                "link": "https://example.com",
+                "source": "Test",
+                "pub_date": "Mon, 01 Jan 2026 00:00:00 +0000",
+            }
+        ]
         # TTLCache uses _data and _timestamps (not _cache).
         import api.routers.news as news_mod
+
         news_mod._news_cache._data.clear()
         news_mod._news_cache._timestamps.clear()
 
@@ -67,6 +74,7 @@ class TestNews:
 # ════════════════════════════════════════════════════════════════════
 #  PREDICTIONS
 # ════════════════════════════════════════════════════════════════════
+
 
 class TestPredictions:
     def test_predictions_with_date_returns_200(self, client):
@@ -93,17 +101,19 @@ class TestPredictions:
 
     def test_prediction_detail_returns_structure_when_found(self, client, mock_supabase):
         """GET /api/predictions/{id} returns full detail structure for a known fixture."""
-        fixture_data = [{
-            "id": "1",
-            "home_team": "PSG",
-            "away_team": "OM",
-            "date": "2026-04-01T20:00:00Z",
-            "status": "NS",
-            "api_fixture_id": 12345,
-            "home_team_id": 10,
-            "away_team_id": 20,
-            "league_id": 61,
-        }]
+        fixture_data = [
+            {
+                "id": "1",
+                "home_team": "PSG",
+                "away_team": "OM",
+                "date": "2026-04-01T20:00:00Z",
+                "status": "NS",
+                "api_fixture_id": 12345,
+                "home_team_id": 10,
+                "away_team_id": 20,
+                "league_id": 61,
+            }
+        ]
 
         def _table_side_effect(table_name):
             chain = MagicMock()
@@ -115,9 +125,26 @@ class TestPredictions:
                 result.data = []
             result.count = 0
 
-            for method in ("select", "eq", "neq", "gte", "lte", "gt", "lt",
-                           "in_", "or_", "order", "limit", "range",
-                           "insert", "upsert", "update", "delete", "filter", "single"):
+            for method in (
+                "select",
+                "eq",
+                "neq",
+                "gte",
+                "lte",
+                "gt",
+                "lt",
+                "in_",
+                "or_",
+                "order",
+                "limit",
+                "range",
+                "insert",
+                "upsert",
+                "update",
+                "delete",
+                "filter",
+                "single",
+            ):
                 getattr(chain, method).return_value = chain
             chain.execute.return_value = result
             return chain
@@ -136,20 +163,38 @@ class TestPredictions:
 #  MONITORING
 # ════════════════════════════════════════════════════════════════════
 
+
 class TestMonitoring:
     def test_monitoring_returns_200(self, client):
         """GET /api/monitoring must return 200 with monitoring data."""
         fake_payload = {
-            "clv": {"clv_best_mean": 0, "clv_when_correct": 0, "pct_positive_clv": 0,
-                    "n_matches": 0, "verdict": "NO_DATA", "by_league": {}, "daily_clv": [],
-                    "status": "NO_DATA"},
-            "brier": {"brier_1x2": None, "brier_1x2_grade": None, "ece": None,
-                      "ece_grade": None, "log_loss": None, "btts": None,
-                      "over15": None, "over25": None, "n_matches": 0, "drift": {}},
+            "clv": {
+                "clv_best_mean": 0,
+                "clv_when_correct": 0,
+                "pct_positive_clv": 0,
+                "n_matches": 0,
+                "verdict": "NO_DATA",
+                "by_league": {},
+                "daily_clv": [],
+                "status": "NO_DATA",
+            },
+            "brier": {
+                "brier_1x2": None,
+                "brier_1x2_grade": None,
+                "ece": None,
+                "ece_grade": None,
+                "log_loss": None,
+                "btts": None,
+                "over15": None,
+                "over25": None,
+                "n_matches": 0,
+                "drift": {},
+            },
             "health_score": 5,
         }
         # TTLCache uses _data and _timestamps (not _cache).
         import api.routers.monitoring as mon_mod
+
         mon_mod._monitoring_cache._data.clear()
         mon_mod._monitoring_cache._timestamps.clear()
 
@@ -173,6 +218,7 @@ class TestMonitoring:
 #  PERFORMANCE
 # ════════════════════════════════════════════════════════════════════
 
+
 class TestPerformance:
     def test_performance_all_time_returns_200(self, client):
         """GET /api/performance (days=0) must return 200 with summary fields."""
@@ -193,6 +239,7 @@ class TestPerformance:
 # ════════════════════════════════════════════════════════════════════
 #  AUTH — verify 401 on protected endpoints
 # ════════════════════════════════════════════════════════════════════
+
 
 class TestAuth:
     # ── /api/best-bets/resolve (verify_cron_auth) ─────────────────
@@ -240,6 +287,7 @@ class TestAuth:
 #  ADMIN — pipeline status and stop (require Supabase admin JWT)
 # ════════════════════════════════════════════════════════════════════
 
+
 class TestAdmin:
     def test_pipeline_status_with_admin_auth(self, client, mock_supabase):
         """GET /api/admin/pipeline-status with valid admin JWT → 200."""
@@ -250,14 +298,26 @@ class TestAdmin:
         profile_chain = MagicMock()
         profile_result = MagicMock()
         profile_result.data = {"role": "admin"}
-        for method in ("select", "eq", "neq", "single", "order", "limit",
-                       "gte", "lte", "filter", "in_"):
+        for method in (
+            "select",
+            "eq",
+            "neq",
+            "single",
+            "order",
+            "limit",
+            "gte",
+            "lte",
+            "filter",
+            "in_",
+        ):
             getattr(profile_chain, method).return_value = profile_chain
         profile_chain.execute.return_value = profile_result
 
-        with patch("api.routers.admin.supabase", mock_supabase), \
-             patch("api.routers.admin.supabase.table", return_value=profile_chain), \
-             patch("api.routers.admin.supabase.auth", mock_supabase.auth):
+        with (
+            patch("api.routers.admin.supabase", mock_supabase),
+            patch("api.routers.admin.supabase.table", return_value=profile_chain),
+            patch("api.routers.admin.supabase.auth", mock_supabase.auth),
+        ):
             resp = client.get(
                 "/api/admin/pipeline-status",
                 headers={"Authorization": "Bearer fake-admin-jwt"},
@@ -275,14 +335,26 @@ class TestAdmin:
         profile_chain = MagicMock()
         profile_result = MagicMock()
         profile_result.data = {"role": "admin"}
-        for method in ("select", "eq", "neq", "single", "order", "limit",
-                       "gte", "lte", "filter", "in_"):
+        for method in (
+            "select",
+            "eq",
+            "neq",
+            "single",
+            "order",
+            "limit",
+            "gte",
+            "lte",
+            "filter",
+            "in_",
+        ):
             getattr(profile_chain, method).return_value = profile_chain
         profile_chain.execute.return_value = profile_result
 
-        with patch("api.routers.admin.supabase", mock_supabase), \
-             patch("api.routers.admin.supabase.table", return_value=profile_chain), \
-             patch("api.routers.admin.supabase.auth", mock_supabase.auth):
+        with (
+            patch("api.routers.admin.supabase", mock_supabase),
+            patch("api.routers.admin.supabase.table", return_value=profile_chain),
+            patch("api.routers.admin.supabase.auth", mock_supabase.auth),
+        ):
             resp = client.post(
                 "/api/admin/stop-pipeline",
                 headers={"Authorization": "Bearer fake-admin-jwt"},
@@ -295,6 +367,7 @@ class TestAdmin:
 # ════════════════════════════════════════════════════════════════════
 #  BEST BETS
 # ════════════════════════════════════════════════════════════════════
+
 
 class TestBestBets:
     def test_get_best_bets_with_date_returns_200(self, client):
@@ -325,8 +398,17 @@ class TestBestBets:
         insert_chain = MagicMock()
         insert_result = MagicMock()
         insert_result.data = [{"id": 42}]
-        for method in ("select", "eq", "insert", "upsert", "update", "delete",
-                       "order", "limit", "filter"):
+        for method in (
+            "select",
+            "eq",
+            "insert",
+            "upsert",
+            "update",
+            "delete",
+            "order",
+            "limit",
+            "filter",
+        ):
             getattr(insert_chain, method).return_value = insert_chain
         insert_chain.execute.return_value = insert_result
 
@@ -356,6 +438,7 @@ class TestBestBets:
 #  EXPERT PICKS
 # ════════════════════════════════════════════════════════════════════
 
+
 class TestExpertPicks:
     def test_get_expert_picks_returns_200(self, client):
         """GET /api/expert-picks must return 200 with picks list."""
@@ -376,6 +459,7 @@ class TestExpertPicks:
 # ════════════════════════════════════════════════════════════════════
 #  ERROR HANDLING
 # ════════════════════════════════════════════════════════════════════
+
 
 class TestErrorHandling:
     def test_global_exception_handler_returns_500_without_stack_trace(self, client):

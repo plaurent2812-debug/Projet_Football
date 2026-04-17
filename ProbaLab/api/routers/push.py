@@ -8,6 +8,7 @@ Endpoints:
 Utility:
   send_push_to_all(title, body, url) — Send push to all subscribers
 """
+
 from __future__ import annotations
 
 import json
@@ -27,6 +28,7 @@ def _verify_push_auth(x_api_key: str = Header(None, alias="X-Push-Key")):
     if PUSH_API_KEY and (not x_api_key or x_api_key != PUSH_API_KEY):
         raise HTTPException(status_code=403, detail="Forbidden")
 
+
 logger = logging.getLogger("push_router")
 
 router = APIRouter(prefix="/api/push", tags=["Push"])
@@ -39,7 +41,7 @@ VAPID_EMAIL = os.getenv("VAPID_EMAIL", "mailto:contact@probalab.net")
 class PushSubscriptionBody(BaseModel):
     endpoint: str
     keys: dict | None = None
-    expirationTime: float | None = None
+    expirationTime: float | None = None  # noqa: N815 — matches Web Push API browser schema
 
 
 class UnsubscribeBody(BaseModel):
@@ -66,7 +68,9 @@ async def subscribe_push(body: PushSubscriptionBody):
             .data
         )
         if existing:
-            supabase.table("push_subscriptions").update(record).eq("endpoint", body.endpoint).execute()
+            supabase.table("push_subscriptions").update(record).eq(
+                "endpoint", body.endpoint
+            ).execute()
         else:
             supabase.table("push_subscriptions").insert(record).execute()
 
@@ -97,7 +101,7 @@ def send_push_to_all(title: str, body: str, url: str = "/paris-du-soir") -> int:
         return 0
 
     try:
-        from pywebpush import WebPushException, webpush
+        from pywebpush import webpush
     except ImportError:
         logger.warning("pywebpush not installed. Install with: pip install pywebpush")
         return 0
@@ -111,11 +115,13 @@ def send_push_to_all(title: str, body: str, url: str = "/paris-du-soir") -> int:
     if not subs:
         return 0
 
-    payload = json.dumps({
-        "title": title,
-        "body": body,
-        "url": url,
-    })
+    payload = json.dumps(
+        {
+            "title": title,
+            "body": body,
+            "url": url,
+        }
+    )
 
     sent = 0
     stale_endpoints = []
@@ -149,5 +155,7 @@ def send_push_to_all(title: str, body: str, url: str = "/paris-du-soir") -> int:
         except Exception as e:
             logger.warning("Failed to cleanup stale endpoint %s: %s", endpoint[:50], e)
 
-    logger.info("Push sent to %d/%d subscribers (%d stale removed)", sent, len(subs), len(stale_endpoints))
+    logger.info(
+        "Push sent to %d/%d subscribers (%d stale removed)", sent, len(subs), len(stale_endpoints)
+    )
     return sent

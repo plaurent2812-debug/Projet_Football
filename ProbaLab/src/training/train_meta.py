@@ -9,7 +9,12 @@ from src.config import logger
 from src.models.meta_learner import XGBMetaLearner
 
 
-def train_meta_model(target_name: str, num_classes: int, dataset_path: str = "meta_dataset.csv", model_dir: str = "models/football"):
+def train_meta_model(
+    target_name: str,
+    num_classes: int,
+    dataset_path: str = "meta_dataset.csv",
+    model_dir: str = "models/football",
+):
     """
     Entraîne le Meta-Modèle XGBoost pour prédire un marché donné.
     Utilise une validation croisée temporelle (Time Series Split).
@@ -27,7 +32,11 @@ def train_meta_model(target_name: str, num_classes: int, dataset_path: str = "me
 
     # Sélection dynamique des features en fonction du target
     feature_cols = [
-        "ai_motivation", "ai_media_pressure", "ai_injury_impact", "ai_cohesion", "ai_style_risk"
+        "ai_motivation",
+        "ai_media_pressure",
+        "ai_injury_impact",
+        "ai_cohesion",
+        "ai_style_risk",
     ]
 
     if target_name == "target_1x2":
@@ -56,26 +65,28 @@ def train_meta_model(target_name: str, num_classes: int, dataset_path: str = "me
     # On s'assure qu'il n'y a pas de NaNs dans les probas de base
     X.fillna(0, inplace=True)
 
-    logger.info(f"Dataset chargé pour {target_name}: {len(X)} échantillons, {len(feature_cols)} features.")
+    logger.info(
+        f"Dataset chargé pour {target_name}: {len(X)} échantillons, {len(feature_cols)} features."
+    )
 
     # Time Series Split
     tscv = TimeSeriesSplit(n_splits=5)
 
     # Paramètres avec objective multi-class ou binary logistic
-    objective = 'multi:softprob' if num_classes > 2 else 'binary:logistic'
+    objective = "multi:softprob" if num_classes > 2 else "binary:logistic"
     params = {
-        'n_estimators': 150,
-        'max_depth': 3,
-        'learning_rate': 0.05,
-        'subsample': 0.8,
-        'colsample_bytree': 0.8,
-        'objective': objective,
-        'eval_metric': 'mlogloss' if num_classes > 2 else 'logloss',
-        'random_state': 42
+        "n_estimators": 150,
+        "max_depth": 3,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "objective": objective,
+        "eval_metric": "mlogloss" if num_classes > 2 else "logloss",
+        "random_state": 42,
     }
 
     if num_classes > 2:
-        params['num_class'] = num_classes
+        params["num_class"] = num_classes
 
     log_losses = []
     accuracies = []
@@ -102,12 +113,18 @@ def train_meta_model(target_name: str, num_classes: int, dataset_path: str = "me
         acc = accuracy_score(y_test, y_pred_class)
         accuracies.append(acc)
 
-        logger.info(f"  [{target_name}] Fold {fold+1}: Log Loss = {loss:.4f}, Accuracy = {acc:.4f}")
+        logger.info(
+            f"  [{target_name}] Fold {fold + 1}: Log Loss = {loss:.4f}, Accuracy = {acc:.4f}"
+        )
 
-    logger.info("="*50)
-    logger.info(f"🔹 [{target_name}] Mean Log Loss: {np.mean(log_losses):.4f} (std: {np.std(log_losses):.4f})")
-    logger.info(f"🔹 [{target_name}] Mean Accuracy: {np.mean(accuracies):.4f} (std: {np.std(accuracies):.4f})")
-    logger.info("="*50)
+    logger.info("=" * 50)
+    logger.info(
+        f"🔹 [{target_name}] Mean Log Loss: {np.mean(log_losses):.4f} (std: {np.std(log_losses):.4f})"
+    )
+    logger.info(
+        f"🔹 [{target_name}] Mean Accuracy: {np.mean(accuracies):.4f} (std: {np.std(accuracies):.4f})"
+    )
+    logger.info("=" * 50)
 
     # Entraînement final sur TOUT le dataset
     logger.info(f"[{target_name}] Entraînement final sur tout le dataset historique...")
@@ -124,8 +141,9 @@ def train_meta_model(target_name: str, num_classes: int, dataset_path: str = "me
         "target": target_name,
         "log_loss": round(float(np.mean(log_losses)), 4),
         "accuracy": round(float(np.mean(accuracies)), 4),
-        "samples": len(X)
+        "samples": len(X),
     }
+
 
 def train_all_meta_models():
     """Entraîne tous les méta-modèles disponibles."""
@@ -133,25 +151,30 @@ def train_all_meta_models():
 
     # 1X2 (3 classes : Away=0, Draw=1, Home=2)
     res_1x2 = train_meta_model("target_1x2", num_classes=3)
-    if res_1x2: results.append(res_1x2)
+    if res_1x2:
+        results.append(res_1x2)
 
     # BTTS (2 classes : No=0, Yes=1)
     res_btts = train_meta_model("target_btts", num_classes=2)
-    if res_btts: results.append(res_btts)
+    if res_btts:
+        results.append(res_btts)
 
     # Over 1.5 (2 classes : Under=0, Over=1)
     res_o15 = train_meta_model("target_over_15", num_classes=2)
-    if res_o15: results.append(res_o15)
+    if res_o15:
+        results.append(res_o15)
 
     # Over 2.5 (2 classes : Under=0, Over=1)
     res_o25 = train_meta_model("target_over_25", num_classes=2)
-    if res_o25: results.append(res_o25)
+    if res_o25:
+        results.append(res_o25)
 
     logger.info("🎯 Récapitulatif de l'entraînement META :")
     for r in results:
         logger.info(f"  - {r['target']}: Acc={r['accuracy']:.2f} | LogLoss={r['log_loss']:.4f}")
 
     return results
+
 
 if __name__ == "__main__":
     train_all_meta_models()

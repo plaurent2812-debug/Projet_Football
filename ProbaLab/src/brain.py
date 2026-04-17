@@ -78,17 +78,19 @@ def get_matches_to_predict(force: bool = False) -> list[dict]:
         .select("fixture_id, model_version")
         .in_("fixture_id", fixture_ids)
         .execute()
-        .data or []
+        .data
+        or []
     )
 
     # Build set of fixture_ids that already have a hybrid_v3 prediction
     v3_fixture_ids = {
-        p["fixture_id"] for p in existing_predictions
-        if p.get("model_version") == "hybrid_v3"
+        p["fixture_id"] for p in existing_predictions if p.get("model_version") == "hybrid_v3"
     }
 
     to_process = [fix for fix in fixtures if fix["id"] not in v3_fixture_ids]
-    logger.info(f"{len(to_process)} matchs à analyser (sur {len(fixtures)} NS, {len(v3_fixture_ids)} déjà v3).")
+    logger.info(
+        f"{len(to_process)} matchs à analyser (sur {len(fixtures)} NS, {len(v3_fixture_ids)} déjà v3)."
+    )
     return to_process
 
 
@@ -304,10 +306,7 @@ def run_brain() -> None:
 
                 embed_text = final.get("analysis_text", "")
                 profile = build_match_profile_text(fix, stats_result)
-                if embed_text:
-                    embed_text = f"{profile} | {embed_text}"
-                else:
-                    embed_text = profile
+                embed_text = f"{profile} | {embed_text}" if embed_text else profile
 
                 pred_embedding = get_embedding(embed_text)
                 if pred_embedding:
@@ -348,7 +347,8 @@ def run_brain() -> None:
                     .eq("fixture_id", fix["id"])
                     .neq("model_version", insert_data["model_version"])
                     .execute()
-                    .data or []
+                    .data
+                    or []
                 )
                 if stale:
                     stale_ids = [s["id"] for s in stale]

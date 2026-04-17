@@ -14,6 +14,7 @@ Thresholds:
 Usage:
     python -m src.monitoring.feature_audit
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -67,7 +68,14 @@ def audit_model(model_name: str, importances: dict[str, float]) -> dict[str, Any
     elo_share = sum(normalized.get(f, 0) for f in elo_features)
 
     # Form features share
-    form_features = {"home_form", "away_form", "form_diff", "home_form_long", "away_form_long", "form_long_diff"}
+    form_features = {
+        "home_form",
+        "away_form",
+        "form_diff",
+        "home_form_long",
+        "away_form_long",
+        "form_long_diff",
+    }
     form_share = sum(normalized.get(f, 0) for f in form_features)
 
     # Verdict

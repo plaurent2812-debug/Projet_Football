@@ -11,14 +11,11 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from src.prediction_blender import (
     _build_fallback_analysis,
     _try_meta_blend,
     blend_predictions,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════
 #  _build_fallback_analysis
@@ -348,7 +345,9 @@ class TestBlendPredictionsPhase1:
         assert out["confidence_score"] == 8
 
     def test_recommended_bet_default_empty(self):
-        out = blend_predictions({"proba_home": 50, "proba_draw": 30, "proba_away": 20}, ai_result=None)
+        out = blend_predictions(
+            {"proba_home": 50, "proba_draw": 30, "proba_away": 20}, ai_result=None
+        )
         assert out["recommended_bet"] == ""
         assert out["confidence_score"] == 5
 

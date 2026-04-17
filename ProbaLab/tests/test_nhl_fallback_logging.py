@@ -6,13 +6,13 @@ Tests are split into two layers:
 2. Integration test on /brain_quick — skipped because the endpoint requires
    complex Supabase fixtures that are not available in CI.
 """
+
 import logging
 import math
 
 import pytest
 
 from src.nhl.ml_models import EnhancedGoalPredictor
-
 
 # ---------------------------------------------------------------------------
 # Unit tests — EnhancedGoalPredictor
@@ -85,11 +85,7 @@ class TestEnhancedGoalPredictorFallbackBehavior:
         prob = predictor.predict_proba(data)
         # Poisson: P(X >= 3) = 1 - P(0) - P(1) - P(2) at rate=3*0.95=2.85
         lam = 3.0 * 0.95
-        expected = 1.0 - (
-            math.exp(-lam)
-            + lam * math.exp(-lam)
-            + (lam**2 / 2) * math.exp(-lam)
-        )
+        expected = 1.0 - (math.exp(-lam) + lam * math.exp(-lam) + (lam**2 / 2) * math.exp(-lam))
         assert abs(prob - expected) < 0.01
 
 

@@ -53,6 +53,8 @@ class _RestrictedUnpickler(pickle.Unpickler):
 def safe_pickle_load(f) -> Any:
     """Deserialize a file object using the restricted unpickler."""
     return _RestrictedUnpickler(f).load()
+
+
 from src.nhl.calibration import probability_calibrator
 
 # Imports NHL Modules
@@ -71,7 +73,6 @@ from src.nhl.schemas import (
 # ML Models Import with Fallback
 try:
     from src.nhl.ml_models import (
-        ModelBacktester,
         assist_predictor,
         goal_predictor,
         load_all_models,
@@ -138,6 +139,7 @@ def _load_game_win_model():
             ubj_path = model_path.replace(".pkl", ".ubj")
             if os.path.isfile(ubj_path):
                 from xgboost import XGBClassifier
+
                 _game_win_model = XGBClassifier()
                 _game_win_model.load_model(ubj_path)
                 print(f"   ✅ Game model UBJ chargé: {ubj_path}")
@@ -355,6 +357,8 @@ def brain_quick(req: BrainRequest):
             )
             raw_prob_assist = 1.0 - math.exp(-apg * home_factor)
             ml_fallback_used["assist"] = True
+
+        prob_assist = probability_calibrator.calibrate_probability("ASSIST", raw_prob_assist)
 
         confidence = "high" if prob_goal_raw > 0.4 else ("medium" if prob_goal_raw > 0.2 else "low")
 
@@ -630,14 +634,16 @@ def get_nhl_performance(days: int = 30):
             elif res == "LOSS":
                 res = "PERDU"
 
-            rows.append({
-                "date": b.get("date"),
-                "match": match_str,
-                "joueur": joueur_str,
-                "pari": pari_str,
-                "résultat": res,
-                "proba_predite": b.get("proba_model", 0)
-            })
+            rows.append(
+                {
+                    "date": b.get("date"),
+                    "match": match_str,
+                    "joueur": joueur_str,
+                    "pari": pari_str,
+                    "résultat": res,
+                    "proba_predite": b.get("proba_model", 0),
+                }
+            )
 
         # ── Classify each row by market type ─────────────────────────
         def _market_type(pari: str) -> str | None:
@@ -655,6 +661,7 @@ def get_nhl_performance(days: int = 30):
         # ── Keep only the TOP 1 player per (date, match, market) ─────
         # Group by (date, match, market), pick the player with highest proba
         from collections import defaultdict
+
         groups: dict[tuple, list] = defaultdict(list)
 
         for r in rows:
@@ -685,7 +692,7 @@ def get_nhl_performance(days: int = 30):
         }
         daily = {}
 
-        for (day, match_name, market), r in top1_rows:
+        for (day, _match_name, market), r in top1_rows:
             is_win = "GAGN" in (r.get("résultat") or "").upper()
 
             stats[market]["total"] += 1
@@ -733,9 +740,7 @@ def get_nhl_performance(days: int = 30):
             "brier_score": brier_global,
             "brier_by_market": brier_by_market,
             "avg_confidence": (
-                round(stats["all"]["sum_conf"] / total_all, 1)
-                if total_all > 0
-                else 0
+                round(stats["all"]["sum_conf"] / total_all, 1) if total_all > 0 else 0
             ),
             "daily_stats": sorted(daily.values(), key=lambda x: x["date"]),
         }
@@ -891,4 +896,3 @@ def get_nhl_meta_analysis(date: str = None):
         pass
 
     return {"ok": False, "date": date, "analysis": None, "source": None}
-

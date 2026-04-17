@@ -50,6 +50,7 @@ class _RestrictedUnpickler(pickle.Unpickler):
 def _safe_pickle_load(f) -> Any:
     return _RestrictedUnpickler(f).load()
 
+
 MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "models" / "nhl"
 
 # Cache
@@ -74,6 +75,7 @@ def _load_models():
                 # tells us via `serialization` field where the model weights live.
                 if data.get("serialization") == "ubj" and "model" not in data:
                     import xgboost as xgb
+
                     ubj_path = MODEL_DIR / f"nhl_match_{name}.ubj"
                     if not ubj_path.exists():
                         logger.warning(

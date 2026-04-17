@@ -85,14 +85,17 @@ def place_bet(
 
     # ── Atomic path via Supabase RPC ──────────────────────────────
     try:
-        result = supabase.rpc("place_bet_atomic", {
-            "p_ticket_type": ticket_type,
-            "p_stake": round(stake, 2),
-            "p_odds": round(odds, 3),
-            "p_description": description,
-            "p_fixture_ids": fixture_ids or [],
-            "p_model_version": model_version,
-        }).execute()
+        result = supabase.rpc(
+            "place_bet_atomic",
+            {
+                "p_ticket_type": ticket_type,
+                "p_stake": round(stake, 2),
+                "p_odds": round(odds, 3),
+                "p_description": description,
+                "p_fixture_ids": fixture_ids or [],
+                "p_model_version": model_version,
+            },
+        ).execute()
 
         data = result.data
         if isinstance(data, list) and len(data) == 1:
@@ -164,7 +167,11 @@ def _place_bet_legacy(
                 inserted_id = result.data[0].get("id") if result.data else None
                 if inserted_id:
                     supabase.table(TABLE).delete().eq("id", inserted_id).execute()
-                logger.warning("Bankroll concurrent modification detected, retrying (%d/%d)", attempt + 1, MAX_RETRIES)
+                logger.warning(
+                    "Bankroll concurrent modification detected, retrying (%d/%d)",
+                    attempt + 1,
+                    MAX_RETRIES,
+                )
                 continue
 
             logger.info(

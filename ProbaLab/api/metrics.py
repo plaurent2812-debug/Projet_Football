@@ -1,4 +1,5 @@
 """Custom Prometheus metrics for ProbaLab business logic."""
+
 from prometheus_client import Counter, Histogram
 
 # ─── Prediction pipeline ─────────────────────────────────────────────────────

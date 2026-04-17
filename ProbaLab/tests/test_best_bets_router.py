@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ═══════════════════════════════════════════════════════════════════
 #  Helper: route-aware Supabase mock
 # ═══════════════════════════════════════════════════════════════════
@@ -30,9 +29,7 @@ class RouteAwareQuery:
         self._filters: dict = {}
         self._default_data: list[dict] = staged.get("__default__", [])
         self._update_payload: dict | None = None
-        self._update_captured: list[tuple[dict, dict]] = staged.setdefault(
-            "__updates__", []
-        )
+        self._update_captured: list[tuple[dict, dict]] = staged.setdefault("__updates__", [])
 
     # ── chainable selectors (no-op) ───────────────────────────────
     def select(self, *args, **kwargs):
@@ -166,9 +163,7 @@ class TestResolveBestBetsFootball:
             },
         )
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -216,9 +211,7 @@ class TestResolveBestBetsFootball:
             },
         )
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -274,9 +267,7 @@ class TestResolveBestBetsFootball:
             },
         )
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -323,9 +314,7 @@ class TestResolveBestBetsFootball:
             },
         )
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -370,9 +359,7 @@ class TestResolveBestBetsFootball:
             },
         )
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -405,9 +392,7 @@ class TestResolveBestBetsFootball:
         # Return a fixture for a different match so by-teams lookup also misses
         sb.stage("fixtures", {"__default__": []})
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -453,9 +438,7 @@ class TestResolveBestBetsFootball:
             },
         )
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -531,9 +514,7 @@ class TestResolveBestBetsNHL:
             },
         )
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -582,9 +563,7 @@ class TestResolveBestBetsNHL:
             },
         )
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -617,9 +596,7 @@ class TestResolveBestBetsNHL:
         sb.stage("nhl_fixtures", {"__default__": []})
         sb.stage("nhl_player_game_stats", {"__default__": []})
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -653,9 +630,7 @@ class TestResolveBestBetsNHL:
         sb.stage("nhl_fixtures", {"__default__": []})
         sb.stage("nhl_player_game_stats", {"__default__": []})
 
-        with patch.object(bb_module, "supabase", sb), patch.object(
-            bb_module, "verify_cron_auth"
-        ):
+        with patch.object(bb_module, "supabase", sb), patch.object(bb_module, "verify_cron_auth"):
             result = bb_module.resolve_best_bets.__wrapped__(
                 body=self._make_body(),
                 request=MagicMock(),
@@ -674,14 +649,15 @@ class TestResolveBestBetsNHL:
 
 class TestResolveBestBetsValidation:
     def test_invalid_sport_rejected(self):
-        from api.routers import best_bets as bb_module
+
+        from pydantic import ValidationError
+
         from api.schemas import ResolveBetsRequest
-        from fastapi import HTTPException
 
         # pydantic won't even accept this, so we bypass the schema layer
         # by manually constructing a body with a valid sport then tampering.
         # Actually, pydantic will reject at construction, so we test via body.
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ResolveBetsRequest(date="2026-04-01", sport="basketball")  # type: ignore[arg-type]
 
     def test_missing_data_raises_400(self):
@@ -698,11 +674,10 @@ class TestResolveBestBetsValidation:
 
         from fastapi import HTTPException
 
-        with patch.object(bb_module, "verify_cron_auth"):
-            with pytest.raises(HTTPException) as exc:
-                bb_module.resolve_best_bets.__wrapped__(
-                    body=FakeBody(),  # type: ignore[arg-type]
-                    request=MagicMock(),
-                    authorization="Bearer test",
-                )
+        with patch.object(bb_module, "verify_cron_auth"), pytest.raises(HTTPException) as exc:
+            bb_module.resolve_best_bets.__wrapped__(
+                body=FakeBody(),  # type: ignore[arg-type]
+                request=MagicMock(),
+                authorization="Bearer test",
+            )
         assert exc.value.status_code == 400

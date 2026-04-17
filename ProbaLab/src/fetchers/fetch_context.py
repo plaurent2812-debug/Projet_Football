@@ -8,6 +8,7 @@ fetch_context.py — Récupère le contexte des matchs à venir :
 ~65 matchs × 3 endpoints = ~195 requêtes API-Football
 + ~65 requêtes OpenWeatherMap (optionnel)
 """
+
 import logging
 import os
 from datetime import datetime, timezone
@@ -37,15 +38,17 @@ def fetch_injuries():
             team = item.get("team", {})
             fixture = item.get("fixture", {})
 
-            batch.append({
-                "player_api_id":  player.get("id"),
-                "player_name":    player.get("name"),
-                "team_api_id":    team.get("id"),
-                "league_id":      lid,
-                "fixture_api_id": fixture.get("id"),
-                "type":           player.get("type"),       # Missing Fixture, Questionable, etc.
-                "reason":         player.get("reason"),     # Knee Injury, Suspended, etc.
-            })
+            batch.append(
+                {
+                    "player_api_id": player.get("id"),
+                    "player_name": player.get("name"),
+                    "team_api_id": team.get("id"),
+                    "league_id": lid,
+                    "fixture_api_id": fixture.get("id"),
+                    "type": player.get("type"),  # Missing Fixture, Questionable, etc.
+                    "reason": player.get("reason"),  # Knee Injury, Suspended, etc.
+                }
+            )
 
         if batch:
             # Vider les anciennes blessures de cette ligue puis insérer
@@ -61,30 +64,33 @@ def fetch_injuries():
     logger.info("  Synchronisation du flag is_injured...")
     try:
         # Récupérer les fixture_api_id des matchs NS (à venir)
-        ns_fixtures = supabase.table("fixtures").select("api_fixture_id").eq("status", "NS").execute().data
+        ns_fixtures = (
+            supabase.table("fixtures").select("api_fixture_id").eq("status", "NS").execute().data
+        )
         ns_fids = [f["api_fixture_id"] for f in ns_fixtures if f.get("api_fixture_id")]
 
         injured_ids = set()
         if ns_fids:
             # Blessures uniquement pour les matchs à venir
-            ns_injuries = supabase.table("injuries") \
-                .select("player_api_id") \
-                .in_("fixture_api_id", ns_fids) \
-                .execute().data
-            injured_ids = set(i["player_api_id"] for i in ns_injuries if i.get("player_api_id"))
+            ns_injuries = (
+                supabase.table("injuries")
+                .select("player_api_id")
+                .in_("fixture_api_id", ns_fids)
+                .execute()
+                .data
+            )
+            injured_ids = {i["player_api_id"] for i in ns_injuries if i.get("player_api_id")}
 
         # Reset tous les joueurs à non-blessé
-        supabase.table("players").update(
-            {"is_injured": False}
-        ).eq("is_injured", True).execute()
+        supabase.table("players").update({"is_injured": False}).eq("is_injured", True).execute()
 
         # Marquer les blessés actuels
         if injured_ids:
             for pid in injured_ids:
                 try:
-                    supabase.table("players").update(
-                        {"is_injured": True}
-                    ).eq("api_id", pid).execute()
+                    supabase.table("players").update({"is_injured": True}).eq(
+                        "api_id", pid
+                    ).execute()
                 except Exception:
                     pass
             logger.info("  %d joueurs marques comme blesses/absents", len(injured_ids))
@@ -102,9 +108,7 @@ def fetch_odds():
     logger.info("=== Importation des cotes bookmakers ===")
 
     # Récupérer les fixtures NS
-    fixtures = supabase.table("fixtures").select(
-        "api_fixture_id"
-    ).eq("status", "NS").execute().data
+    fixtures = supabase.table("fixtures").select("api_fixture_id").eq("status", "NS").execute().data
 
     if not fixtures:
         logger.info("   Aucun match a venir.")
@@ -130,25 +134,25 @@ def fetch_odds():
 
                     if bet_name == "Match Winner":
                         odds_data["home_win_odds"] = safe_float(values.get("Home"))
-                        odds_data["draw_odds"]     = safe_float(values.get("Draw"))
+                        odds_data["draw_odds"] = safe_float(values.get("Draw"))
                         odds_data["away_win_odds"] = safe_float(values.get("Away"))
 
                     elif bet_name == "Goals Over/Under":
-                        odds_data["over_15_odds"]  = safe_float(values.get("Over 1.5"))
+                        odds_data["over_15_odds"] = safe_float(values.get("Over 1.5"))
                         odds_data["under_15_odds"] = safe_float(values.get("Under 1.5"))
-                        odds_data["over_25_odds"]  = safe_float(values.get("Over 2.5"))
+                        odds_data["over_25_odds"] = safe_float(values.get("Over 2.5"))
                         odds_data["under_25_odds"] = safe_float(values.get("Under 2.5"))
-                        odds_data["over_35_odds"]  = safe_float(values.get("Over 3.5"))
+                        odds_data["over_35_odds"] = safe_float(values.get("Over 3.5"))
                         odds_data["under_35_odds"] = safe_float(values.get("Under 3.5"))
 
                     elif bet_name == "Both Teams Score":
                         odds_data["btts_yes_odds"] = safe_float(values.get("Yes"))
-                        odds_data["btts_no_odds"]  = safe_float(values.get("No"))
+                        odds_data["btts_no_odds"] = safe_float(values.get("No"))
 
                     elif bet_name == "Double Chance":
-                        odds_data["dc_1x_odds"]    = safe_float(values.get("Home/Draw"))
-                        odds_data["dc_x2_odds"]    = safe_float(values.get("Draw/Away"))
-                        odds_data["dc_12_odds"]    = safe_float(values.get("Home/Away"))
+                        odds_data["dc_1x_odds"] = safe_float(values.get("Home/Draw"))
+                        odds_data["dc_x2_odds"] = safe_float(values.get("Draw/Away"))
+                        odds_data["dc_12_odds"] = safe_float(values.get("Home/Away"))
 
         if odds_data.get("home_win_odds"):
             try:
@@ -226,22 +230,24 @@ def fetch_h2h():
             else:
                 draws += 1
 
-            last_matches.append({
-                "date": m["fixture"]["date"],
-                "home": m["teams"]["home"]["name"],
-                "away": m["teams"]["away"]["name"],
-                "score": f"{gh}-{ga}",
-            })
+            last_matches.append(
+                {
+                    "date": m["fixture"]["date"],
+                    "home": m["teams"]["home"]["name"],
+                    "away": m["teams"]["away"]["name"],
+                    "score": f"{gh}-{ga}",
+                }
+            )
 
         h2h_data = {
-            "team_a_api_id":    home_id,
-            "team_b_api_id":    away_id,
-            "total_matches":    len(matches),
-            "team_a_wins":      a_wins,
-            "draws":            draws,
-            "team_b_wins":      b_wins,
-            "team_a_goals":     a_goals,
-            "team_b_goals":     b_goals,
+            "team_a_api_id": home_id,
+            "team_b_api_id": away_id,
+            "total_matches": len(matches),
+            "team_a_wins": a_wins,
+            "draws": draws,
+            "team_b_wins": b_wins,
+            "team_a_goals": a_goals,
+            "team_b_goals": b_goals,
             "last_matches_json": last_matches,
         }
 
@@ -266,9 +272,13 @@ def fetch_weather():
 
     logger.info("=== Importation meteo ===")
 
-    fixtures = supabase.table("fixtures").select(
-        "api_fixture_id, date, stats_json"
-    ).eq("status", "NS").execute().data
+    fixtures = (
+        supabase.table("fixtures")
+        .select("api_fixture_id, date, stats_json")
+        .eq("status", "NS")
+        .execute()
+        .data
+    )
 
     total = 0
     for fix in fixtures:
@@ -278,12 +288,16 @@ def fetch_weather():
             continue
 
         try:
-            resp = requests.get("https://api.openweathermap.org/data/2.5/forecast", params={
-                "q": city,
-                "appid": api_key,
-                "units": "metric",
-                "cnt": 8,  # 24h de prévision
-            }, timeout=5)
+            resp = requests.get(
+                "https://api.openweathermap.org/data/2.5/forecast",
+                params={
+                    "q": city,
+                    "appid": api_key,
+                    "units": "metric",
+                    "cnt": 8,  # 24h de prévision
+                },
+                timeout=5,
+            )
             weather_data = resp.json()
 
             if weather_data.get("cod") != "200":
@@ -293,8 +307,11 @@ def fetch_weather():
             match_dt = datetime.fromisoformat(fix["date"].replace("Z", "+00:00"))
             closest = min(
                 weather_data.get("list", []),
-                key=lambda w: abs(datetime.fromtimestamp(w["dt"], tz=timezone.utc).timestamp() - match_dt.timestamp()),
-                default=None
+                key=lambda w: abs(
+                    datetime.fromtimestamp(w["dt"], tz=timezone.utc).timestamp()
+                    - match_dt.timestamp()
+                ),
+                default=None,
             )
 
             if closest:
@@ -306,9 +323,9 @@ def fetch_weather():
                     "rain_mm": closest.get("rain", {}).get("3h", 0),
                 }
 
-                supabase.table("fixtures").update(
-                    {"weather_json": weather}
-                ).eq("api_fixture_id", fix["api_fixture_id"]).execute()
+                supabase.table("fixtures").update({"weather_json": weather}).eq(
+                    "api_fixture_id", fix["api_fixture_id"]
+                ).execute()
                 total += 1
 
         except Exception:

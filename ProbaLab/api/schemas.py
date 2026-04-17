@@ -12,8 +12,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 # ─── Strict base — prevents mass-assignment (P0-7) ───────────────
+
 
 class _StrictBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -21,12 +21,14 @@ class _StrictBase(BaseModel):
 
 # ─── Email Endpoints ─────────────────────────────────────────────
 
+
 class EmailPayload(_StrictBase):
     email: str = Field(..., max_length=320, description="Recipient email address")
     name: str | None = Field(None, max_length=200, description="Recipient name (optional)")
 
 
 # ─── Best Bets ───────────────────────────────────────────────────
+
 
 class SaveBetRequest(_StrictBase):
     date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="ISO date YYYY-MM-DD")
@@ -41,11 +43,14 @@ class SaveBetRequest(_StrictBase):
 
 
 class UpdateBetResultRequest(_StrictBase):
-    result: Literal["WIN", "LOSS", "VOID", "PENDING"] = Field(..., description="WIN, LOSS, VOID, or PENDING")
+    result: Literal["WIN", "LOSS", "VOID", "PENDING"] = Field(
+        ..., description="WIN, LOSS, VOID, or PENDING"
+    )
     notes: str = Field("", max_length=1000, description="Optional notes")
 
 
 # ─── CRON / Pipeline ─────────────────────────────────────────────
+
 
 class DateRequest(_StrictBase):
     date: str | None = Field(None, description="ISO date YYYY-MM-DD (defaults to today)")
@@ -55,6 +60,7 @@ class DateRequest(_StrictBase):
     def validate_date_format(cls, v: str | None) -> str | None:
         if v is not None:
             import re
+
             if not re.match(r"^\d{4}-\d{2}-\d{2}$", v):
                 raise ValueError("date must match YYYY-MM-DD format")
         return v
@@ -67,7 +73,9 @@ class ResolveBetsRequest(_StrictBase):
 
 class ResolveExpertPicksRequest(_StrictBase):
     date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="ISO date YYYY-MM-DD")
-    sport: Literal["football", "nhl"] | None = Field(None, description="'football' or 'nhl' (optional)")
+    sport: Literal["football", "nhl"] | None = Field(
+        None, description="'football' or 'nhl' (optional)"
+    )
 
 
 class RunPipelineRequest(_StrictBase):

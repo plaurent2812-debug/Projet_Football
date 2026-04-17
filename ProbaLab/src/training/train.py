@@ -51,14 +51,14 @@ _ALLOWED_PREFIXES = (
     "sklearn.linear_model.",
     "sklearn.preprocessing.",
     "sklearn.calibration.",
-    "sklearn.isotonic",     # IsotonicRegression used for probability calibration
+    "sklearn.isotonic",  # IsotonicRegression used for probability calibration
     "sklearn.pipeline.",
     "sklearn.impute.",
-    "sklearn.tree.",       # used by ensemble internals
-    "sklearn.utils.",      # _bunch, Tags, etc. used by sklearn internals
-    "sklearn.base.",       # BaseEstimator and mixin classes
+    "sklearn.tree.",  # used by ensemble internals
+    "sklearn.utils.",  # _bunch, Tags, etc. used by sklearn internals
+    "sklearn.base.",  # BaseEstimator and mixin classes
     "numpy.",
-    "numpy",               # catches bare "numpy" module for ndarray/dtype
+    "numpy",  # catches bare "numpy" module for ndarray/dtype
     "xgboost.",
     "lightgbm.",
     "_codecs",
@@ -367,10 +367,16 @@ def train_classifier(
         warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
         warnings.filterwarnings("ignore", category=FutureWarning)
         cv_scores = cross_val_score(
-            model, X_train, y_train, cv=tscv, scoring="accuracy",
+            model,
+            X_train,
+            y_train,
+            cv=tscv,
+            scoring="accuracy",
             fit_params={"sample_weight": sample_weight_train},
         )
-    logger.info(f"  CV Accuracy (temporal, balanced) : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+    logger.info(
+        f"  CV Accuracy (temporal, balanced) : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}"
+    )
     logger.info(f"  CV Folds : {[round(s, 4) for s in cv_scores.tolist()]}")
 
     # ── Split train into fit + calibration sets ─────────────────
@@ -381,7 +387,9 @@ def train_classifier(
     y_train_fit, y_cal = y_train[:-cal_size], y_train[-cal_size:]
     weight_fit = sample_weight_train[:-cal_size]
 
-    logger.info(f"  Split calibration : fit={len(X_train_fit)}, cal={len(X_cal)}, test={len(X_test)}")
+    logger.info(
+        f"  Split calibration : fit={len(X_train_fit)}, cal={len(X_cal)}, test={len(X_test)}"
+    )
 
     # Validation split from training set (separate from test set)
     # Used for early stopping — never touches the holdout test set
@@ -398,7 +406,8 @@ def train_classifier(
         warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
         warnings.filterwarnings("ignore", category=FutureWarning)
         model.fit(
-            X_train_early, y_train_early,
+            X_train_early,
+            y_train_early,
             sample_weight=weight_early,
             eval_set=[(X_val, y_val)],
             verbose=False,
@@ -416,7 +425,9 @@ def train_classifier(
             y_binary = (y_cal == k).astype(float)
             ir.fit(y_proba_cal[:, k], y_binary)
             calibrators.append(ir)
-        logger.info(f"  🎯 Isotonic calibration fitted on {len(X_cal)} samples ({n_classes} classes)")
+        logger.info(
+            f"  🎯 Isotonic calibration fitted on {len(X_cal)} samples ({n_classes} classes)"
+        )
     except Exception as e:
         logger.warning(f"  ⚠️ Calibration step failed: {e}")
         calibrators = None
@@ -426,9 +437,9 @@ def train_classifier(
 
     if calibrators:
         # Apply isotonic calibration to test probabilities
-        y_proba_calibrated = np.column_stack([
-            calibrators[k].predict(y_proba_raw[:, k]) for k in range(n_classes)
-        ])
+        y_proba_calibrated = np.column_stack(
+            [calibrators[k].predict(y_proba_raw[:, k]) for k in range(n_classes)]
+        )
         # Renormalize rows to sum to 1.0
         row_sums = y_proba_calibrated.sum(axis=1, keepdims=True)
         row_sums = np.where(row_sums > 0, row_sums, 1.0)
@@ -629,6 +640,7 @@ def _optuna_lgb_params(
 ) -> dict:
     """Find optimal LightGBM hyperparameters via Bayesian optimization."""
     import lightgbm as lgb
+
     tscv = TimeSeriesSplit(n_splits=3)
 
     def objective(trial: optuna.Trial) -> float:
@@ -749,8 +761,13 @@ def run() -> None:
         lgb_tuned_1x2 = None
 
     result_ens_1x2 = train_stacking_ensemble(
-        X, y_1x2, "ensemble_1x2", "result", n_classes=3, imputer=imputer,
-        lgb_tuned_params=lgb_tuned_1x2
+        X,
+        y_1x2,
+        "ensemble_1x2",
+        "result",
+        n_classes=3,
+        imputer=imputer,
+        lgb_tuned_params=lgb_tuned_1x2,
     )
 
     # Tune LightGBM for the binary ensembles
@@ -761,12 +778,22 @@ def run() -> None:
         lgb_tuned_binary = None
 
     result_ens_btts = train_stacking_ensemble(
-        X, y_btts, "ensemble_btts", "btts", n_classes=2, imputer=imputer,
-        lgb_tuned_params=lgb_tuned_binary
+        X,
+        y_btts,
+        "ensemble_btts",
+        "btts",
+        n_classes=2,
+        imputer=imputer,
+        lgb_tuned_params=lgb_tuned_binary,
     )
     result_ens_o25 = train_stacking_ensemble(
-        X, y_o25, "ensemble_over25", "over_25", n_classes=2, imputer=imputer,
-        lgb_tuned_params=lgb_tuned_binary
+        X,
+        y_o25,
+        "ensemble_over25",
+        "over_25",
+        n_classes=2,
+        imputer=imputer,
+        lgb_tuned_params=lgb_tuned_binary,
     )
 
     # ── Sauvegarder les modèles ───────────────────────────────────

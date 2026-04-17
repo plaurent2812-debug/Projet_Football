@@ -78,18 +78,20 @@ def semantic_search(
                 for r in pred_results:
                     fix = fixtures_map.get(r.get("fixture_id"), {})
                     league_name = league_map.get(str(fix.get("league_id", "")), "")
-                    results["predictions"].append({
-                        "fixture_id": r.get("fixture_id"),
-                        "home_team": fix.get("home_team", "?"),
-                        "away_team": fix.get("away_team", "?"),
-                        "date": fix.get("date"),
-                        "league": league_name,
-                        "analysis_text": (r.get("analysis_text") or "")[:300],
-                        "proba_home": r.get("proba_home"),
-                        "proba_draw": r.get("proba_draw"),
-                        "proba_away": r.get("proba_away"),
-                        "similarity": round(r.get("similarity", 0), 4),
-                    })
+                    results["predictions"].append(
+                        {
+                            "fixture_id": r.get("fixture_id"),
+                            "home_team": fix.get("home_team", "?"),
+                            "away_team": fix.get("away_team", "?"),
+                            "date": fix.get("date"),
+                            "league": league_name,
+                            "analysis_text": (r.get("analysis_text") or "")[:300],
+                            "proba_home": r.get("proba_home"),
+                            "proba_draw": r.get("proba_draw"),
+                            "proba_away": r.get("proba_away"),
+                            "similarity": round(r.get("similarity", 0), 4),
+                        }
+                    )
         except Exception:
             logger.warning("Semantic search predictions failed", exc_info=True)
             results["predictions_error"] = "Search unavailable"

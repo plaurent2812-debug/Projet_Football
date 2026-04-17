@@ -13,7 +13,6 @@ Responsibilities:
 from src.config import logger
 from src.constants import META_LEARNER_ENABLED, WEIGHT_AI, WEIGHT_STATS
 
-
 # ═══════════════════════════════════════════════════════════════════
 #  FALLBACK ANALYSIS (when Gemini is unavailable)
 # ═══════════════════════════════════════════════════════════════════
@@ -34,34 +33,52 @@ def _build_fallback_analysis(stats_result: dict) -> str:
 
     # xG assessment
     if xg_total >= 3.0:
-        parts.append(f"Les xG attendus sont élevés ({xg_home:.2f} - {xg_away:.2f}), annonçant un match ouvert avec de nombreuses occasions.")
+        parts.append(
+            f"Les xG attendus sont élevés ({xg_home:.2f} - {xg_away:.2f}), annonçant un match ouvert avec de nombreuses occasions."
+        )
     elif xg_total >= 2.2:
-        parts.append(f"Les xG attendus ({xg_home:.2f} - {xg_away:.2f}) suggèrent un match équilibré avec un potentiel offensif correct.")
+        parts.append(
+            f"Les xG attendus ({xg_home:.2f} - {xg_away:.2f}) suggèrent un match équilibré avec un potentiel offensif correct."
+        )
     else:
-        parts.append(f"Les xG attendus sont modérés ({xg_home:.2f} - {xg_away:.2f}), ce qui laisse présager un match plutôt fermé.")
+        parts.append(
+            f"Les xG attendus sont modérés ({xg_home:.2f} - {xg_away:.2f}), ce qui laisse présager un match plutôt fermé."
+        )
 
     # Favorite assessment
     if p_home >= 55:
-        parts.append(f"L'équipe à domicile est nettement favorite ({p_home}%) grâce à sa supériorité statistique.")
+        parts.append(
+            f"L'équipe à domicile est nettement favorite ({p_home}%) grâce à sa supériorité statistique."
+        )
     elif p_away >= 55:
-        parts.append(f"L'équipe visiteuse est favorite ({p_away}%) malgré son déplacement, un profil intéressant.")
+        parts.append(
+            f"L'équipe visiteuse est favorite ({p_away}%) malgré son déplacement, un profil intéressant."
+        )
     elif abs(p_home - p_away) < 10:
-        parts.append(f"Les équipes se tiennent de très près ({p_home}% - {p_draw}% - {p_away}%), un match incertain.")
+        parts.append(
+            f"Les équipes se tiennent de très près ({p_home}% - {p_draw}% - {p_away}%), un match incertain."
+        )
     else:
         dom = "domicile" if p_home > p_away else "extérieur"
         parts.append(f"Léger avantage pour l'équipe à {dom}, mais le match reste ouvert.")
 
     # Goals market
     if p_over25 >= 55:
-        parts.append(f"Le marché Over 2.5 buts est bien orienté ({p_over25}%), les deux équipes ayant un profil offensif.")
+        parts.append(
+            f"Le marché Over 2.5 buts est bien orienté ({p_over25}%), les deux équipes ayant un profil offensif."
+        )
     elif p_over25 <= 35:
-        parts.append(f"Profil défensif pour cette rencontre avec seulement {p_over25}% de chances de voir plus de 2.5 buts.")
+        parts.append(
+            f"Profil défensif pour cette rencontre avec seulement {p_over25}% de chances de voir plus de 2.5 buts."
+        )
 
     # BTTS
     if p_btts >= 60:
         parts.append(f"Les deux équipes devraient marquer (BTTS à {p_btts}%).")
     elif p_btts <= 35:
-        parts.append(f"Il est peu probable que les deux équipes trouvent le chemin des filets (BTTS à {p_btts}%).")
+        parts.append(
+            f"Il est peu probable que les deux équipes trouvent le chemin des filets (BTTS à {p_btts}%)."
+        )
 
     # Context from form/rest if available
     ctx = stats_result.get("context", {})
@@ -134,8 +151,12 @@ def _try_meta_blend(
             and meta_preds.get("proba_draw_meta") is not None
             and meta_preds.get("proba_away_meta") is not None
         ):
-            blended_home = round(WEIGHT_STATS * final["proba_home"] + WEIGHT_AI * meta_preds["proba_home_meta"])
-            blended_draw = round(WEIGHT_STATS * final["proba_draw"] + WEIGHT_AI * meta_preds["proba_draw_meta"])
+            blended_home = round(
+                WEIGHT_STATS * final["proba_home"] + WEIGHT_AI * meta_preds["proba_home_meta"]
+            )
+            blended_draw = round(
+                WEIGHT_STATS * final["proba_draw"] + WEIGHT_AI * meta_preds["proba_draw_meta"]
+            )
             blended_away = 100 - blended_home - blended_draw
             final["proba_home"] = blended_home
             final["proba_draw"] = blended_draw
@@ -148,15 +169,22 @@ def _try_meta_blend(
             )
 
         # Over 1.5 blend
-        if meta_preds.get("proba_over_15_meta") is not None and final.get("proba_over_15") is not None:
+        if (
+            meta_preds.get("proba_over_15_meta") is not None
+            and final.get("proba_over_15") is not None
+        ):
             final["proba_over_15"] = round(
                 WEIGHT_STATS * final["proba_over_15"] + WEIGHT_AI * meta_preds["proba_over_15_meta"]
             )
 
         # Over 2.5 blend
-        if meta_preds.get("proba_over_25_meta") is not None and final.get("proba_over_2_5") is not None:
+        if (
+            meta_preds.get("proba_over_25_meta") is not None
+            and final.get("proba_over_2_5") is not None
+        ):
             final["proba_over_2_5"] = round(
-                WEIGHT_STATS * final["proba_over_2_5"] + WEIGHT_AI * meta_preds["proba_over_25_meta"]
+                WEIGHT_STATS * final["proba_over_2_5"]
+                + WEIGHT_AI * meta_preds["proba_over_25_meta"]
             )
 
         logger.info(
@@ -275,7 +303,9 @@ def blend_predictions(stats_result: dict, ai_result: object | None) -> dict:
         "proba_btts": final.get("proba_btts"),
         "proba_over_05": final.get("proba_over_05"),
         "proba_over_15": final.get("proba_over_15"),
-        "proba_over_2_5": final.get("proba_over_2_5") or stats_result.get("proba_over_2_5") or stats_result.get("proba_over_25"),
+        "proba_over_2_5": final.get("proba_over_2_5")
+        or stats_result.get("proba_over_2_5")
+        or stats_result.get("proba_over_25"),
         "proba_over_35": final.get("proba_over_35"),
         "proba_dc_1x": final.get("proba_dc_1x"),
         "proba_dc_x2": final.get("proba_dc_x2"),

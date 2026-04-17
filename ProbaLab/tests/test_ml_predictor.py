@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+
 from src.constants import FEATURE_COLS
 from src.models.ml_predictor import (
     _impute,

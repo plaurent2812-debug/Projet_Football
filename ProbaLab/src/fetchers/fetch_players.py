@@ -5,6 +5,7 @@ Endpoint : GET /players?team={id}&season=2025&page={n}
 Paginé : 20 joueurs par page.
 ~160 équipes × ~2 pages = ~320 requêtes
 """
+
 import logging
 
 from src.config import SEASON, api_get, get_request_count, reset_request_count, supabase
@@ -63,15 +64,15 @@ def fetch_players_for_team(team_api_id, team_name):
 
             # Données joueur
             player_data = {
-                "api_id":      p["id"],
-                "name":        p.get("name", "Unknown"),
+                "api_id": p["id"],
+                "name": p.get("name", "Unknown"),
                 "team_api_id": team_api_id,
                 "nationality": p.get("nationality"),
-                "age":         p.get("age"),
-                "height_cm":   height,
-                "weight_kg":   weight,
-                "photo_url":   p.get("photo"),
-                "is_injured":  p.get("injured", False),
+                "age": p.get("age"),
+                "height_cm": height,
+                "weight_kg": weight,
+                "photo_url": p.get("photo"),
+                "is_injured": p.get("injured", False),
             }
 
             # Position depuis les stats (première entrée)
@@ -96,35 +97,35 @@ def fetch_players_for_team(team_api_id, team_name):
                         continue
 
                     stat_data = {
-                        "player_api_id":    p["id"],
-                        "team_api_id":      team_api_id,
-                        "league_id":        league_id,
-                        "season":           SEASON,
-                        "appearances":      safe_int(games.get("appearences")),  # typo dans l'API
-                        "minutes_played":   safe_int(games.get("minutes")),
-                        "rating":           safe_float(games.get("rating")),
-                        "goals":            safe_int(goals.get("total")),
-                        "assists":          safe_int(goals.get("assists")),
-                        "goals_conceded":   safe_int(goals.get("conceded")),
-                        "saves":            safe_int(goals.get("saves")),
-                        "shots_total":      safe_int(shots.get("total")),
-                        "shots_on_target":  safe_int(shots.get("on")),
-                        "passes_total":     safe_int(passes.get("total")),
-                        "passes_key":       safe_int(passes.get("key")),
-                        "passes_accuracy":  safe_int(passes.get("accuracy")),
+                        "player_api_id": p["id"],
+                        "team_api_id": team_api_id,
+                        "league_id": league_id,
+                        "season": SEASON,
+                        "appearances": safe_int(games.get("appearences")),  # typo dans l'API
+                        "minutes_played": safe_int(games.get("minutes")),
+                        "rating": safe_float(games.get("rating")),
+                        "goals": safe_int(goals.get("total")),
+                        "assists": safe_int(goals.get("assists")),
+                        "goals_conceded": safe_int(goals.get("conceded")),
+                        "saves": safe_int(goals.get("saves")),
+                        "shots_total": safe_int(shots.get("total")),
+                        "shots_on_target": safe_int(shots.get("on")),
+                        "passes_total": safe_int(passes.get("total")),
+                        "passes_key": safe_int(passes.get("key")),
+                        "passes_accuracy": safe_int(passes.get("accuracy")),
                         "dribbles_attempts": safe_int(dribbles.get("attempts")),
                         "dribbles_success": safe_int(dribbles.get("success")),
-                        "tackles_total":    safe_int(tackles.get("total")),
-                        "interceptions":    safe_int(tackles.get("interceptions")),
-                        "duels_total":      safe_int(duels.get("total")),
-                        "duels_won":        safe_int(duels.get("won")),
-                        "fouls_drawn":      safe_int(fouls.get("drawn")),
-                        "fouls_committed":  safe_int(fouls.get("committed")),
-                        "yellow_cards":     safe_int(cards.get("yellow")),
-                        "red_cards":        safe_int(cards.get("red")),
-                        "penalty_scored":   safe_int(penalty.get("scored")),
-                        "penalty_missed":   safe_int(penalty.get("missed")),
-                        "penalty_saved":    safe_int(penalty.get("saved")),
+                        "tackles_total": safe_int(tackles.get("total")),
+                        "interceptions": safe_int(tackles.get("interceptions")),
+                        "duels_total": safe_int(duels.get("total")),
+                        "duels_won": safe_int(duels.get("won")),
+                        "fouls_drawn": safe_int(fouls.get("drawn")),
+                        "fouls_committed": safe_int(fouls.get("committed")),
+                        "yellow_cards": safe_int(cards.get("yellow")),
+                        "red_cards": safe_int(cards.get("red")),
+                        "penalty_scored": safe_int(penalty.get("scored")),
+                        "penalty_missed": safe_int(penalty.get("missed")),
+                        "penalty_saved": safe_int(penalty.get("saved")),
                     }
                     all_stats.append(stat_data)
 

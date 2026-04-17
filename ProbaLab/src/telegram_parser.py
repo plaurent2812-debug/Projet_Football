@@ -10,6 +10,7 @@ Extrait:
   - date          : YYYY-MM-DD (date du match détectée ou aujourd'hui)
   - expert_note   : Texte libre capturé (ex: caption envoyé avec l'image)
 """
+
 from __future__ import annotations
 
 import json
@@ -40,7 +41,7 @@ RÈGLES :
 - Si c'est un combiné avec plusieurs sélections sur plusieurs matchs, liste CHAQUE sélection
 - Une sélection = un pari sur un match spécifique
 - Si tu vois "Points du joueur : 1 ou plus", le market est "Over 0.5 Points"
-- Si tu vois "Buts du joueur : 1 ou plus", le market est "Buteur"  
+- Si tu vois "Buts du joueur : 1 ou plus", le market est "Buteur"
 - Détecte le sport automatiquement (NHL si tu vois des équipes NHL, football sinon)
 - Si la cote est au format virgule (3,55), convertis en point (3.55)
 
@@ -168,7 +169,9 @@ def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
 
         if not raw_text or not raw_text.strip():
             logger.error("All models returned empty text")
-            return {"error": "Gemini a retourné une réponse vide. Réessaie avec un screenshot plus net."}
+            return {
+                "error": "Gemini a retourné une réponse vide. Réessaie avec un screenshot plus net."
+            }
 
         raw_text = raw_text.strip()
         logger.info("Gemini raw response: %s", raw_text[:300])

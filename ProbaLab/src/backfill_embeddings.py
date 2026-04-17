@@ -48,9 +48,9 @@ def backfill_learnings() -> int:
             continue
 
         try:
-            supabase.table("ai_learnings").update(
-                {"embedding": embedding}
-            ).eq("id", row["id"]).execute()
+            supabase.table("ai_learnings").update({"embedding": embedding}).eq(
+                "id", row["id"]
+            ).execute()
             count += 1
             if (i + 1) % 10 == 0:
                 logger.info(f"[Backfill] Learnings: {i + 1}/{len(rows)} processed")
@@ -80,10 +80,7 @@ def backfill_predictions(batch_size: int = 50) -> int:
         logger.error(f"[Backfill] Failed to fetch predictions: {e}")
         return 0
 
-    rows = [
-        r for r in (response.data or [])
-        if not r.get("embedding") and r.get("analysis_text")
-    ]
+    rows = [r for r in (response.data or []) if not r.get("embedding") and r.get("analysis_text")]
     logger.info(f"[Backfill] {len(rows)} predictions need embeddings")
 
     # Fetch fixture info for profile builder
@@ -93,14 +90,14 @@ def backfill_predictions(batch_size: int = 50) -> int:
         try:
             # Process in batches to avoid query size limits
             for batch_start in range(0, len(fixture_ids), 50):
-                batch_ids = fixture_ids[batch_start:batch_start + 50]
+                batch_ids = fixture_ids[batch_start : batch_start + 50]
                 fx_resp = (
                     supabase.table("fixtures")
                     .select("id, home_team, away_team, league_id, date")
                     .in_("id", batch_ids)
                     .execute()
                 )
-                for f in (fx_resp.data or []):
+                for f in fx_resp.data or []:
                     fixtures_map[f["id"]] = f
         except Exception as e:
             logger.warning(f"[Backfill] Could not fetch fixtures: {e}")
@@ -130,9 +127,9 @@ def backfill_predictions(batch_size: int = 50) -> int:
             continue
 
         try:
-            supabase.table("predictions").update(
-                {"embedding": embedding}
-            ).eq("id", row["id"]).execute()
+            supabase.table("predictions").update({"embedding": embedding}).eq(
+                "id", row["id"]
+            ).execute()
             count += 1
             if (i + 1) % 10 == 0:
                 logger.info(f"[Backfill] Predictions: {i + 1}/{len(rows)} processed")

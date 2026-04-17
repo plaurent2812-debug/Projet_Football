@@ -60,5 +60,6 @@ def get_nhl_season_id() -> str:
     start_year = now.year if now.month >= 8 else now.year - 1
     return f"{start_year}{start_year + 1}"
 
+
 # Common statuses for finished NHL matches across different APIs/sources
 NHL_FINISHED_STATUSES: set[str] = {"FT", "Final", "FINAL", "OFF", "Official"}

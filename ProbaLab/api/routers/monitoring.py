@@ -12,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter
 
 from api.cache import TTLCache
-from api.response_models import MonitoringHealthResponse, MonitoringResponse
 from src.config import supabase
 from src.constants import CACHE_TTL_MONITORING
 
@@ -113,9 +112,7 @@ def monitoring_health():
             else len(preds_today_resp.data or [])
         )
         last_prediction_at = (
-            preds_today_resp.data[0]["created_at"]
-            if preds_today_resp.data
-            else None
+            preds_today_resp.data[0]["created_at"] if preds_today_resp.data else None
         )
 
         # Yesterday's fixture coverage
@@ -144,16 +141,10 @@ def monitoring_health():
             if preds_yesterday_resp.count is not None
             else len(preds_yesterday_resp.data or [])
         )
-        coverage_pct = (
-            round(preds_yesterday / fix_count * 100, 1) if fix_count > 0 else None
-        )
+        coverage_pct = round(preds_yesterday / fix_count * 100, 1) if fix_count > 0 else None
 
         # Evaluated results count
-        eval_count_resp = (
-            supabase.table("prediction_results")
-            .select("id", count="exact")
-            .execute()
-        )
+        eval_count_resp = supabase.table("prediction_results").select("id", count="exact").execute()
         evaluated_total = (
             eval_count_resp.count
             if eval_count_resp.count is not None
@@ -175,4 +166,8 @@ def monitoring_health():
         }
     except Exception:
         logger.exception("Monitoring health check error")
-        return {"healthy": False, "error": "Internal error", "checked_at": datetime.now(timezone.utc).isoformat()}
+        return {
+            "healthy": False,
+            "error": "Internal error",
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }

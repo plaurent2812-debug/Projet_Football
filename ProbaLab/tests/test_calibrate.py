@@ -3,6 +3,7 @@ Tests unitaires pour calibrate.py — fonctions de calibration ML.
 """
 
 import numpy as np
+
 from src.models.calibrate import compute_bias, fit_isotonic_calibration, fit_platt_scaling
 
 # ═══════════════════════════════════════════════════════════════════

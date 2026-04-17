@@ -237,9 +237,7 @@ def analyze_history(
 
     # Filtrage temporel si model_training_date fourni
     if model_training_date:
-        before_count = len(history)
         history = [r for r in history if str(r.get("date", "")) > model_training_date]
-        # print(f"   📅 Filtrage temporel: {before_count} → {len(history)} (après {model_training_date})")
         if len(history) < 10:
             # print(f"   ⚠️ Pas assez de données post-entraînement pour calibrer")
             return {}
@@ -276,10 +274,7 @@ def analyze_history(
         if proba <= 0 or proba >= 1.0:
             # Fallback : utiliser la probabilité implicite de la cote si disponible
             cote = _safe_float(row.get("cote"))
-            if cote > 1.0:
-                proba = 1.0 / cote
-            else:
-                proba = _infer_probability_from_pari(pari)
+            proba = 1.0 / cote if cote > 1.0 else _infer_probability_from_pari(pari)
         if proba > 1.0:
             proba = proba / 100.0
         proba = max(0.05, min(0.95, proba))

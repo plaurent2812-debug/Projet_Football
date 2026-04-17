@@ -1,4 +1,3 @@
-
 def calculate_vorp_impact(missing_players: list[dict], team_stats: dict) -> tuple[float, float]:
     """
     Calculate the Value Over Replacement Player (VORP) impact for a list of missing players.

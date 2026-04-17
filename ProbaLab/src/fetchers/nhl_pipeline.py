@@ -34,7 +34,10 @@ try:
 except ImportError:
     logger.warning("[NHL] nhl.ml_models not available.")
     ML_MODELS = {}
-    def nhl_ml_available(): return False
+
+    def nhl_ml_available():
+        return False
+
 
 NHL_API = "https://api-web.nhle.com/v1"
 
@@ -55,7 +58,9 @@ def _fetch_json(endpoint: str) -> dict | None:
                 logger.error(f"[NHL] HTTP {resp.status_code} on {endpoint}")
                 return None
         except Exception:
-            logger.warning("[NHL] Error fetching %s (attempt %d)", endpoint, attempt + 1, exc_info=True)
+            logger.warning(
+                "[NHL] Error fetching %s (attempt %d)", endpoint, attempt + 1, exc_info=True
+            )
             time.sleep(1.0 * (attempt + 1))
     return None
 
@@ -65,7 +70,7 @@ def _fetch_json(endpoint: str) -> dict | None:
 
 def fetch_schedule() -> tuple[list[dict], str]:
     """Fetch today's NHL games.
-    
+
     Returns:
         A tuple of (games_list, schedule_date_str).
         schedule_date_str is the NHL "hockey day" date (YYYY-MM-DD),
@@ -108,7 +113,6 @@ def fetch_standings() -> dict:
             "pp_pct": t.get("powerPlayPctg", 0.20),
             "pk_pct": t.get("penaltyKillPctg", 0.80),
             "l10_pts_pct": t.get("l10PtsPctg", 0.5),
-            "pk_pct": t.get("pkPctg", 80.0) / 100.0,
             "l10_gaa": round(l10_ga / l10_gp, 2),
             "wins": t.get("wins", 0),
             "losses": t.get("losses", 0),
@@ -167,9 +171,7 @@ def fetch_team_special_teams() -> dict[str, dict]:
                     stats[name] = {}
                 stats[name]["pp_pct"] = t.get("powerPlayPct", 0.20)
                 stats[name]["pp_toi_seconds"] = t.get("ppTimeOnIcePerGame", 240)
-                stats[name]["pp_opportunities_per_game"] = t.get(
-                    "ppOpportunitiesPerGame", 3.0
-                )
+                stats[name]["pp_opportunities_per_game"] = t.get("ppOpportunitiesPerGame", 3.0)
     except Exception:
         logger.warning("[NHL] Failed to fetch PP stats", exc_info=True)
 
@@ -186,9 +188,7 @@ def fetch_team_special_teams() -> dict[str, dict]:
                 name = t.get("teamFullName", "")
                 if name not in stats:
                     stats[name] = {}
-                stats[name]["shots_against_per_game"] = t.get(
-                    "shotsAgainstPerGame", 30.0
-                )
+                stats[name]["shots_against_per_game"] = t.get("shotsAgainstPerGame", 30.0)
     except Exception:
         logger.warning("[NHL] Failed to fetch summary stats", exc_info=True)
 
@@ -241,7 +241,6 @@ def fetch_goalie_form(teams: list[str]) -> dict:
         for g in last5:
             is_home = g.get("homeTeam", {}).get("abbrev") == team
             opp_team_key = "awayTeam" if is_home else "homeTeam"
-            my_team_key = "homeTeam" if is_home else "awayTeam"
 
             ga = g.get(opp_team_key, {}).get("score", 0)
             total_ga += ga
@@ -304,7 +303,9 @@ def detect_fatigue(games: list[dict]) -> dict[str, float]:
         return fatigue_modifiers
 
     # We need the last 3 days to check for 3-in-4 (Today + 3 previous days)
-    past_dates = [(datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(1, 4)]
+    past_dates = [
+        (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(1, 4)
+    ]
     yesterday_str = past_dates[0]
 
     schedule_data = _fetch_json("/schedule/now")
@@ -382,7 +383,17 @@ def calculate_recent_form(game_log: list[dict]) -> dict:
     - Hard TOI Drop Filter (Massive penalty if L3 TOI < L20 TOI - 1.5 mins)
     """
     if len(game_log) < 5:
-        return {"goal": 1.0, "assist": 1.0, "point": 1.0, "shot": 1.0, "hot": False, "cold": False, "m5_m10_regression": 1.0, "max_gap_surge": 1.0, "toi_drop_penalty": 1.0}
+        return {
+            "goal": 1.0,
+            "assist": 1.0,
+            "point": 1.0,
+            "shot": 1.0,
+            "hot": False,
+            "cold": False,
+            "m5_m10_regression": 1.0,
+            "max_gap_surge": 1.0,
+            "toi_drop_penalty": 1.0,
+        }
 
     # Slices
     last5 = game_log[:5]
@@ -455,8 +466,9 @@ def calculate_recent_form(game_log: list[dict]) -> dict:
     days_since_last_game = 999
     if all_games and "gameDate" in all_games[0]:
         try:
-            from datetime import datetime, timezone
-            last_date = datetime.strptime(all_games[0]["gameDate"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            last_date = datetime.strptime(all_games[0]["gameDate"], "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
             days_since_last_game = (datetime.now(timezone.utc) - last_date).days
         except Exception:
             pass
@@ -603,12 +615,14 @@ def get_ai_game_context(games: list[dict], standings: dict) -> dict:
 
 
 def get_gemini_nhl_analysis(
-    home_team: str, away_team: str, top_players: list[dict], ai_factors: dict,
+    home_team: str,
+    away_team: str,
+    top_players: list[dict],
+    ai_factors: dict,
     injured_info: dict | None = None,
 ) -> str:
     """Use Gemini to generate a detailed, player-centric NHL match analysis."""
     try:
-        from google import genai
         from google.genai import types
 
         from src.brain import get_active_learnings, get_gemini_client
@@ -627,11 +641,9 @@ def get_gemini_nhl_analysis(
     for p in top_players[:10]:  # Top 10 des joueurs du match
         goal_prob = p.get("prob_goal", 0)
         point_prob = p.get("prob_point", 0)
-        assist_prob = p.get("prob_assist", 0)
 
         # Stats saison (per game)
         gpg = p.get("goals_per_game", 0)
-        apg = p.get("assists_per_game", 0)
         ppg = p.get("points_per_game", 0)
 
         form_tag = (
@@ -652,10 +664,12 @@ def get_gemini_nhl_analysis(
     learnings = get_active_learnings("nhl")
     learnings_block = ""
     if learnings:
-        learnings_block = "\n\n--- LEÇONS D'AUTO-CORRECTION ---\nPrends en compte tes erreurs passées :\n"
+        learnings_block = (
+            "\n\n--- LEÇONS D'AUTO-CORRECTION ---\nPrends en compte tes erreurs passées :\n"
+        )
         for i, l in enumerate(learnings, 1):
             learnings_block += f"{i}. {l}\n"
-    system_prompt = f"""Tu es un analyste expert de la NHL. 
+    system_prompt = f"""Tu es un analyste expert de la NHL.
 Ta mission est de fournir une synthèse narrative très courte et percutante (- de 60 mots) qui explique le contexte du match et justifie les notes (sur 10) des joueurs calculées par notre modèle.
 {learnings_block}"""
 
@@ -821,9 +835,10 @@ def _score_player(
         pp1_discipline_boost = 1.20
 
     # Final PP boost: team advantage × player share × opponent penalty volume × PP1 Target
-    pp_boost = 1.0 + (
-        team_pp_advantage * max(0.1, pp_share) * 2.0 * opp_penalty_volume
-    ) * pp1_discipline_boost
+    pp_boost = (
+        1.0
+        + (team_pp_advantage * max(0.1, pp_share) * 2.0 * opp_penalty_volume) * pp1_discipline_boost
+    )
 
     # Back-to-back & 3-in-4 fatigue penalty
     b2b_penalty = fatigue_dict.get(team, 1.0)
@@ -1036,7 +1051,7 @@ def calculate_win_prob(home: str, away: str, standings: dict, fatigue_dict: dict
 
     # Per-game goals scored & conceded (already computed by fetch_standings)
     h_gf = float(h.get("gf_per_game", 3.1))  # goals scored per game
-    h_ga = float(h.get("gaa", 3.1))            # goals conceded per game
+    h_ga = float(h.get("gaa", 3.1))  # goals conceded per game
     a_gf = float(a.get("gf_per_game", 3.1))
     a_ga = float(a.get("gaa", 3.1))
 
@@ -1379,7 +1394,9 @@ def run_nhl_pipeline() -> dict:
                     try:
                         last_game_date = game_log[0].get("gameDate", "")
                         if last_game_date:
-                            last_dt = datetime.strptime(last_game_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                            last_dt = datetime.strptime(last_game_date, "%Y-%m-%d").replace(
+                                tzinfo=timezone.utc
+                            )
                             days_since = (datetime.now(timezone.utc) - last_dt).days
                             if days_since > 10:
                                 injured.add(pid)
@@ -1408,7 +1425,6 @@ def run_nhl_pipeline() -> dict:
             if not team_players_sorted:
                 continue
 
-            top_passer = team_players_sorted[0]
             # Check if any top assist player from this team was injured
             team_injured_passers = [
                 p
@@ -1534,7 +1550,6 @@ def run_nhl_pipeline() -> dict:
 
         # Win probabilities for fixtures_data (saved to Supabase)
 
-
         fixtures_data.append(
             {
                 "api_fixture_id": game_id,
@@ -1645,7 +1660,9 @@ def run_nhl_pipeline() -> dict:
                     }
                 ).execute()
         except Exception:
-            logger.exception("[NHL] Error upserting fixture %s vs %s", f.get("home_team"), f.get("away_team"))
+            logger.exception(
+                "[NHL] Error upserting fixture %s vs %s", f.get("home_team"), f.get("away_team")
+            )
 
     logger.info(f"[NHL] ✅ {len(fixtures_data)} matchs insérés dans nhl_fixtures")
 
@@ -1655,10 +1672,12 @@ def run_nhl_pipeline() -> dict:
         # Fetch tomorrow's already-stored fixtures from DB to include in DeepThink
         extended_fixtures = list(fixtures_data)
         try:
-            from datetime import datetime as dt, timezone
-            from datetime import timedelta
-            tomorrow = (dt.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
-            cutoff_str = (dt.now(timezone.utc) + timedelta(days=1)).replace(hour=20, minute=0, second=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+            tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+            cutoff_str = (
+                (datetime.now(timezone.utc) + timedelta(days=1))
+                .replace(hour=20, minute=0, second=0)
+                .strftime("%Y-%m-%dT%H:%M:%SZ")
+            )
             tmrw_data = (
                 supabase.table("nhl_fixtures")
                 .select("*")
@@ -1666,29 +1685,34 @@ def run_nhl_pipeline() -> dict:
                 .gte("date", f"{tomorrow}T00:00:00Z")
                 .lt("date", cutoff_str)
                 .execute()
-                .data or []
+                .data
+                or []
             )
             if tmrw_data:
                 for tf in tmrw_data:
                     # Only add if not already in today's fixtures
                     existing_ids = {f.get("api_fixture_id") for f in extended_fixtures}
                     if tf.get("api_fixture_id") not in existing_ids:
-                        extended_fixtures.append({
-                            "home_team": tf["home_team"],
-                            "away_team": tf["away_team"],
-                            "date": tf["date"],
-                            "status": tf["status"],
-                            "proba_home": tf.get("proba_home", 50),
-                            "proba_away": tf.get("proba_away", 50),
-                            "proba_over_55": tf.get("proba_over_55", 50),
-                            "ai_home_factor": tf.get("ai_home_factor", 1.0),
-                            "ai_away_factor": tf.get("ai_away_factor", 1.0),
-                            "recommended_bet": tf.get("recommended_bet", ""),
-                            "confidence_score": tf.get("confidence_score", 5),
-                            "api_fixture_id": tf.get("api_fixture_id"),
-                            "stats_json": tf.get("stats_json", {}),
-                        })
-                logger.info(f"[NHL] DeepThink: added {len(tmrw_data)} tomorrow fixtures (total: {len(extended_fixtures)})")
+                        extended_fixtures.append(
+                            {
+                                "home_team": tf["home_team"],
+                                "away_team": tf["away_team"],
+                                "date": tf["date"],
+                                "status": tf["status"],
+                                "proba_home": tf.get("proba_home", 50),
+                                "proba_away": tf.get("proba_away", 50),
+                                "proba_over_55": tf.get("proba_over_55", 50),
+                                "ai_home_factor": tf.get("ai_home_factor", 1.0),
+                                "ai_away_factor": tf.get("ai_away_factor", 1.0),
+                                "recommended_bet": tf.get("recommended_bet", ""),
+                                "confidence_score": tf.get("confidence_score", 5),
+                                "api_fixture_id": tf.get("api_fixture_id"),
+                                "stats_json": tf.get("stats_json", {}),
+                            }
+                        )
+                logger.info(
+                    f"[NHL] DeepThink: added {len(tmrw_data)} tomorrow fixtures (total: {len(extended_fixtures)})"
+                )
         except Exception:
             logger.warning("[NHL] Could not fetch tomorrow's fixtures for DeepThink", exc_info=True)
 
@@ -1699,9 +1723,9 @@ def run_nhl_pipeline() -> dict:
             if meta_analysis:
                 # Store as special row in nhl_data_lake
                 try:
-                    supabase.table("nhl_data_lake").delete().eq(
-                        "player_id", "META_ANALYSIS"
-                    ).eq("date", today).execute()
+                    supabase.table("nhl_data_lake").delete().eq("player_id", "META_ANALYSIS").eq(
+                        "date", today
+                    ).execute()
                 except Exception:
                     pass
                 try:
@@ -1724,7 +1748,10 @@ def run_nhl_pipeline() -> dict:
                     logger.info("[NHL] ✅ DeepThink meta-analysis saved")
                 except Exception:
                     # Fallback: store in player_name field if meta_analysis column doesn't exist
-                    logger.warning("[NHL] meta_analysis column insert failed, trying fallback...", exc_info=True)
+                    logger.warning(
+                        "[NHL] meta_analysis column insert failed, trying fallback...",
+                        exc_info=True,
+                    )
                     try:
                         supabase.table("nhl_data_lake").insert(
                             {
@@ -1810,22 +1837,21 @@ def generate_deepthink_meta_analysis(
         a_fatigue = fatigue_dict.get(a_abbrev, 1.0)
 
         # Top players for this match
-        match_top = [
-            p for p in all_players
-            if p["team"] in (h_abbrev, a_abbrev)
-        ]
+        match_top = [p for p in all_players if p["team"] in (h_abbrev, a_abbrev)]
         match_top.sort(key=lambda p: p.get("prob_point", 0), reverse=True)
         top5 = match_top[:5]
 
-        players_str = "\n".join([
-            f"    - {p['player_name']} ({p['team']}): "
-            f"Point {p.get('prob_point', 0):.0f}%, But {p.get('prob_goal', 0):.0f}%, "
-            f"Tirs {p.get('shots_per_game', 0):.1f}/m, "
-            f"PP boost {p.get('pp_boost', 1.0):.2f}, "
-            f"PP share {p.get('pp_share', 0):.1%}, "
-            f"{'🔥 HOT' if p.get('l5_form', {}).get('hot') else '🥶 COLD' if p.get('l5_form', {}).get('cold') else ''}"
-            for p in top5
-        ])
+        players_str = "\n".join(
+            [
+                f"    - {p['player_name']} ({p['team']}): "
+                f"Point {p.get('prob_point', 0):.0f}%, But {p.get('prob_goal', 0):.0f}%, "
+                f"Tirs {p.get('shots_per_game', 0):.1f}/m, "
+                f"PP boost {p.get('pp_boost', 1.0):.2f}, "
+                f"PP share {p.get('pp_share', 0):.1%}, "
+                f"{'🔥 HOT' if p.get('l5_form', {}).get('hot') else '🥶 COLD' if p.get('l5_form', {}).get('cold') else ''}"
+                for p in top5
+            ]
+        )
 
         fatigue_tag = ""
         if h_fatigue < 1.0:
@@ -1876,8 +1902,7 @@ def generate_deepthink_meta_analysis(
 
     user_prompt = (
         f"Soirée NHL du {datetime.now(timezone.utc).strftime('%d/%m/%Y')} — "
-        f"{len(fixtures_data)} matchs à analyser :\n\n"
-        + "\n\n".join(matches_summary)
+        f"{len(fixtures_data)} matchs à analyser :\n\n" + "\n\n".join(matches_summary)
     )
 
     try:
@@ -1909,4 +1934,3 @@ def generate_deepthink_meta_analysis(
     except Exception:
         logger.warning("[NHL] DeepThink generation failed", exc_info=True)
         return None
-

@@ -154,7 +154,9 @@ def build_nhl_dataset(output_file="nhl_dataset.csv"):
     # Ensure 'date' column is preserved for TimeSeriesSplit sorting
     if "date" in df.columns:
         df = df.sort_values("date").reset_index(drop=True)
-        logger.info(f"  📅 Dataset trié par date: {df['date'].iloc[0][:10]} → {df['date'].iloc[-1][:10]}")
+        logger.info(
+            f"  📅 Dataset trié par date: {df['date'].iloc[0][:10]} → {df['date'].iloc[-1][:10]}"
+        )
 
     output_path = Path(__file__).parent.parent / output_file
     df.to_csv(output_path, index=False)

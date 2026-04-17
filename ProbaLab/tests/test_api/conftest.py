@@ -9,10 +9,10 @@ We achieve this by:
      src.config is imported (triggered by the `client` fixture), it receives
      our mock instead of making a real network call.
 """
+
 from __future__ import annotations
 
 import os
-import sys
 from unittest.mock import MagicMock, patch
 
 # ── Step 1: set env vars before any project import ───────────────
@@ -24,8 +24,8 @@ os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:5173")
 import pytest
 from fastapi.testclient import TestClient
 
-
 # ─── Chainable Supabase mock ──────────────────────────────────────
+
 
 def _make_chain(data=None, count=0):
     """Return a fully chainable MagicMock that ends in .execute()."""
@@ -37,10 +37,25 @@ def _make_chain(data=None, count=0):
 
     # Every chaining method returns itself so calls can be composed freely.
     for method in (
-        "select", "eq", "neq", "gte", "lte", "gt", "lt",
-        "in_", "or_", "order", "limit", "range",
-        "insert", "upsert", "update", "delete", "filter",
-        "single", "desc",
+        "select",
+        "eq",
+        "neq",
+        "gte",
+        "lte",
+        "gt",
+        "lt",
+        "in_",
+        "or_",
+        "order",
+        "limit",
+        "range",
+        "insert",
+        "upsert",
+        "update",
+        "delete",
+        "filter",
+        "single",
+        "desc",
     ):
         getattr(chain, method).return_value = chain
 
@@ -60,6 +75,7 @@ def _make_supabase_mock():
 
 # ─── Fixtures ────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="session")
 def mock_supabase():
     """A reusable Supabase mock shared across the session."""
@@ -77,10 +93,13 @@ def client(mock_supabase):
     have already imported the symbol before the test session starts.
     """
     # Patch the library-level factory and the already-imported module attr.
-    with patch("supabase.create_client", return_value=mock_supabase), \
-         patch("src.config.supabase", mock_supabase), \
-         patch("api.auth.supabase", mock_supabase):
+    with (
+        patch("supabase.create_client", return_value=mock_supabase),
+        patch("src.config.supabase", mock_supabase),
+        patch("api.auth.supabase", mock_supabase),
+    ):
         from api.main import app
+
         with TestClient(app, raise_server_exceptions=False) as c:
             yield c
 

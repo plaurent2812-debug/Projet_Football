@@ -18,20 +18,20 @@ DIXON_COLES_RHO: float = -0.13  # Corrélation Dixon-Coles globale (fallback)
 # Plus négatif = correction plus forte sur les scores à faible buts (0-0, 1-1...).
 # Méthode : ajuster jusqu'à ce que la proba de nul Poisson ≃ taux historique.
 DIXON_COLES_RHO_BY_LEAGUE: dict[int, float] = {
-    61: -0.14,   # Ligue 1 — défensif, taux de nuls élevé
-    62: -0.13,   # Ligue 2 — similaire à Ligue 1
-    39: -0.11,   # Premier League — jeu ouvert, peu de 0-0
+    61: -0.14,  # Ligue 1 — défensif, taux de nuls élevé
+    62: -0.13,  # Ligue 2 — similaire à Ligue 1
+    39: -0.11,  # Premier League — jeu ouvert, peu de 0-0
     140: -0.12,  # La Liga — équilibré
     135: -0.16,  # Serie A — taux de nuls le plus élevé d'Europe
-    78: -0.09,   # Bundesliga — jeu rapide, peu de nuls
-    2: -0.17,    # Champions League — très tactique, nuls fréquents
-    3: -0.15,    # Europa League — défensif
+    78: -0.09,  # Bundesliga — jeu rapide, peu de nuls
+    2: -0.17,  # Champions League — très tactique, nuls fréquents
+    3: -0.15,  # Europa League — défensif
     848: -0.14,  # Conference League
-    66: -0.12,   # Coupe de France
-    45: -0.11,   # FA Cup
+    66: -0.12,  # Coupe de France
+    45: -0.11,  # FA Cup
     143: -0.12,  # Copa del Rey
     137: -0.15,  # Coppa Italia
-    81: -0.10,   # DFB-Pokal
+    81: -0.10,  # DFB-Pokal
 }
 
 
@@ -47,19 +47,19 @@ DEFAULT_ELO: int = 1500
 # Calibrated from historical home win rates:
 #   ~60% home wins → +75 ELO, ~55% → +65, ~52% → +50
 HOME_ELO_ADVANTAGE_BY_LEAGUE: dict[int, int] = {
-    61: 70,   # Ligue 1 — strong home advantage
-    62: 70,   # Ligue 2 — strong home advantage
-    39: 60,   # Premier League — moderate
+    61: 70,  # Ligue 1 — strong home advantage
+    62: 70,  # Ligue 2 — strong home advantage
+    39: 60,  # Premier League — moderate
     140: 65,  # La Liga — average
     135: 65,  # Serie A — average
-    78: 50,   # Bundesliga — weakest in top 5 leagues
-    2: 55,    # Champions League — reduced (neutral-ish)
-    3: 55,    # Europa League
+    78: 50,  # Bundesliga — weakest in top 5 leagues
+    2: 55,  # Champions League — reduced (neutral-ish)
+    3: 55,  # Europa League
     848: 55,  # Conference League
     # Coupes nationales (knockout, home advantage réduit)
-    45: 55,   # FA Cup — neutral/reduced home advantage
-    66: 55,   # Coupe de France
-    81: 50,   # DFB-Pokal
+    45: 55,  # FA Cup — neutral/reduced home advantage
+    66: 55,  # Coupe de France
+    81: 50,  # DFB-Pokal
     137: 55,  # Coppa Italia
     143: 55,  # Copa del Rey
 }
@@ -68,20 +68,20 @@ ELO_DECAY_RATE: float = 0.001  # Decay ELO temporel (régression vers 1500)
 # K-factor dynamique par ligue : compétitions européennes comptent plus,
 # coupes nationales (knockout, small sample) comptent moins.
 K_FACTOR_BY_LEAGUE: dict[int, int] = {
-    2: 40,   # Champions League — résultats très informatifs
-    3: 36,   # Europa League
-    848: 34, # Conference League
+    2: 40,  # Champions League — résultats très informatifs
+    3: 36,  # Europa League
+    848: 34,  # Conference League
     39: 32,  # Premier League
     61: 32,  # Ligue 1
-    140: 32, # La Liga
-    135: 32, # Serie A
+    140: 32,  # La Liga
+    135: 32,  # Serie A
     78: 32,  # Bundesliga
     62: 30,  # Ligue 2 (niveau inférieur)
     # Coupes nationales (matchs knockout, signal plus faible)
     66: 24,  # Coupe de France
     45: 24,  # FA Cup
-    143: 24, # Copa del Rey
-    137: 24, # Coppa Italia
+    143: 24,  # Copa del Rey
+    137: 24,  # Coppa Italia
     81: 24,  # DFB-Pokal
 }
 
@@ -100,7 +100,7 @@ FORM_LOOKBACK_LONG: int = 12
 FORM_DECAY_LONG: float = 0.90  # Décroissance plus lente → poids plus uniforme sur 12 matchs
 # Pondération court/long terme dans le form_factor final
 FORM_WEIGHT_SHORT: float = 0.70  # 70% forme 6 matchs
-FORM_WEIGHT_LONG: float = 0.30   # 30% tendance 12 matchs
+FORM_WEIGHT_LONG: float = 0.30  # 30% tendance 12 matchs
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -260,33 +260,33 @@ XG_FALLBACK_AWAY: float = 1.1
 # Leagues where teams come from different domestic leagues
 # → need fallback to domestic league strengths
 CROSS_LEAGUE_IDS: set[int] = {
-    2,    # Champions League
-    3,    # Europa League
-    66,   # Coupe de France
-    45,   # FA Cup
+    2,  # Champions League
+    3,  # Europa League
+    66,  # Coupe de France
+    45,  # FA Cup
     143,  # Copa del Rey
     137,  # Coppa Italia
-    81,   # DFB-Pokal
+    81,  # DFB-Pokal
 }
 
 # xG scaling factors by competition type
 # CL matches are more tactical/defensive → fewer goals
 COMPETITION_XG_FACTOR: dict[int, float] = {
-    2: 0.92,    # Champions League — ~8% fewer goals
-    3: 0.95,    # Europa League — ~5% fewer goals
-    66: 0.97,   # Coupe de France
-    45: 0.97,   # FA Cup
+    2: 0.92,  # Champions League — ~8% fewer goals
+    3: 0.95,  # Europa League — ~5% fewer goals
+    66: 0.97,  # Coupe de France
+    45: 0.97,  # FA Cup
     143: 0.97,  # Copa del Rey
     137: 0.97,  # Coppa Italia
-    81: 0.97,   # DFB-Pokal
+    81: 0.97,  # DFB-Pokal
 }
 
 # European competition draw boost (higher stakes → more cautious → more draws)
 # NOTE: CL (2), EL (3), ECL (848) are in DRAW_FACTOR_BY_LEAGUE,
 # so this boost only applies to competitions WITHOUT calibrated draw factors.
 EURO_COMP_DRAW_BOOST: dict[int, float] = {
-    2: 0.04,    # Champions League: +4% draw probability
-    3: 0.03,    # Europa League: +3% draw probability
+    2: 0.04,  # Champions League: +4% draw probability
+    3: 0.03,  # Europa League: +3% draw probability
     848: 0.02,  # Conference League: +2%
 }
 
@@ -301,7 +301,7 @@ PROB_1X2_FLOOR: int = 5
 PROB_1X2_CEIL: int = 72
 
 # Markets: BTTS, Over/Under floors and ceilings
-PROB_BTTS_FLOOR: int = 18    # Even the most defensive matches have ≥18% BTTS
+PROB_BTTS_FLOOR: int = 18  # Even the most defensive matches have ≥18% BTTS
 PROB_BTTS_CEIL: int = 75
 PROB_OVER25_FLOOR: int = 15  # O2.5 is never below 15%
 PROB_OVER25_CEIL: int = 80
@@ -311,16 +311,18 @@ PROB_OVER25_CEIL: int = 80
 #  CALIBRATION
 # ═══════════════════════════════════════════════════════════════════
 
-MIN_CALIBRATION_SAMPLES: int = 100   # Minimum pour Platt scaling fiable
-MIN_ISOTONIC_SAMPLES: int = 500      # Minimum pour Isotonic regression (évite la "fonction en escalier")
-BAYESIAN_SHRINKAGE_K: int = 50       # Shrinkage strength for Bayesian 1X2 calibration
-                                     # At n=50 samples, trust raw 50%; at n=500, trust raw 91%
-                                     # Used when sample count is below MIN_ISOTONIC_SAMPLES
+MIN_CALIBRATION_SAMPLES: int = 100  # Minimum pour Platt scaling fiable
+MIN_ISOTONIC_SAMPLES: int = (
+    500  # Minimum pour Isotonic regression (évite la "fonction en escalier")
+)
+BAYESIAN_SHRINKAGE_K: int = 50  # Shrinkage strength for Bayesian 1X2 calibration
+# At n=50 samples, trust raw 50%; at n=500, trust raw 91%
+# Used when sample count is below MIN_ISOTONIC_SAMPLES
 
 # Base rates for Bayesian 1X2 shrinkage (average across European top leagues)
-BASE_RATE_HOME: float = 45.0   # Average home win rate %
-BASE_RATE_DRAW: float = 27.0   # Average draw rate %
-BASE_RATE_AWAY: float = 28.0   # Average away win rate %
+BASE_RATE_HOME: float = 45.0  # Average home win rate %
+BASE_RATE_DRAW: float = 27.0  # Average draw rate %
+BASE_RATE_AWAY: float = 28.0  # Average away win rate %
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -446,16 +448,16 @@ assert abs(WEIGHT_POISSON_NO_MARKET + WEIGHT_ELO_NO_MARKET - 1.0) < 1e-9, (
 assert abs(WEIGHT_STATS_VS_ML + WEIGHT_ML - 1.0) < 1e-9, (
     "WEIGHT_STATS_VS_ML + WEIGHT_ML must equal 1.0"
 )
-assert abs(WEIGHT_STATS + WEIGHT_AI - 1.0) < 1e-9, (
-    "WEIGHT_STATS + WEIGHT_AI must equal 1.0"
-)
+assert abs(WEIGHT_STATS + WEIGHT_AI - 1.0) < 1e-9, "WEIGHT_STATS + WEIGHT_AI must equal 1.0"
 assert PROB_1X2_FLOOR > 0, "PROB_1X2_FLOOR must be positive"
 assert PROB_1X2_CEIL < 100, "PROB_1X2_CEIL must be less than 100"
 assert PROB_1X2_FLOOR * 3 <= 100, "3 × PROB_1X2_FLOOR must be ≤ 100 (three outcomes)"
 assert XG_FLOOR > 0, "XG_FLOOR must be positive"
 assert XG_CEIL > XG_FLOOR, "XG_CEIL must be greater than XG_FLOOR"
 assert KELLY_FRACTION > 0 and KELLY_FRACTION <= 1.0, "KELLY_FRACTION must be in (0, 1]"
-assert KELLY_MAX_BET_FRACTION > 0 and KELLY_MAX_BET_FRACTION <= 1.0, "KELLY_MAX_BET_FRACTION must be in (0, 1]"
+assert KELLY_MAX_BET_FRACTION > 0 and KELLY_MAX_BET_FRACTION <= 1.0, (
+    "KELLY_MAX_BET_FRACTION must be in (0, 1]"
+)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -473,8 +475,8 @@ LEAGUES_TO_FETCH: list[int] = [61, 62, 39, 140, 135, 78, 2, 3, 1, 4]
 # ═══════════════════════════════════════════════════════════════════
 
 # Cache TTLs (seconds)
-CACHE_TTL_NEWS: int = 3600       # 1 hour — RSS feeds don't change often
-CACHE_TTL_LEAGUES: int = 3600    # 1 hour — league metadata is static
+CACHE_TTL_NEWS: int = 3600  # 1 hour — RSS feeds don't change often
+CACHE_TTL_LEAGUES: int = 3600  # 1 hour — league metadata is static
 CACHE_TTL_MONITORING: int = 300  # 5 min — CLV/Brier are expensive to compute
 
 # Rate limiting

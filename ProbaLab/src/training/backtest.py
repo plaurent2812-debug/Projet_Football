@@ -117,7 +117,7 @@ def _calibration_metrics(results: list[dict]) -> dict[str, float]:
         oh = 1.0 if actual == "H" else 0.0
         od = 1.0 if actual == "D" else 0.0
         oa = 1.0 if actual == "A" else 0.0
-        brier = (p_h/100 - oh)**2 + (p_d/100 - od)**2 + (p_a/100 - oa)**2
+        brier = (p_h / 100 - oh) ** 2 + (p_d / 100 - od) ** 2 + (p_a / 100 - oa) ** 2
         briers.append(brier)
 
         # Log loss
@@ -170,13 +170,15 @@ def _calibration_curve(results: list[dict], n_bins: int = 10) -> list[dict]:
             continue
         mean_pred = sum(p for p, _ in in_bin) / len(in_bin)
         mean_actual = sum(a for _, a in in_bin) / len(in_bin)
-        bins.append({
-            "bin": f"{round(lo*100)}-{round(hi*100)}%",
-            "mean_predicted": round(mean_pred * 100, 1),
-            "actual_frequency": round(mean_actual * 100, 1),
-            "count": len(in_bin),
-            "gap": round(abs(mean_pred - mean_actual) * 100, 1),
-        })
+        bins.append(
+            {
+                "bin": f"{round(lo * 100)}-{round(hi * 100)}%",
+                "mean_predicted": round(mean_pred * 100, 1),
+                "actual_frequency": round(mean_actual * 100, 1),
+                "count": len(in_bin),
+                "gap": round(abs(mean_pred - mean_actual) * 100, 1),
+            }
+        )
     return bins
 
 
@@ -278,16 +280,18 @@ def _simulate_kelly_roi(
             total_returned += winnings
             bets_won += 1
 
-        history.append({
-            "fixture_id": fid,
-            "outcome": outcome,
-            "prob": round(prob * 100, 1),
-            "odds": odds,
-            "edge": round(best_edge * 100, 1),
-            "stake": stake,
-            "won": won,
-            "bankroll": round(bankroll, 2),
-        })
+        history.append(
+            {
+                "fixture_id": fid,
+                "outcome": outcome,
+                "prob": round(prob * 100, 1),
+                "odds": odds,
+                "edge": round(best_edge * 100, 1),
+                "stake": stake,
+                "won": won,
+                "bankroll": round(bankroll, 2),
+            }
+        )
 
     roi = ((total_returned - total_staked) / total_staked * 100) if total_staked > 0 else 0
 
@@ -301,12 +305,8 @@ def _simulate_kelly_roi(
         "win_rate": round(bets_won / bets_placed * 100, 1) if bets_placed > 0 else 0,
         "total_staked": round(total_staked, 2),
         "total_returned": round(total_returned, 2),
-        "avg_odds": round(
-            sum(h["odds"] for h in history) / len(history), 2
-        ) if history else 0,
-        "avg_edge": round(
-            sum(h["edge"] for h in history) / len(history), 1
-        ) if history else 0,
+        "avg_odds": round(sum(h["odds"] for h in history) / len(history), 2) if history else 0,
+        "avg_edge": round(sum(h["edge"] for h in history) / len(history), 1) if history else 0,
         "skipped_no_odds": skipped_no_odds,
         "skipped_no_edge": skipped_no_edge,
         "history": history,
@@ -361,11 +361,13 @@ def _by_confidence(results: list[dict]) -> list[dict]:
         if not group:
             continue
         ok = sum(1 for r in group if r.get("result_1x2_ok"))
-        report.append({
-            "confidence": label,
-            "n": len(group),
-            "accuracy_1x2": round(ok / len(group) * 100, 1),
-        })
+        report.append(
+            {
+                "confidence": label,
+                "n": len(group),
+                "accuracy_1x2": round(ok / len(group) * 100, 1),
+            }
+        )
     return report
 
 
@@ -389,12 +391,14 @@ def _by_month(results: list[dict], fixtures: dict[str, dict]) -> list[dict]:
         ok = sum(1 for r in group if r.get("result_1x2_ok"))
         briers = [r["brier_score_1x2"] for r in group if r.get("brier_score_1x2") is not None]
         avg_brier = round(sum(briers) / len(briers), 4) if briers else None
-        report.append({
-            "month": month,
-            "n": len(group),
-            "accuracy_1x2": round(ok / len(group) * 100, 1) if group else 0,
-            "avg_brier": avg_brier,
-        })
+        report.append(
+            {
+                "month": month,
+                "n": len(group),
+                "accuracy_1x2": round(ok / len(group) * 100, 1) if group else 0,
+                "avg_brier": avg_brier,
+            }
+        )
     return report
 
 
@@ -405,17 +409,19 @@ def _high_confidence_failures(results: list[dict]) -> list[dict]:
         conf = r.get("pred_confidence") or 0
         if conf >= 7 and not r.get("result_1x2_ok"):
             max_pred = max(r.get("pred_home", 0), r.get("pred_draw", 0), r.get("pred_away", 0))
-            failures.append({
-                "fixture_id": r.get("fixture_id"),
-                "league_id": r.get("league_id"),
-                "confidence": conf,
-                "pred_home": r.get("pred_home"),
-                "pred_draw": r.get("pred_draw"),
-                "pred_away": r.get("pred_away"),
-                "actual_result": r.get("actual_result"),
-                "actual_score": f"{r.get('actual_home_goals', '?')}-{r.get('actual_away_goals', '?')}",
-                "max_pred": max_pred,
-            })
+            failures.append(
+                {
+                    "fixture_id": r.get("fixture_id"),
+                    "league_id": r.get("league_id"),
+                    "confidence": conf,
+                    "pred_home": r.get("pred_home"),
+                    "pred_draw": r.get("pred_draw"),
+                    "pred_away": r.get("pred_away"),
+                    "actual_result": r.get("actual_result"),
+                    "actual_score": f"{r.get('actual_home_goals', '?')}-{r.get('actual_away_goals', '?')}",
+                    "max_pred": max_pred,
+                }
+            )
     return sorted(failures, key=lambda x: -x["confidence"])
 
 
@@ -472,12 +478,22 @@ def run_backtest() -> dict:
     if cal["avg_brier"] is not None:
         brier = cal["avg_brier"]
         # Standard multi-class Brier (NOT /3): random baseline = 0.667
-        grade = "EXCELLENT" if brier < 0.50 else "BON" if brier < 0.58 else "MOYEN" if brier < 0.63 else "FAIBLE"
+        grade = (
+            "EXCELLENT"
+            if brier < 0.50
+            else "BON"
+            if brier < 0.58
+            else "MOYEN"
+            if brier < 0.63
+            else "FAIBLE"
+        )
         logger.info(f"  Brier Score moyen  : {brier:.4f}  [{grade}]")
         logger.info("    (réf: random=0.667, <0.50 excellent, <0.58 bon, <0.63 moyen)")
     if cal["avg_log_loss"] is not None:
         ll = cal["avg_log_loss"]
-        grade = "EXCELLENT" if ll < 0.9 else "BON" if ll < 1.05 else "MOYEN" if ll < 1.2 else "FAIBLE"
+        grade = (
+            "EXCELLENT" if ll < 0.9 else "BON" if ll < 1.05 else "MOYEN" if ll < 1.2 else "FAIBLE"
+        )
         logger.info(f"  Log Loss moyen     : {ll:.4f}  [{grade}]")
         logger.info("    (réf: random=1.099, <0.90 excellent, <1.05 bon, <1.20 moyen)")
 
@@ -486,7 +502,7 @@ def run_backtest() -> dict:
     cal_curve = _calibration_curve(results)
     if cal_curve:
         logger.info(f"  {'Bin':>12s} {'Prédit':>8s} {'Réel':>8s} {'Écart':>7s} {'N':>6s}")
-        logger.info(f"  {'─'*12} {'─'*8} {'─'*8} {'─'*7} {'─'*6}")
+        logger.info(f"  {'─' * 12} {'─' * 8} {'─' * 8} {'─' * 7} {'─' * 6}")
         total_gap = 0
         for b in cal_curve:
             logger.info(
@@ -507,7 +523,9 @@ def run_backtest() -> dict:
         profit_sign = "+" if kelly["profit"] >= 0 else ""
         logger.info(f"  Profit/Perte     : {profit_sign}{kelly['profit']:.2f}€")
         logger.info(f"  ROI              : {profit_sign}{kelly['roi_pct']:.1f}%")
-        logger.info(f"  Paris placés     : {kelly['bets_placed']} (gagnés: {kelly['bets_won']}, win rate: {kelly['win_rate']}%)")
+        logger.info(
+            f"  Paris placés     : {kelly['bets_placed']} (gagnés: {kelly['bets_won']}, win rate: {kelly['win_rate']}%)"
+        )
         logger.info(f"  Total misé       : {kelly['total_staked']:.2f}€")
         logger.info(f"  Cote moyenne     : {kelly['avg_odds']:.2f}")
         logger.info(f"  Edge moyen       : {kelly['avg_edge']:.1f}%")
@@ -515,14 +533,16 @@ def run_backtest() -> dict:
         logger.info(f"  Ignorés (pas d'edge)   : {kelly['skipped_no_edge']}")
     else:
         logger.info("  Aucun pari simulé (pas de cotes disponibles ou pas d'edge)")
-        logger.info(f"  Ignorés: {kelly['skipped_no_odds']} sans cotes, {kelly['skipped_no_edge']} sans edge")
+        logger.info(
+            f"  Ignorés: {kelly['skipped_no_odds']} sans cotes, {kelly['skipped_no_edge']} sans edge"
+        )
 
     # ── 5. By League ─────────────────────────────────────────────
     _print_section("5. PERFORMANCE PAR LIGUE")
     leagues = _by_league(results)
     logger.info(f"  {'Ligue':25s} {'N':>5s} {'Acc 1X2':>8s} {'Brier':>8s}")
-    logger.info(f"  {'─'*25} {'─'*5} {'─'*8} {'─'*8}")
-    for lid, data in leagues.items():
+    logger.info(f"  {'─' * 25} {'─' * 5} {'─' * 8} {'─' * 8}")
+    for data in leagues.values():
         brier_str = f"{data['avg_brier']:.4f}" if data["avg_brier"] is not None else "   N/A"
         logger.info(
             f"  {data['name']:25s} {data['n']:>5d} {data['accuracy_1x2']:>7.1f}% {brier_str:>8s}"
@@ -542,10 +562,12 @@ def run_backtest() -> dict:
     monthly = _by_month(results, fixtures)
     if monthly:
         logger.info(f"  {'Mois':>8s} {'N':>5s} {'Acc 1X2':>8s} {'Brier':>8s}")
-        logger.info(f"  {'─'*8} {'─'*5} {'─'*8} {'─'*8}")
+        logger.info(f"  {'─' * 8} {'─' * 5} {'─' * 8} {'─' * 8}")
         for m in monthly:
             brier_str = f"{m['avg_brier']:.4f}" if m["avg_brier"] is not None else "   N/A"
-            logger.info(f"  {m['month']:>8s} {m['n']:>5d} {m['accuracy_1x2']:>7.1f}% {brier_str:>8s}")
+            logger.info(
+                f"  {m['month']:>8s} {m['n']:>5d} {m['accuracy_1x2']:>7.1f}% {brier_str:>8s}"
+            )
 
     # ── 8. High-Confidence Failures ──────────────────────────────
     _print_section("8. ÉCHECS HAUTE CONFIANCE (confiance >= 7)")
@@ -619,7 +641,9 @@ def _print_diagnostic(
         elif avg_gap < 6:
             pass  # Acceptable
         else:
-            issues.append(f"Calibration imprécise (écart moyen {avg_gap:.1f}%) — activer/recalibrer Platt/Isotonic")
+            issues.append(
+                f"Calibration imprécise (écart moyen {avg_gap:.1f}%) — activer/recalibrer Platt/Isotonic"
+            )
 
     # Kelly check
     if kelly["bets_placed"] > 0:
@@ -628,7 +652,9 @@ def _print_diagnostic(
         elif kelly["roi_pct"] > 0:
             strengths.append(f"Kelly ROI légèrement positif ({kelly['roi_pct']:.1f}%)")
         else:
-            issues.append(f"Kelly ROI négatif ({kelly['roi_pct']:.1f}%) — pas d'edge réel sur les cotes")
+            issues.append(
+                f"Kelly ROI négatif ({kelly['roi_pct']:.1f}%) — pas d'edge réel sur les cotes"
+            )
     else:
         issues.append("Pas de simulation Kelly possible (cotes manquantes)")
 

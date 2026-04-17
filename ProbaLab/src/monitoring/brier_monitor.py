@@ -20,6 +20,7 @@ Thresholds (1X2 market):
 Usage:
     python -m src.monitoring.brier_monitor
 """
+
 from __future__ import annotations
 
 import math
@@ -163,13 +164,15 @@ def compute_ece(results: list[dict], n_bins: int = 10) -> dict[str, Any]:
         bin_records = [(p, c) for p, c in records if lo <= p < hi or (i == n_bins - 1 and p == hi)]
 
         if not bin_records:
-            bins.append({
-                "range": f"{lo:.1f}-{hi:.1f}",
-                "n": 0,
-                "avg_predicted": round((lo + hi) / 2, 2),
-                "avg_actual": None,
-                "gap": None,
-            })
+            bins.append(
+                {
+                    "range": f"{lo:.1f}-{hi:.1f}",
+                    "n": 0,
+                    "avg_predicted": round((lo + hi) / 2, 2),
+                    "avg_actual": None,
+                    "gap": None,
+                }
+            )
             continue
 
         avg_pred = sum(p for p, _ in bin_records) / len(bin_records)
@@ -177,19 +180,23 @@ def compute_ece(results: list[dict], n_bins: int = 10) -> dict[str, Any]:
         gap = abs(avg_pred - avg_actual)
         ece += (len(bin_records) / total) * gap
 
-        bins.append({
-            "range": f"{lo:.1f}-{hi:.1f}",
-            "n": len(bin_records),
-            "avg_predicted": round(avg_pred, 3),
-            "avg_actual": round(avg_actual, 3),
-            "gap": round(gap, 3),
-        })
+        bins.append(
+            {
+                "range": f"{lo:.1f}-{hi:.1f}",
+                "n": len(bin_records),
+                "avg_predicted": round(avg_pred, 3),
+                "avg_actual": round(avg_actual, 3),
+                "gap": round(gap, 3),
+            }
+        )
 
     return {
         "ece": round(ece, 4),
         "bins": bins,
         "n": total,
-        "grade": "EXCELLENT" if ece < 0.03 else ("GOOD" if ece < 0.05 else ("ACCEPTABLE" if ece < 0.08 else "DEGRADED")),
+        "grade": "EXCELLENT"
+        if ece < 0.03
+        else ("GOOD" if ece < 0.05 else ("ACCEPTABLE" if ece < 0.08 else "DEGRADED")),
     }
 
 
@@ -215,9 +222,12 @@ def compute_binary_brier(results: list[dict], pred_field: str, actual_fn) -> dic
         "brier": round(brier, 4),
         "n": len(scores),
         "grade": (
-            "EXCELLENT" if brier < thresholds["excellent"]
-            else "GOOD" if brier < thresholds["good"]
-            else "ACCEPTABLE" if brier < thresholds["acceptable"]
+            "EXCELLENT"
+            if brier < thresholds["excellent"]
+            else "GOOD"
+            if brier < thresholds["good"]
+            else "ACCEPTABLE"
+            if brier < thresholds["acceptable"]
             else "DEGRADED"
         ),
     }
@@ -234,11 +244,13 @@ def compute_rolling_brier(results: list[dict], window: int = 30) -> list[dict]:
         batch = dated[i - window : i]
         bs = compute_brier_1x2(batch)
         if bs.get("brier") is not None:
-            rolling.append({
-                "window_end": i,
-                "brier": bs["brier"],
-                "n": bs["n"],
-            })
+            rolling.append(
+                {
+                    "window_end": i,
+                    "brier": bs["brier"],
+                    "n": bs["n"],
+                }
+            )
 
     return rolling
 
@@ -285,7 +297,9 @@ def run() -> dict[str, Any]:
     ece_data = compute_ece(results)
 
     logger.info(f"\n  1X2 Metrics (n={brier_1x2.get('n', 0)}):")
-    logger.info(f"    Brier Score : {brier_1x2.get('brier', 'N/A')} [{brier_1x2.get('grade', '?')}]")
+    logger.info(
+        f"    Brier Score : {brier_1x2.get('brier', 'N/A')} [{brier_1x2.get('grade', '?')}]"
+    )
     logger.info(f"    Log Loss    : {ll_1x2.get('log_loss', 'N/A')}")
     logger.info(f"    ECE         : {ece_data.get('ece', 'N/A')} [{ece_data.get('grade', '?')}]")
 
@@ -296,7 +310,9 @@ def run() -> dict[str, Any]:
             if b["n"] > 0:
                 bar_pred = "#" * int((b["avg_predicted"] or 0) * 20)
                 bar_act = "*" * int((b["avg_actual"] or 0) * 20)
-                logger.info(f"      {b['range']} (n={b['n']:3d}) pred={bar_pred:20s} act={bar_act:20s} gap={b['gap']:.3f}")
+                logger.info(
+                    f"      {b['range']} (n={b['n']:3d}) pred={bar_pred:20s} act={bar_act:20s} gap={b['gap']:.3f}"
+                )
 
     # Binary markets
     binary_markets = {
@@ -321,7 +337,9 @@ def run() -> dict[str, Any]:
         logger.warning("\n  DRIFT DETECTED:")
         logger.warning(f"    Overall Brier : {drift['overall_mean_brier']}")
         logger.warning(f"    Last window   : {drift['last_window_brier']}")
-        logger.warning(f"    Delta         : {drift['delta']:+.4f} (threshold: {drift['threshold']})")
+        logger.warning(
+            f"    Delta         : {drift['delta']:+.4f} (threshold: {drift['threshold']})"
+        )
     else:
         logger.info(f"\n  No drift detected (delta={drift.get('delta', 'N/A')})")
 

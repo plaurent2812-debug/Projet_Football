@@ -21,7 +21,6 @@ from api.routers.best_bets_logic import (
     normalize_market,
 )
 
-
 # ═══════════════════════════════════════════════════════════════════
 #  evaluate_single_football_market
 # ═══════════════════════════════════════════════════════════════════
@@ -150,39 +149,24 @@ class TestEvaluateFootballCombo:
 
     def test_three_legs_all_win(self):
         # 1-1 draw: Match nul WIN, Over 1.5 WIN, BTTS WIN
-        assert (
-            evaluate_football_combo("Match nul + Over 1.5 buts + BTTS Oui", 1, 1) == "WIN"
-        )
+        assert evaluate_football_combo("Match nul + Over 1.5 buts + BTTS Oui", 1, 1) == "WIN"
 
     def test_three_legs_middle_loss(self):
         # 2-0 home win: V.dom WIN, Over 2.5 LOSS → combo LOSS
         assert (
-            evaluate_football_combo(
-                "Victoire domicile + Over 2.5 buts + Match nul", 2, 0
-            )
-            == "LOSS"
+            evaluate_football_combo("Victoire domicile + Over 2.5 buts + Match nul", 2, 0) == "LOSS"
         )
 
     def test_unknown_leg_returns_none(self):
         # Unknown market in the combo → stays PENDING (None)
-        assert (
-            evaluate_football_combo("Victoire domicile + Corner Handicap", 2, 0) is None
-        )
+        assert evaluate_football_combo("Victoire domicile + Corner Handicap", 2, 0) is None
 
     def test_unknown_leg_with_loss_still_loss(self):
         # A LOSS leg short-circuits before the unknown leg is even checked
-        assert (
-            evaluate_football_combo(
-                "Victoire extérieur + Corner Handicap", 2, 0
-            )
-            == "LOSS"
-        )
+        assert evaluate_football_combo("Victoire extérieur + Corner Handicap", 2, 0) == "LOSS"
 
     def test_combo_with_extra_whitespace(self):
-        assert (
-            evaluate_football_combo("Victoire domicile  +  Over 1.5 buts", 2, 0)
-            == "WIN"
-        )
+        assert evaluate_football_combo("Victoire domicile  +  Over 1.5 buts", 2, 0) == "WIN"
 
     def test_single_leg_combo_behaves_as_single(self):
         # A "combo" with a single leg should resolve like the single market
@@ -304,22 +288,13 @@ class TestExtractNHLMarketFromLabel:
         )
 
     def test_tirs_capital(self):
-        assert (
-            extract_nhl_market_from_label("Auston Matthews — 3+ Tirs")
-            == "player_shots_over_2.5"
-        )
+        assert extract_nhl_market_from_label("Auston Matthews — 3+ Tirs") == "player_shots_over_2.5"
 
     def test_tirs_lowercase(self):
-        assert (
-            extract_nhl_market_from_label("david pastrnak tirs")
-            == "player_shots_over_2.5"
-        )
+        assert extract_nhl_market_from_label("david pastrnak tirs") == "player_shots_over_2.5"
 
     def test_unknown_label_defaults_to_points(self):
-        assert (
-            extract_nhl_market_from_label("Unrecognized market")
-            == "player_points_over_0.5"
-        )
+        assert extract_nhl_market_from_label("Unrecognized market") == "player_points_over_0.5"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -349,16 +324,12 @@ class TestNormalizeMarket:
 
     def test_expert_enrichment_duplicates_collapse(self):
         assert normalize_market("Points du joueur : 1 ou plus") == "Points (NHL)"
-        assert (
-            normalize_market("Passes décisives du joueur : 1 ou plus") == "Passes (NHL)"
-        )
+        assert normalize_market("Passes décisives du joueur : 1 ou plus") == "Passes (NHL)"
         assert normalize_market("Buts du joueur : 1 ou plus") == "Buts (NHL)"
 
     def test_category_with_label_extracts_actual_market(self):
         assert (
-            normalize_market(
-                "safe_football", bet_label="PSG vs Lyon — Victoire domicile"
-            )
+            normalize_market("safe_football", bet_label="PSG vs Lyon — Victoire domicile")
             == "Victoire domicile"
         )
 

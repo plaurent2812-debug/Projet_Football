@@ -154,9 +154,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         if request.url.scheme == "https":
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
-            )
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
 
@@ -191,7 +189,12 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 # ─── Health Check ────────────────────────────────────────────────
 
 
-@app.get("/health", tags=["Health"], summary="Health check with dependency status", response_model=HealthResponse)
+@app.get(
+    "/health",
+    tags=["Health"],
+    summary="Health check with dependency status",
+    response_model=HealthResponse,
+)
 async def health_check():
     """Health check endpoint for Railway / monitoring.
 

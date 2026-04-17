@@ -43,7 +43,9 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
         while True:
             q = (
                 supabase.table("fixtures")
-                .select("id, api_fixture_id, home_team, away_team, home_goals, away_goals, date, status")
+                .select(
+                    "id, api_fixture_id, home_team, away_team, home_goals, away_goals, date, status"
+                )
                 .in_("status", ["FT", "AET", "PEN"])
                 .in_("league_id", LEAGUES_TO_FETCH)
             )
@@ -79,7 +81,15 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
         CHUNK = 100
         for i in range(0, len(fixture_ids), CHUNK):
             chunk = fixture_ids[i : i + CHUNK]
-            page = supabase.table("predictions").select("*").in_("fixture_id", chunk).order("created_at").execute().data or []
+            page = (
+                supabase.table("predictions")
+                .select("*")
+                .in_("fixture_id", chunk)
+                .order("created_at")
+                .execute()
+                .data
+                or []
+            )
             predictions.extend(page)
 
         # Fetch bookmaker odds for benchmark computation
@@ -93,7 +103,8 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
                 .select("fixture_api_id, home_win_odds, draw_odds, away_win_odds")
                 .in_("fixture_api_id", chunk)
                 .execute()
-                .data or []
+                .data
+                or []
             )
             for o in odds_page:
                 aid = o["fixture_api_id"]
@@ -142,7 +153,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             # Helper to get field from top-level or stats_json
             stats_json = pred.get("stats_json") or {}
 
-            def get_val(key, default=None):
+            def get_val(key, default=None, pred=pred, stats_json=stats_json):
                 val = pred.get(key)
                 if val is not None:
                     return val
@@ -167,7 +178,12 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
                     bench_home_correct += 1
                 # Bookmaker benchmark — check if odds available
                 bm_odds = bookmaker_odds_by_api_id.get(f.get("api_fixture_id"))
-                if bm_odds and bm_odds.get("home_win_odds") and bm_odds.get("draw_odds") and bm_odds.get("away_win_odds"):
+                if (
+                    bm_odds
+                    and bm_odds.get("home_win_odds")
+                    and bm_odds.get("draw_odds")
+                    and bm_odds.get("away_win_odds")
+                ):
                     h_o = float(bm_odds["home_win_odds"])
                     d_o = float(bm_odds["draw_odds"])
                     a_o = float(bm_odds["away_win_odds"])
@@ -200,7 +216,7 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             o_a = 1 if actual_result == "A" else 0
 
             # Brier score for this match: sum of squared differences
-            brier_match = (p_h - o_h)**2 + (p_d - o_d)**2 + (p_a - o_a)**2
+            brier_match = (p_h - o_h) ** 2 + (p_d - o_d) ** 2 + (p_a - o_a) ** 2
             brier_sum += brier_match
 
             # 1X2 prediction: use strict > to avoid Home bias on ties
@@ -227,7 +243,12 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
 
             # Benchmark "Bookmaker implied" — only for matches with bookmaker odds
             bm_odds = bookmaker_odds_by_api_id.get(f.get("api_fixture_id"))
-            if bm_odds and bm_odds.get("home_win_odds") and bm_odds.get("draw_odds") and bm_odds.get("away_win_odds"):
+            if (
+                bm_odds
+                and bm_odds.get("home_win_odds")
+                and bm_odds.get("draw_odds")
+                and bm_odds.get("away_win_odds")
+            ):
                 h_o = float(bm_odds["home_win_odds"])
                 d_o = float(bm_odds["draw_odds"])
                 a_o = float(bm_odds["away_win_odds"])
@@ -318,7 +339,9 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
             "value_bets": value_bets_count,
             # Brier score for 1X2 (3 outcomes): range [0, 2], normalized to [0, 1] where 0=perfect, 0.5=random
             "brier_score_1x2": round(brier_sum / total_with_pred, 3) if total_with_pred else 0,
-            "brier_score_1x2_normalized": round(brier_sum / total_with_pred / 2, 3) if total_with_pred else 0,
+            "brier_score_1x2_normalized": round(brier_sum / total_with_pred / 2, 3)
+            if total_with_pred
+            else 0,
             "daily_stats": sorted(daily.values(), key=lambda x: x["date"]),
             # Coverage info
             "total_finished": len(finished),
@@ -404,7 +427,9 @@ def _compute_market_performance(days: int = 30) -> dict:
         chunk = fixture_ids[i : i + CHUNK]
         page = (
             supabase.table("predictions")
-            .select("fixture_id, proba_home, proba_draw, proba_away, proba_btts, proba_over_2_5, proba_over_25, stats_json")
+            .select(
+                "fixture_id, proba_home, proba_draw, proba_away, proba_btts, proba_over_2_5, proba_over_25, stats_json"
+            )
             .in_("fixture_id", chunk)
             .order("created_at")
             .execute()
@@ -426,11 +451,7 @@ def _compute_market_performance(days: int = 30) -> dict:
     for i in range(0, len(api_ids), CHUNK):
         chunk = api_ids[i : i + CHUNK]
         rows = (
-            supabase.table("fixture_odds")
-            .select("*")
-            .in_("fixture_api_id", chunk)
-            .execute()
-            .data
+            supabase.table("fixture_odds").select("*").in_("fixture_api_id", chunk).execute().data
             or []
         )
         for r in rows:
@@ -455,7 +476,7 @@ def _compute_market_performance(days: int = 30) -> dict:
             continue
         sj = pred.get("stats_json") or {}
 
-        def _gv(key, default=None):
+        def _gv(key, default=None, pred=pred, sj=sj):
             v = pred.get(key)
             return v if v is not None else sj.get(key, default)
 

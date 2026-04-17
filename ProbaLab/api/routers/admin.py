@@ -11,7 +11,6 @@ import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
@@ -27,6 +26,7 @@ def _require_internal_auth(
 ) -> None:
     """FastAPI dependency wrapping verify_internal_auth with both headers."""
     verify_internal_auth(authorization=authorization, x_cron_secret=x_cron_secret)
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ _ALLOWED_PIPELINE_MODES = ("full", "data", "analyze", "results", "nhl")
 
 
 # ─── Admin Auth Helper ──────────────────────────────────────────
+
 
 def _require_admin(authorization: str | None) -> dict:
     """Verify the Supabase JWT and check the user has admin role."""
@@ -71,6 +72,7 @@ def _require_admin(authorization: str | None) -> dict:
 
 
 # ─── Pipeline background runner ──────────────────────────────────
+
 
 def _run_pipeline_background(mode: str) -> None:
     """Run the pipeline in a background thread and capture output."""
@@ -137,8 +139,11 @@ def _run_pipeline_background(mode: str) -> None:
 
 # ─── Endpoints ──────────────────────────────────────────────────
 
+
 @router.post("/api/cron/run-pipeline")
-def cron_run_pipeline(body: Annotated[RunPipelineRequest, Body()], request: Request, authorization: str = Header(None)):
+def cron_run_pipeline(
+    body: Annotated[RunPipelineRequest, Body()], request: Request, authorization: str = Header(None)
+):
     """
     Trigger the pipeline via Trigger.dev scheduled tasks.
     Authenticated via CRON_SECRET (not Supabase JWT).
@@ -267,7 +272,8 @@ def admin_update_scores(
     t = _threading.Thread(target=_run_scores, daemon=True)
     t.start()
 
-    from datetime import datetime as _dt, timezone
+    from datetime import datetime as _dt
+    from datetime import timezone
 
     target = date or _dt.now(timezone.utc).date().isoformat()
     return {"message": f"Score update started for {target}"}

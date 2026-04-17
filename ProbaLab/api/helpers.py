@@ -25,6 +25,7 @@ def _ensure_dict(data: dict | str | None) -> dict:
         return data
     if isinstance(data, str):
         import json
+
         try:
             return json.loads(data)
         except Exception:
@@ -53,6 +54,7 @@ def _get_league_map() -> dict:
 
 
 # ─── Expected Value (EV+) Calculator ─────────────────────────────
+
 
 def _calculate_ev(proba: float | None, odds: float | None) -> float | None:
     """EV = (Probability * Odds) - 1. Returns an edge representing expected ROI."""

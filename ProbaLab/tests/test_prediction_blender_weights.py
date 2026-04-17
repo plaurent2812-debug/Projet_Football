@@ -38,7 +38,6 @@ def test_market_weight_is_dominant() -> None:
     This assertion is ASPIRATIONAL — it will pass once Task A3 is fully executed
     (backtest confirms GO and constants.py is updated to WEIGHT_MARKET=0.45).
     """
-    assert WEIGHT_MARKET >= max(WEIGHT_POISSON, WEIGHT_ELO), (
-        f"WEIGHT_MARKET={WEIGHT_MARKET} must dominate "
-        f"Poisson={WEIGHT_POISSON} and ELO={WEIGHT_ELO}"
+    assert max(WEIGHT_POISSON, WEIGHT_ELO) <= WEIGHT_MARKET, (
+        f"WEIGHT_MARKET={WEIGHT_MARKET} must dominate Poisson={WEIGHT_POISSON} and ELO={WEIGHT_ELO}"
     )

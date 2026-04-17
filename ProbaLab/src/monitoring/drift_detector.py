@@ -6,6 +6,7 @@ Logique :
   - Si Brier_7j > Brier_30j + DRIFT_THRESHOLD -> alerte + retrain
   - Envoie une notification Telegram via alerting.py
 """
+
 from __future__ import annotations
 
 import html as _html

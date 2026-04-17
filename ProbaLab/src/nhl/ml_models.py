@@ -103,6 +103,7 @@ class EnhancedGoalPredictor:
                 ubj_path = path.replace(".pkl", ".ubj")
                 if os.path.isfile(ubj_path):
                     from xgboost import XGBClassifier
+
                     self.model = XGBClassifier()
                     self.model.load_model(ubj_path)
                     logger.info("   Modele UBJ charge: %s", ubj_path)
@@ -115,11 +116,15 @@ class EnhancedGoalPredictor:
                 self.feature_names = ["algo_score_goal", "python_vol", "is_home"]
                 logger.info("   Modele brut charge (legacy): %s", path)
 
-            market = self.model_metadata.get("market", os.path.basename(path))
             acc = self.model_metadata.get("accuracy", 0)
             auc = self.model_metadata.get("roc_auc", 0)
             if acc > 0:
-                logger.info("      Acc=%.2f%%, AUC=%.3f, Features=%d", 100 * acc, auc, len(self.feature_names))
+                logger.info(
+                    "      Acc=%.2f%%, AUC=%.3f, Features=%d",
+                    100 * acc,
+                    auc,
+                    len(self.feature_names),
+                )
             self.loaded = True
             return True
         except Exception as e:

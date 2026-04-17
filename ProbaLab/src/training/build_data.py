@@ -116,7 +116,7 @@ def load_all_data() -> dict:
         "fixture_odds",
         "fixture_api_id, home_win_odds, draw_odds, away_win_odds, "
         "btts_yes_odds, btts_no_odds, over_25_odds, under_25_odds, "
-        "over_15_odds, under_15_odds"
+        "over_15_odds, under_15_odds",
     )
     data["odds_map"] = {o["fixture_api_id"]: o for o in odds_raw}
     logger.info(f"    ✓ {len(odds_raw)} cotes")

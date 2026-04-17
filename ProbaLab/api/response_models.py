@@ -8,7 +8,7 @@ so that new fields never cause serialisation failures.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -35,7 +35,7 @@ class HealthResponse(BaseModel):
 
     status: str
     timestamp: str
-    checks: Optional[dict[str, str]] = None
+    checks: dict[str, str] | None = None
 
 
 # ─── News ────────────────────────────────────────────────────────────────────

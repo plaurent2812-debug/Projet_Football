@@ -222,7 +222,7 @@ def api_get_with_retry(
         if data and data.get("response"):
             return data
         if attempt < max_retries:
-            delay = 2 ** attempt  # 1s, 2s
+            delay = 2**attempt  # 1s, 2s
             logger.warning(
                 "Empty response for %s (attempt %d/%d), retrying in %ds...",
                 label or endpoint,

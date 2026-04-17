@@ -7,6 +7,7 @@ Usage:
     from src.training.walk_forward import walk_forward_evaluate
     report = walk_forward_evaluate(X, y, dates, n_splits=6, holdout_months=3)
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -66,16 +67,18 @@ def walk_forward_evaluate(
         brier_1x2 = _brier_1x2(probas, y_true, model.classes_)
         ll = log_loss(y_true, probas, labels=model.classes_)
 
-        fold_results.append({
-            "fold": k,
-            "train_until": cutoff.isoformat(),
-            "test_from": cutoff.isoformat(),
-            "test_to": holdout_end.isoformat(),
-            "n_train": int(train_mask.sum()),
-            "n_test": int(test_mask.sum()),
-            "brier_1x2": brier_1x2,
-            "log_loss": ll,
-        })
+        fold_results.append(
+            {
+                "fold": k,
+                "train_until": cutoff.isoformat(),
+                "test_from": cutoff.isoformat(),
+                "test_to": holdout_end.isoformat(),
+                "n_train": int(train_mask.sum()),
+                "n_test": int(test_mask.sum()),
+                "brier_1x2": brier_1x2,
+                "log_loss": ll,
+            }
+        )
 
     return {
         "folds": fold_results,

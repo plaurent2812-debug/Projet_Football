@@ -1,5 +1,5 @@
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from src.config import supabase
 
@@ -67,8 +67,6 @@ def evaluate_recent_matches(days_back=7):
     print(f"[{datetime.now(timezone.utc)}] Démarrage de l'évaluation ML (Brier/LogLoss)...")
 
     # 1. Récupérer les fixtures terminées récemment
-    from datetime import timedelta, timezone
-
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
 
     fixtures_response = (
@@ -113,10 +111,10 @@ def evaluate_recent_matches(days_back=7):
 
             try:
                 stats = json.loads(stats)
-            except:
+            except Exception:
                 stats = {}
 
-        def get_val(key, default=None):
+        def get_val(key, default=None, pred=pred, stats=stats):
             val = pred.get(key)
             if val is not None:
                 return val
@@ -125,12 +123,7 @@ def evaluate_recent_matches(days_back=7):
         # Actuals
         hg = fix.get("home_goals", 0) or 0
         ag = fix.get("away_goals", 0) or 0
-        total_goals = hg + ag
         actual_result = "H" if hg > ag else ("D" if hg == ag else "A")
-        actual_btts = hg > 0 and ag > 0
-        actual_over_05 = total_goals > 0.5
-        actual_over_15 = total_goals > 1.5
-        actual_over_25 = total_goals > 2.5
 
         # 1X2 Probs
         ph = get_val("proba_home")
@@ -198,6 +191,7 @@ def evaluate_recent_matches(days_back=7):
 
         if diff >= 30:
             from src.notifications import send_telegram
+
             msg = (
                 f"📊 *Rappel Backtest — ProbaLab*\n\n"
                 f"Il y a maintenant *{total_count}* matchs évalués (soit *+{diff}* nouveaux).\n\n"

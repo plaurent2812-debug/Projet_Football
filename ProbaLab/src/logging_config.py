@@ -1,4 +1,5 @@
 """Centralized structured logging configuration for ProbaLab."""
+
 from __future__ import annotations
 
 import contextvars
@@ -8,9 +9,7 @@ import uuid
 from pythonjsonlogger.json import JsonFormatter
 
 # Context variable for request tracing
-request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "request_id", default=""
-)
+request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
 
 
 class ProbaLabFormatter(JsonFormatter):

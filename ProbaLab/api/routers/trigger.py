@@ -25,18 +25,11 @@ import os
 import threading
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.brain import ask_gemini, extract_json
 from src.config import api_get, logger, supabase
-
-try:
-    import httpx
-
-    HTTPX_AVAILABLE = True
-except ImportError:
-    HTTPX_AVAILABLE = False
 
 # ─── Telegram Config ────────────────────────────────────────────
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -104,12 +97,7 @@ class AnalyzeRequest(BaseModel):
 @router.get("/admin/users")
 def admin_list_users():
     """List all user profiles (admin only)."""
-    result = (
-        supabase.table("profiles")
-        .select("*")
-        .order("created_at", desc=True)
-        .execute()
-    )
+    result = supabase.table("profiles").select("*").order("created_at", desc=True).execute()
     return {"users": result.data or []}
 
 
@@ -118,12 +106,7 @@ def admin_update_role(user_id: str, body: RoleUpdate):
     """Update a user's role (admin only)."""
     if body.role not in ("free", "premium", "admin"):
         raise HTTPException(status_code=400, detail="Role must be free, premium, or admin")
-    result = (
-        supabase.table("profiles")
-        .update({"role": body.role})
-        .eq("id", user_id)
-        .execute()
-    )
+    result = supabase.table("profiles").update({"role": body.role}).eq("id", user_id).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="User not found")
     return {"status": "ok", "user": result.data[0]}
@@ -165,11 +148,22 @@ def admin_stats():
         stats["users_by_role"] = roles
 
         # Today's predictions
-        preds_today = supabase.table("predictions").select("id", count="exact").gte("created_at", today).execute()
+        preds_today = (
+            supabase.table("predictions")
+            .select("id", count="exact")
+            .gte("created_at", today)
+            .execute()
+        )
         stats["predictions_today"] = preds_today.count or len(preds_today.data or [])
 
         # Today's fixtures
-        fixtures_today = supabase.table("fixtures").select("id", count="exact").gte("match_date", today).lte("match_date", today + "T23:59:59").execute()
+        fixtures_today = (
+            supabase.table("fixtures")
+            .select("id", count="exact")
+            .gte("match_date", today)
+            .lte("match_date", today + "T23:59:59")
+            .execute()
+        )
         stats["matches_today"] = fixtures_today.count or len(fixtures_today.data or [])
 
         # Total predictions all time
@@ -177,7 +171,12 @@ def admin_stats():
         stats["predictions_total"] = preds_all.count or len(preds_all.data or [])
 
         # Recent signups (last 7 days)
-        recent = supabase.table("profiles").select("id", count="exact").gte("created_at", week_ago).execute()
+        recent = (
+            supabase.table("profiles")
+            .select("id", count="exact")
+            .gte("created_at", week_ago)
+            .execute()
+        )
         stats["signups_last_7d"] = recent.count or len(recent.data or [])
 
     except Exception as e:
@@ -190,11 +189,13 @@ def admin_stats():
 def admin_api_quota():
     """Check API-Football remaining quota."""
     import requests as req_lib
+
     try:
         api_key = os.getenv("API_FOOTBALL_KEY", "")
         if not api_key:
             try:
                 from src.config import API_FOOTBALL_KEY
+
                 api_key = API_FOOTBALL_KEY or ""
             except Exception:
                 pass
@@ -243,7 +244,9 @@ def admin_api_quota():
 def admin_get_leagues():
     """Get currently tracked leagues."""
     from src.config import LEAGUES
+
     return {"leagues": LEAGUES}
+
 
 SYSTEM_PROMPT = """Tu es un expert en paris sportifs spécialisé dans le Live Betting.
 On te fournit les statistiques à la mi-temps d'un match (tirs, possession, xG, corners, score).
@@ -466,29 +469,40 @@ def check_active_matches():
     Used by Trigger.dev to skip useless runs and save compute costs.
     """
     from datetime import timedelta, timezone
+
     now_utc = datetime.now(timezone.utc)
     next_15m = (now_utc + timedelta(minutes=15)).isoformat()
-    today_start = now_utc.replace(hour=0, minute=0, second=0).isoformat()
-    today_end = now_utc.replace(hour=23, minute=59, second=59).isoformat()
 
     # 1. Check for LIVE matches in DB
     active_statuses = ["1H", "2H", "HT", "ET", "LIVE", "BT"]
-    res_active = supabase.table("fixtures").select("id", count="exact").in_("status", active_statuses).execute()
+    res_active = (
+        supabase.table("fixtures")
+        .select("id", count="exact")
+        .in_("status", active_statuses)
+        .execute()
+    )
     has_active = (res_active.count or 0) > 0
 
     # 2. Check for matches starting in the next 15 mins
-    res_upcoming = supabase.table("fixtures").select("id", count="exact").eq("status", "NS").gte("date", now_utc.isoformat()).lte("date", next_15m).execute()
+    res_upcoming = (
+        supabase.table("fixtures")
+        .select("id", count="exact")
+        .eq("status", "NS")
+        .gte("date", now_utc.isoformat())
+        .lte("date", next_15m)
+        .execute()
+    )
     has_upcoming = (res_upcoming.count or 0) > 0
 
     # 3. Quick NHL check (16h-08h UTC)
     hour = now_utc.hour
-    nhl_active_window = (hour >= 16 or hour <= 8)
+    nhl_active_window = hour >= 16 or hour <= 8
 
     return {
         "active": has_active,
         "upcoming_soon": has_upcoming,
         "nhl_window": nhl_active_window,
-        "summary": "Skip if not active and not upcoming and not in NHL window"
+        "summary": "Skip if not active and not upcoming and not in NHL window",
     }
 
 
@@ -576,7 +590,11 @@ def retrain_meta_model():
             )
             _send_telegram_message(msg)
 
-        return {"status": "ok", "message": "XGBoost Meta-Model successfully retrained and saved", "metrics": metrics}
+        return {
+            "status": "ok",
+            "message": "XGBoost Meta-Model successfully retrained and saved",
+            "metrics": metrics,
+        }
     except Exception as e:
         logger.error(f"[MLOps] Meta-Model Retraining Failed: {e}")
         return {"status": "error", "message": str(e)}

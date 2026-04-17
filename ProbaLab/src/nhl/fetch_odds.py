@@ -10,6 +10,7 @@ Usage:
 The Odds API key: ODDS_API_KEY env var
 Free plan: 500 req/mois (suffisant pour ~31 req/mois à raison de 1 fetch/soir)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -39,7 +40,9 @@ def _get(path: str, params: dict) -> dict | None:
         resp = requests.get(url, params=params, timeout=20)
         remaining = resp.headers.get("x-requests-remaining", "?")
         used = resp.headers.get("x-requests-used", "?")
-        logger.debug("Odds API %s → %d | remaining=%s used=%s", path, resp.status_code, remaining, used)
+        logger.debug(
+            "Odds API %s → %d | remaining=%s used=%s", path, resp.status_code, remaining, used
+        )
 
         if resp.status_code == 401:
             logger.error("ODDS_API_KEY invalide ou manquante")
@@ -73,10 +76,13 @@ def fetch_events(date_str: str) -> list[dict]:
     from_dt = day.replace(hour=0, minute=0, second=0)
     to_dt = from_dt + timedelta(days=1, hours=8)  # jusqu'à 08h UTC du lendemain
 
-    data = _get(f"/sports/{SPORT}/events", {
-        "commenceTimeFrom": from_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "commenceTimeTo": to_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
-    })
+    data = _get(
+        f"/sports/{SPORT}/events",
+        {
+            "commenceTimeFrom": from_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "commenceTimeTo": to_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+    )
 
     if not data:
         return []
@@ -88,12 +94,15 @@ def fetch_events(date_str: str) -> list[dict]:
 
 def fetch_player_props(event_id: str, home_team: str, away_team: str) -> list[dict]:
     """Récupère les player props pour un match spécifique."""
-    data = _get(f"/sports/{SPORT}/events/{event_id}/odds", {
-        "regions": "us",
-        "markets": "player_points",
-        "oddsFormat": "decimal",
-        "bookmakers": ",".join(BOOKMAKERS),
-    })
+    data = _get(
+        f"/sports/{SPORT}/events/{event_id}/odds",
+        {
+            "regions": "us",
+            "markets": "player_points",
+            "oddsFormat": "decimal",
+            "bookmakers": ",".join(BOOKMAKERS),
+        },
+    )
 
     if not data:
         return []
@@ -108,10 +117,10 @@ def fetch_player_props(event_id: str, home_team: str, away_team: str) -> list[di
                 continue
             for outcome in market.get("outcomes", []):
                 # The Odds API format: name = 'Over'/'Under', description = player name
-                direction = outcome.get("name", "").lower()   # 'over' or 'under'
+                direction = outcome.get("name", "").lower()  # 'over' or 'under'
                 name = outcome.get("description", "").strip()  # player name
                 price = outcome.get("price", 0.0)
-                point = outcome.get("point", None)   # ex: 0.5 or 1.5
+                point = outcome.get("point", None)  # ex: 0.5 or 1.5
 
                 if not name or direction != "over":
                     continue
@@ -120,16 +129,18 @@ def fetch_player_props(event_id: str, home_team: str, away_team: str) -> list[di
                 if point is not None and float(point) > 0.5:
                     continue
 
-                rows.append({
-                    "game_id": event_id,
-                    "home_team": home_team,
-                    "away_team": away_team,
-                    "player_name": name,
-                    "bookmaker": bookie_key,
-                    "market": "player_points",
-                    "line": float(point) if point is not None else 0.5,
-                    "over_odds": float(price),
-                })
+                rows.append(
+                    {
+                        "game_id": event_id,
+                        "home_team": home_team,
+                        "away_team": away_team,
+                        "player_name": name,
+                        "bookmaker": bookie_key,
+                        "market": "player_points",
+                        "line": float(point) if point is not None else 0.5,
+                        "over_odds": float(price),
+                    }
+                )
 
     logger.debug("  %s vs %s → %d player prop rows", home_team, away_team, len(rows))
     return rows

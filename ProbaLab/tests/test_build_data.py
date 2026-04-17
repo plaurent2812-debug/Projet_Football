@@ -5,6 +5,7 @@ Tests de _advanced_features_from_mem (Phase 5).
 """
 
 import pytest
+
 from src.training.build_data import _advanced_features_from_mem
 
 
@@ -52,13 +53,16 @@ class TestAdvancedFeatures:
         for key in expected_keys:
             assert key in result, f"Missing key: {key}"
 
-    @pytest.mark.parametrize("field", [
-        "home_momentum",
-        "away_momentum",
-        "home_goal_diff_avg",
-        "home_result_variance",
-        "home_clean_sheet_rate",
-    ])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "home_momentum",
+            "away_momentum",
+            "home_goal_diff_avg",
+            "home_result_variance",
+            "home_clean_sheet_rate",
+        ],
+    )
     def test_empty_history_defaults_to_zero(self, field):
         data = _make_data([])
         result = _advanced_features_from_mem(data, "TeamA", "TeamB", "2025-01-10")

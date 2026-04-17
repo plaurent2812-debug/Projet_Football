@@ -152,7 +152,7 @@ export default function PremiumPage() {
                     </Button>
                     <p className="text-xs text-muted-foreground">
                         {stripeAvailable
-                            ? "Puis 9,99\u20AC/mois \u00b7 Sans engagement \u00b7 Annulation en 1 clic via Stripe"
+                            ? "Puis 14,99\u20AC/mois \u00b7 Sans engagement \u00b7 Annulation en 1 clic via Stripe"
                             : "Paiement temporairement indisponible"
                         }
                     </p>

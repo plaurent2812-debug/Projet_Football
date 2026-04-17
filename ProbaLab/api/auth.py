@@ -28,8 +28,30 @@ def verify_cron_auth(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def verify_internal_auth(authorization: str | None) -> None:
-    """Verify request comes from CRON_SECRET or an admin JWT."""
+def verify_internal_auth(
+    authorization: str | None = None,
+    x_cron_secret: str | None = None,
+) -> None:
+    """
+    Verify the request comes from CRON_SECRET or an admin JWT.
+
+    Accepts either:
+      - ``Authorization: Bearer <CRON_SECRET>`` (or an admin Supabase JWT), or
+      - ``X-Cron-Secret: <CRON_SECRET>`` (convenience header for schedulers).
+
+    Raises HTTPException(401/403) on failure.
+    """
+    # Accept the dedicated cron header even when Authorization is missing.
+    if x_cron_secret:
+        if CRON_SECRET and hmac.compare_digest(x_cron_secret.strip(), CRON_SECRET):
+            logger.info(
+                "ADMIN_AUTH_OK: source=cron-header, token=%s...",
+                x_cron_secret[:8],
+            )
+            return
+        logger.warning("ADMIN_AUTH_FAIL: invalid X-Cron-Secret")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
     token = authorization.replace("Bearer ", "").strip()

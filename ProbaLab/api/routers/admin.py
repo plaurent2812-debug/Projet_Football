@@ -14,11 +14,19 @@ from pathlib import Path
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 
-from api.auth import verify_cron_auth
+from api.auth import verify_cron_auth, verify_internal_auth
 from api.schemas import RunPipelineRequest
 from src.config import supabase
+
+
+def _require_internal_auth(
+    authorization: str | None = Header(None),
+    x_cron_secret: str | None = Header(None, alias="X-Cron-Secret"),
+) -> None:
+    """FastAPI dependency wrapping verify_internal_auth with both headers."""
+    verify_internal_auth(authorization=authorization, x_cron_secret=x_cron_secret)
 
 logger = logging.getLogger(__name__)
 
@@ -231,25 +239,21 @@ def admin_pipeline_status(request: Request, authorization: str | None = Header(N
         return state
 
 
-@router.post("/api/admin/update-scores")
+@router.post(
+    "/api/admin/update-scores",
+    dependencies=[Depends(_require_internal_auth)],
+)
 def admin_update_scores(
     request: Request,
     date: str | None = Query(None, description="Date YYYY-MM-DD (default: today)"),
-    authorization: str | None = Header(None),
 ):
     """
     Update match scores for a given date from API Football.
     Designed to be called by a CRON job every 15 minutes during match hours.
-    No auth required when called internally (Railway CRON), but JWT accepted.
+    Requires either a valid CRON_SECRET (Authorization: Bearer or X-Cron-Secret
+    header) or an admin Supabase JWT — enforced by verify_internal_auth to
+    protect the paid API-Football quota against unauthenticated DoS.
     """
-    # Allow unauthenticated calls from Railway CRON (internal network)
-    # If Authorization header is present, validate it
-    if authorization:
-        try:
-            _require_admin(authorization)
-        except HTTPException:
-            raise
-
     import threading as _threading
 
     def _run_scores():

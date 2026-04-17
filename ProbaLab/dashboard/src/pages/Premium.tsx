@@ -65,7 +65,7 @@ export default function PremiumPage() {
                 </h1>
                 <p className="text-muted-foreground max-w-md mx-auto">
                     Value Bets illimit&eacute;s, mise optimale Kelly, alertes temps r&eacute;el.
-                    Essai gratuit 7 jours — sans engagement.
+                    Essai gratuit 30 jours — sans engagement.
                 </p>
             </div>
 
@@ -147,7 +147,7 @@ export default function PremiumPage() {
                         disabled={!stripeAvailable}
                     >
                         <Zap className="w-5 h-5 mr-2" />
-                        Essai gratuit 7 jours
+                        Essai gratuit 30 jours
                         <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
                     <p className="text-xs text-muted-foreground">

@@ -79,7 +79,7 @@ export function PremiumTeaser({ valueBetCount = 3 }: { valueBetCount?: number })
                 className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all hover:scale-[1.02] glow-value"
             >
                 <Zap className="w-4 h-4" />
-                D&eacute;bloquer les Value Bets — Essai 7 jours gratuit
+                D&eacute;bloquer les Value Bets — Essai 30 jours gratuit
                 <ArrowRight className="w-4 h-4" />
             </Link>
         </div>

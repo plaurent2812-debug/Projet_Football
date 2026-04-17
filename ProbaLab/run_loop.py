@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 
 # Configuration
-PROJECT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Projet_Football")
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 PYTHON_CMD = sys.executable
 
 

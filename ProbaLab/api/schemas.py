@@ -2,24 +2,33 @@
 api/schemas.py — Pydantic models for API request validation.
 
 Replaces raw `dict` parameters with typed, validated models.
+All schemas inherit from _StrictBase which sets extra="forbid" to prevent
+mass-assignment vulnerabilities (P0-7).
 """
 
 from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+# ─── Strict base — prevents mass-assignment (P0-7) ───────────────
+
+class _StrictBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
 
 # ─── Email Endpoints ─────────────────────────────────────────────
 
-class EmailPayload(BaseModel):
+class EmailPayload(_StrictBase):
     email: str = Field(..., max_length=320, description="Recipient email address")
     name: str | None = Field(None, max_length=200, description="Recipient name (optional)")
 
 
 # ─── Best Bets ───────────────────────────────────────────────────
 
-class SaveBetRequest(BaseModel):
+class SaveBetRequest(_StrictBase):
     date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="ISO date YYYY-MM-DD")
     sport: Literal["football", "nhl"] = Field(..., description="'football' or 'nhl'")
     label: str = Field(..., max_length=500, description="Bet description label")
@@ -31,14 +40,14 @@ class SaveBetRequest(BaseModel):
     player_name: str | None = Field(None, max_length=200, description="Player name for props")
 
 
-class UpdateBetResultRequest(BaseModel):
+class UpdateBetResultRequest(_StrictBase):
     result: Literal["WIN", "LOSS", "VOID", "PENDING"] = Field(..., description="WIN, LOSS, VOID, or PENDING")
     notes: str = Field("", max_length=1000, description="Optional notes")
 
 
 # ─── CRON / Pipeline ─────────────────────────────────────────────
 
-class DateRequest(BaseModel):
+class DateRequest(_StrictBase):
     date: str | None = Field(None, description="ISO date YYYY-MM-DD (defaults to today)")
 
     @field_validator("date")
@@ -51,17 +60,17 @@ class DateRequest(BaseModel):
         return v
 
 
-class ResolveBetsRequest(BaseModel):
+class ResolveBetsRequest(_StrictBase):
     date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="ISO date YYYY-MM-DD")
     sport: Literal["football", "nhl"] = Field(..., description="'football' or 'nhl'")
 
 
-class ResolveExpertPicksRequest(BaseModel):
+class ResolveExpertPicksRequest(_StrictBase):
     date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="ISO date YYYY-MM-DD")
     sport: Literal["football", "nhl"] | None = Field(None, description="'football' or 'nhl' (optional)")
 
 
-class RunPipelineRequest(BaseModel):
+class RunPipelineRequest(_StrictBase):
     mode: Literal["full", "data", "analyze", "results", "nhl"] = Field(
         "full", description="Pipeline mode: full, data, analyze, results, nhl"
     )

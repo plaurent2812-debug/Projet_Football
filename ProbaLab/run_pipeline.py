@@ -117,6 +117,40 @@ def run_results(date: str | None = None):
     )
 
 
+def _persist_health_log(sport: str) -> None:
+    """Insère un snapshot de santé du modèle dans model_health_log.
+
+    Réutilise check_drift() qui calcule déjà brier_7d et brier_30d
+    à partir de prediction_results. La table ne filtre pas par sport
+    nativement, donc football et NHL reçoivent les mêmes métriques
+    globales (acceptable en phase initiale).
+
+    Args:
+        sport: 'football' ou 'nhl'.
+    """
+    from src.config import supabase
+    from src.monitoring.drift_detector import check_drift
+
+    try:
+        drift = check_drift()
+        supabase.table("model_health_log").insert({
+            "sport": sport,
+            "brier_7d": drift.get("brier_7d"),
+            "brier_30d": drift.get("brier_30d"),
+            "drift_detected": drift.get("drifted", False),
+            "prediction_volume_today": None,
+        }).execute()
+        logger.info(
+            "[_persist_health_log] %s — brier_7d=%s brier_30d=%s drift=%s",
+            sport,
+            drift.get("brier_7d"),
+            drift.get("brier_30d"),
+            drift.get("drifted"),
+        )
+    except Exception as e:
+        logger.error("[_persist_health_log] Erreur persist %s: %s", sport, e)
+
+
 def run_monitoring_alerts():
     """Run post-pipeline monitoring checks and send Telegram alerts."""
     logger.info("=" * 60)
@@ -135,6 +169,9 @@ def run_monitoring_alerts():
             logger.info("✅ Monitoring: aucune alerte")
     except Exception as e:
         logger.error("Erreur monitoring: %s", e)
+
+    _persist_health_log("football")
+    _persist_health_log("nhl")
 
 
 if __name__ == "__main__":

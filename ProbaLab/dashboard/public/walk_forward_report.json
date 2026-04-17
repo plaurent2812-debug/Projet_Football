@@ -1,0 +1,8 @@
+{
+  "error": "Insufficient historical data: fewer than 100 rows with actual_result in prediction_results",
+  "folds": [],
+  "brier_1x2_mean": null,
+  "brier_1x2_std": null,
+  "log_loss_mean": null,
+  "generated_at": "2026-04-17T12:18:45.646495Z"
+}

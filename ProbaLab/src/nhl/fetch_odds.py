@@ -64,13 +64,13 @@ def fetch_events(date_str: str) -> list[dict]:
     """Récupère les events NHL pour une date donnée."""
     # The Odds API filtre les events via commenceTimeFrom/To (ISO 8601)
     try:
-        day = datetime.strptime(date_str, "%Y-%m-%d")
+        day = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except ValueError:
-        day = datetime.now()
+        day = datetime.now(timezone.utc)
 
     # On prend la journée entière en UTC (les matchs NHL à 01h-05h UTC = nuit du jour J+1 Paris)
     # Pour March 7 Paris = March 6 21h UTC → March 7 07h UTC
-    from_dt = day.replace(hour=0, minute=0, second=0, tzinfo=timezone.utc)
+    from_dt = day.replace(hour=0, minute=0, second=0)
     to_dt = from_dt + timedelta(days=1, hours=8)  # jusqu'à 08h UTC du lendemain
 
     data = _get(f"/sports/{SPORT}/events", {
@@ -163,7 +163,7 @@ def run(date_str: str | None = None) -> dict:
         return {"ok": False, "error": "ODDS_API_KEY non définie"}
 
     if not date_str:
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     logger.info("Fetching NHL odds for %s", date_str)
 

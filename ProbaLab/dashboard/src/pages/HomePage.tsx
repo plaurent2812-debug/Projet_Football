@@ -22,7 +22,7 @@ function LiveAlertBanner({ alert }) {
                 <BellRing className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                 <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-[10px] font-bold text-red-500 uppercase bg-red-500/10 px-1.5 py-0.5 rounded">
+                        <span className="text-xs font-bold text-red-500 uppercase bg-red-500/10 px-1.5 py-0.5 rounded">
                             🔥 Alerte Mi-Temps
                         </span>
                         <span className="text-xs font-bold">
@@ -52,12 +52,17 @@ function MatchRow({ match, sport = "football" }) {
     const link = sport === "nhl" ? `/nhl/match/${match.api_fixture_id || match.id}` : `/football/match/${match.id}`
 
     return (
-        <div className="fs-match-row" onClick={() => navigate(link)}>
+        <button
+            type="button"
+            className="fs-match-row w-full text-left"
+            onClick={() => navigate(link)}
+            aria-label={`${match.home_team} vs ${match.away_team}`}
+        >
             <div className="fs-match-time">
                 {isLive ? (
                     <span className="fs-live-badge">{match.elapsed ? `${match.elapsed}'` : "LIVE"}</span>
                 ) : isFinished ? (
-                    <span className="text-[10px] font-semibold text-emerald-500">FT</span>
+                    <span className="text-xs font-semibold text-emerald-500">FT</span>
                 ) : (
                     <span>{time}</span>
                 )}
@@ -67,7 +72,7 @@ function MatchRow({ match, sport = "football" }) {
                 <div className="flex-1 flex items-center gap-1.5 min-w-0 justify-end">
                     <span className={cn("fs-team-name text-right", homeWon && "winner")}>{match.home_team}</span>
                     {match.home_logo ? (
-                        <img src={match.home_logo} alt="" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
+                        <img src={match.home_logo} alt="" role="presentation" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
                     ) : (
                         <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
                             {match.home_team?.charAt(0)}
@@ -91,7 +96,7 @@ function MatchRow({ match, sport = "football" }) {
 
                 <div className="flex-1 flex items-center gap-1.5 min-w-0">
                     {match.away_logo ? (
-                        <img src={match.away_logo} alt="" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
+                        <img src={match.away_logo} alt="" role="presentation" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
                     ) : (
                         <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
                             {match.away_team?.charAt(0)}
@@ -116,7 +121,7 @@ function MatchRow({ match, sport = "football" }) {
                     )}
                 </div>
             )}
-        </div>
+        </button>
     )
 }
 
@@ -368,10 +373,10 @@ export default function HomePage() {
                         <div className="text-2xl font-black text-primary tabular-nums mb-1">
                             {loading ? <Skeleton className="w-8 h-8" /> : fbCount}
                         </div>
-                        <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-3">
+                        <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-3">
                             Matchs Aujourd'hui
                         </div>
-                        <div className="text-[10px] font-bold text-primary group-hover:translate-x-1 transition-transform flex items-center">
+                        <div className="text-xs font-bold text-primary group-hover:translate-x-1 transition-transform flex items-center">
                             VOIR LES MATCHS <ArrowRight className="w-3 h-3 ml-1" />
                         </div>
                     </div>
@@ -392,10 +397,10 @@ export default function HomePage() {
                         <div className="text-2xl font-black text-blue-500 tabular-nums mb-1">
                             {loading ? <Skeleton className="w-8 h-8" /> : nhlCount}
                         </div>
-                        <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-3">
+                        <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-3">
                             Matchs Aujourd'hui
                         </div>
-                        <div className="text-[10px] font-bold text-blue-500 group-hover:translate-x-1 transition-transform flex items-center">
+                        <div className="text-xs font-bold text-blue-500 group-hover:translate-x-1 transition-transform flex items-center">
                             VOIR LES MATCHS <ArrowRight className="w-3 h-3 ml-1" />
                         </div>
                     </div>
@@ -469,7 +474,7 @@ export default function HomePage() {
                                         <div key={i} className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/20 text-xs">
                                             <div className="flex items-center gap-2 min-w-0 flex-1">
                                                 <span className={cn(
-                                                    "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                                                    "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
                                                     bet.result === "WIN" ? "bg-emerald-500/20 text-emerald-400" :
                                                     bet.result === "LOSS" ? "bg-red-500/20 text-red-400" :
                                                     "bg-muted text-muted-foreground"

@@ -17,7 +17,7 @@ Push dans nhl_data_lake + nhl_fixtures dans Supabase.
 
 import math
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -73,13 +73,15 @@ def fetch_schedule() -> tuple[list[dict], str]:
     """
     data = _fetch_json("/schedule/now")
     if not data or "gameWeek" not in data:
-        return [], datetime.utcnow().strftime("%Y-%m-%d")
+        return [], datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # 1. Préfère today s'il a effectivement des matchs
     for day in data["gameWeek"]:
-        if day["date"] == today:
-            return day.get("games", []), day["date"]
-    # Fallback: find the closest day with games (handles timezone edge cases)
+        if day["date"] == today and day.get("games"):
+            return day["games"], day["date"]
+    # 2. Sinon, prochain jour avec matchs (fin de saison, jours off,
+    #    ou edge case timezone où "today" UTC est déjà "hier" côté NHL)
     for day in data["gameWeek"]:
         if day.get("games"):
             return day["games"], day["date"]
@@ -225,7 +227,7 @@ def fetch_goalie_form(teams: list[str]) -> dict:
             for g in data["games"]
             if g.get("gameState") in ("FINAL", "OFF")
             and datetime.fromisoformat(g["startTimeUTC"].replace("Z", "+00:00"))
-            < datetime.now().astimezone()
+            < datetime.now(timezone.utc).astimezone()
         ]
         finished.sort(key=lambda g: g["startTimeUTC"], reverse=True)
         last5 = finished[:5]
@@ -302,7 +304,7 @@ def detect_fatigue(games: list[dict]) -> dict[str, float]:
         return fatigue_modifiers
 
     # We need the last 3 days to check for 3-in-4 (Today + 3 previous days)
-    past_dates = [(datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(1, 4)]
+    past_dates = [(datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(1, 4)]
     yesterday_str = past_dates[0]
 
     schedule_data = _fetch_json("/schedule/now")
@@ -453,9 +455,9 @@ def calculate_recent_form(game_log: list[dict]) -> dict:
     days_since_last_game = 999
     if all_games and "gameDate" in all_games[0]:
         try:
-            from datetime import datetime
-            last_date = datetime.strptime(all_games[0]["gameDate"], "%Y-%m-%d")
-            days_since_last_game = (datetime.utcnow() - last_date).days
+            from datetime import datetime, timezone
+            last_date = datetime.strptime(all_games[0]["gameDate"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            days_since_last_game = (datetime.now(timezone.utc) - last_date).days
         except Exception:
             pass
 
@@ -1124,7 +1126,7 @@ def run_nhl_pipeline() -> dict:
         g
         for g in games
         if datetime.fromisoformat(g["startTimeUTC"].replace("Z", "+00:00"))
-        > datetime.now().astimezone()
+        > datetime.now(timezone.utc).astimezone()
     ]
 
     if not future_games:
@@ -1377,8 +1379,8 @@ def run_nhl_pipeline() -> dict:
                     try:
                         last_game_date = game_log[0].get("gameDate", "")
                         if last_game_date:
-                            last_dt = datetime.strptime(last_game_date, "%Y-%m-%d")
-                            days_since = (datetime.utcnow() - last_dt).days
+                            last_dt = datetime.strptime(last_game_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                            days_since = (datetime.now(timezone.utc) - last_dt).days
                             if days_since > 10:
                                 injured.add(pid)
                                 injured_by_team.setdefault(team, []).append(p["player_name"])
@@ -1653,10 +1655,10 @@ def run_nhl_pipeline() -> dict:
         # Fetch tomorrow's already-stored fixtures from DB to include in DeepThink
         extended_fixtures = list(fixtures_data)
         try:
-            from datetime import datetime as dt
+            from datetime import datetime as dt, timezone
             from datetime import timedelta
-            tomorrow = (dt.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
-            cutoff_str = (dt.utcnow() + timedelta(days=1)).replace(hour=20, minute=0, second=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+            tomorrow = (dt.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+            cutoff_str = (dt.now(timezone.utc) + timedelta(days=1)).replace(hour=20, minute=0, second=0).strftime("%Y-%m-%dT%H:%M:%SZ")
             tmrw_data = (
                 supabase.table("nhl_fixtures")
                 .select("*")
@@ -1873,7 +1875,7 @@ def generate_deepthink_meta_analysis(
     )
 
     user_prompt = (
-        f"Soirée NHL du {datetime.utcnow().strftime('%d/%m/%Y')} — "
+        f"Soirée NHL du {datetime.now(timezone.utc).strftime('%d/%m/%Y')} — "
         f"{len(fixtures_data)} matchs à analyser :\n\n"
         + "\n\n".join(matches_summary)
     )

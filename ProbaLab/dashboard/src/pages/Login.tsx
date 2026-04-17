@@ -143,13 +143,13 @@ function RegisterForm() {
             <div>
                 <InputField label="Mot de passe" type="password" value={password} onChange={setPassword} placeholder="Min. 6 caractères" icon={Lock} />
                 {password.length > 0 && password.length < 6 && (
-                    <p className="text-[10px] text-amber-500 mt-1 ml-1">{6 - password.length} caractère{6 - password.length > 1 ? "s" : ""} restant{6 - password.length > 1 ? "s" : ""}</p>
+                    <p className="text-xs text-amber-500 mt-1 ml-1">{6 - password.length} caractère{6 - password.length > 1 ? "s" : ""} restant{6 - password.length > 1 ? "s" : ""}</p>
                 )}
             </div>
             <div>
                 <InputField label="Confirmer le mot de passe" type="password" value={confirm} onChange={setConfirm} placeholder="••••••••" icon={Lock} />
                 {confirm.length > 0 && password !== confirm && (
-                    <p className="text-[10px] text-red-400 mt-1 ml-1">Les mots de passe ne correspondent pas</p>
+                    <p className="text-xs text-red-400 mt-1 ml-1">Les mots de passe ne correspondent pas</p>
                 )}
             </div>
             {error && <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>}
@@ -157,7 +157,7 @@ function RegisterForm() {
                 {loading ? "Création..." : "Créer mon compte"}
                 <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
-            <p className="text-[11px] text-muted-foreground text-center">
+            <p className="text-xs text-muted-foreground text-center">
                 En créant un compte, vous acceptez nos CGU. ProbaLab ne constitue pas un conseil en paris sportifs.
             </p>
         </form>

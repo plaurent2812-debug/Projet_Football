@@ -77,7 +77,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                         {match.elapsed ? `${match.elapsed}'` : "LIVE"}
                     </span>
                 ) : isFinished ? (
-                    <span className="text-[10px] font-semibold text-emerald-500">FT</span>
+                    <span className="text-xs font-semibold text-emerald-500">FT</span>
                 ) : (
                     <span>{time}</span>
                 )}
@@ -91,7 +91,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                         {match.home_team}
                     </span>
                     {match.home_logo ? (
-                        <img src={match.home_logo} alt="" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
+                        <img src={match.home_logo} alt="" role="presentation" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
                     ) : (
                         <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
                             {match.home_team?.charAt(0)}
@@ -108,7 +108,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                         </>
                     ) : (
                         <>
-                            <span className="text-[10px] font-medium text-muted-foreground/50">vs</span>
+                            <span className="text-xs font-medium text-muted-foreground/50">vs</span>
                         </>
                     )}
                 </div>
@@ -116,7 +116,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                 {/* Away */}
                 <div className="flex-1 flex items-center gap-1.5 min-w-0">
                     {match.away_logo ? (
-                        <img src={match.away_logo} alt="" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
+                        <img src={match.away_logo} alt="" role="presentation" className="w-4 h-4 shrink-0 object-contain" loading="lazy" />
                     ) : (
                         <div className="w-4 h-4 rounded-sm bg-primary/10 shrink-0 flex items-center justify-center text-[7px] font-bold text-primary">
                             {match.away_team?.charAt(0)}
@@ -134,7 +134,7 @@ function MatchRow({ match, isStarred, onToggleStar }) {
                     <>
                         {/* Value Bet Badge */}
                         {match.best_value && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 whitespace-nowrap" title={`${match.best_value.market} @ ${match.best_value.odds}`}>
+                            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 whitespace-nowrap" title={`${match.best_value.market} @ ${match.best_value.odds}`}>
                                 VALUE +{match.best_value.edge.toFixed(0)}%
                             </span>
                         )}
@@ -179,7 +179,7 @@ function LeagueSection({ leagueName, leagueId, countryName, matches, isStarred, 
                     <div className="fs-league-name">{leagueName}</div>
                 </div>
                 {liveCount > 0 && (
-                    <span className="fs-summary-badge bg-red-500/15 text-red-500 text-[10px]">{liveCount}</span>
+                    <span className="fs-summary-badge bg-red-500/15 text-red-500 text-xs">{liveCount}</span>
                 )}
                 <span className={cn("fs-league-count", liveCount > 0 && "has-live")}>
                     {matches.length}
@@ -254,7 +254,7 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
                     <button
                         onClick={() => setValueOnly(v => !v)}
                         className={cn(
-                            "ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors",
+                            "ml-2 text-xs font-bold px-2 py-0.5 rounded-full border transition-colors",
                             valueOnly
                                 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                                 : "bg-transparent text-muted-foreground border-border/50 hover:text-emerald-400"
@@ -268,7 +268,7 @@ export default function FootballPage({ date, setDate, selectedLeague, setSelecte
                 <select
                     value={minConfidence}
                     onChange={(e) => setMinConfidence(Number(e.target.value))}
-                    className="ml-2 text-[10px] font-semibold bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground focus:outline-none cursor-pointer"
+                    className="ml-2 text-xs font-semibold bg-transparent border border-border/50 rounded px-1.5 py-0.5 text-muted-foreground focus:outline-none cursor-pointer"
                 >
                     <option value={0}>Tous</option>
                     <option value={6}>6+</option>

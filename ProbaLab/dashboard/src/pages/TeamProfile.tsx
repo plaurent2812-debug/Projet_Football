@@ -170,7 +170,7 @@ export default function TeamProfile() {
                     <Users className="w-4 h-4 inline-block" />
                     Effectif
                     {roster.length > 0 && (
-                        <span className="text-[10px] bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded-full">
+                        <span className="text-xs bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded-full">
                             {roster.length}
                         </span>
                     )}
@@ -189,7 +189,7 @@ export default function TeamProfile() {
                                 </div>
                                 <div>
                                     <p className="text-2xl font-black tabular-nums">{summary.total}</p>
-                                    <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Matchs</p>
+                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Matchs</p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -201,7 +201,7 @@ export default function TeamProfile() {
                                 </div>
                                 <div>
                                     <p className="text-2xl font-black tabular-nums">{summary.wins}</p>
-                                    <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Victoires</p>
+                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Victoires</p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -213,7 +213,7 @@ export default function TeamProfile() {
                                 </div>
                                 <div>
                                     <p className="text-2xl font-black tabular-nums">{summary.draws}</p>
-                                    <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Nuls</p>
+                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Nuls</p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -225,7 +225,7 @@ export default function TeamProfile() {
                                 </div>
                                 <div>
                                     <p className="text-2xl font-black tabular-nums">{summary.losses}</p>
-                                    <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">Défaites</p>
+                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Défaites</p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -241,7 +241,7 @@ export default function TeamProfile() {
                                     return (
                                         <span
                                             key={i}
-                                            className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white", bg)}
+                                            className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-black text-white", bg)}
                                             title={`${m.opponent} (${m.score})`}
                                         >
                                             {m.result}
@@ -283,7 +283,7 @@ export default function TeamProfile() {
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-sm truncate">{m.opponent}</span>
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-secondary text-muted-foreground font-medium">
+                                                <span className="text-xs px-1.5 py-0.5 rounded-sm bg-secondary text-muted-foreground font-medium">
                                                     {m.home_away === 'D' ? 'DOM' : 'EXT'}
                                                 </span>
                                             </div>
@@ -323,12 +323,12 @@ export default function TeamProfile() {
                                             )}
                                             <div className="min-w-0 flex-1">
                                                 <div className="font-bold text-sm truncate">{player.name}</div>
-                                                <div className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
+                                                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                                                     <span className="font-medium text-foreground">{player.position || "Joueur"}</span>
                                                     {player.age && <span>• {player.age} ans</span>}
                                                     {player.number && <span>• N°{player.number}</span>}
                                                 </div>
-                                                <div className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-3 font-medium">
+                                                <div className="text-xs text-muted-foreground mt-1.5 flex items-center gap-3 font-medium">
                                                     {(player.appearances > 0 || player.goals > 0 || player.assists > 0 || player.goals_conceded > 0) ? (
                                                         <>
                                                             <span className="flex items-center gap-1">🏃‍♂️ {player.appearances || 0} matchs</span>

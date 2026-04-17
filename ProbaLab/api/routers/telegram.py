@@ -21,7 +21,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 from fastapi import APIRouter, BackgroundTasks, Request, Response
@@ -135,7 +135,7 @@ def _save_expert_pick(pick: dict, chat_id: int) -> bool:
                 odds_val = None
 
         record = {
-            "date": pick.get("date") or datetime.utcnow().strftime("%Y-%m-%d"),
+            "date": pick.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "sport": pick.get("sport", "football"),
             "player_name": pick.get("player_name"),
             "market": market,
@@ -184,7 +184,7 @@ def _handle_update(update: dict) -> None:
         _combo_state[chat_id] = {
             "selections": [],
             "sport": "football",
-            "date": datetime.utcnow().strftime("%Y-%m-%d"),
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         }
         _send_message(
             chat_id,

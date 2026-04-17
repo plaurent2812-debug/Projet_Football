@@ -1,8 +1,29 @@
+"""
+api/routers/trigger.py — Endpoints admin/trigger pour ProbaLab.
+
+IMPORTANT — SOURCE DE VÉRITÉ DU SCHEDULING :
+  APScheduler (worker.py) est la SEULE source de scheduling automatique.
+  Les endpoints ci-dessous sont des déclenchements AD-HOC manuels uniquement
+  (admin, debug, re-run, backtest).  Ne jamais en faire des crons depuis
+  Trigger.dev ou un scheduler externe — cela créerait une double source
+  silencieuse (leçon 64 NHL, 2026-04-17).
+
+ENDPOINTS SUPPRIMÉS le 2026-04-17 (duplicates des crons APScheduler) :
+  - POST /update-live-scores       → remplacé par job_live (*/5 min)
+  - POST /nhl-update-live-scores   → remplacé par job_live (*/5 min, NHL branch)
+  - POST /run-daily-pipeline       → remplacé par job_data_pipeline + job_brain
+  - POST /daily-recap              → remplacé par job_results (*/15 min)
+  - POST /detect-value-bets        → remplacé par job_football_picks (12:00)
+  - POST /nhl-fetch-odds           → remplacé par job_nhl_fetch_odds (16:15/23:15)
+  - POST /nhl-run-pipeline         → remplacé par job_nhl_pipeline (16:00/23:00)
+  - POST /nhl-evaluate-performance → remplacé par job_nhl_evaluation (08:00)
+"""
+
 from __future__ import annotations
 
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -127,10 +148,10 @@ def admin_delete_user(user_id: str):
 @router.get("/admin/stats")
 def admin_stats():
     """Site-wide KPIs for admin overview."""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    week_ago = (datetime.utcnow() - timedelta(days=7)).isoformat()
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
     stats = {}
     try:
@@ -316,7 +337,7 @@ def _detect_anomalies(t1: dict, t2: dict, score_home: int, score_away: int) -> l
 @router.get("/daily-matches")
 def get_daily_matches():
     """Returns all matches planned for today that haven't started yet."""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     fixtures = (
         supabase.table("fixtures")
         .select("id, api_fixture_id, date, home_team, away_team")
@@ -444,8 +465,8 @@ def check_active_matches():
     """Lite check to see if we have any active or upcoming matches.
     Used by Trigger.dev to skip useless runs and save compute costs.
     """
-    from datetime import timedelta
-    now_utc = datetime.utcnow()
+    from datetime import timedelta, timezone
+    now_utc = datetime.now(timezone.utc)
     next_15m = (now_utc + timedelta(minutes=15)).isoformat()
     today_start = now_utc.replace(hour=0, minute=0, second=0).isoformat()
     today_end = now_utc.replace(hour=23, minute=59, second=59).isoformat()
@@ -471,228 +492,7 @@ def check_active_matches():
     }
 
 
-# ─── Live Scores Update ─────────────────────────────────────────
-
-
-@router.post("/update-live-scores")
-def update_live_scores(detail: bool = Query(False, description="Fetch events & stats (every 5 min)")):
-    """Fetch all live scores from API-Football and update Supabase fixtures table.
-    
-    When detail=False (default): only updates score/status/elapsed (1 API call).
-    When detail=True: also fetches events, stats, and checks stale matches.
-    """
-    logger.info(f"[Live Scores] Fetching live fixtures (detail={detail})...")
-
-    resp = api_get("fixtures", {"live": "all"})
-    live_fixtures = resp.get("response", []) if resp else []
-
-    if not live_fixtures:
-        logger.info("[Live Scores] No live matches found.")
-        return {"status": "ok", "updated": 0, "finished": 0, "errors": 0, "total_live": 0}
-
-    # Map API status to our status codes
-    status_map = {
-        "1H": "1H", "HT": "HT", "2H": "2H", "ET": "ET", "P": "PEN",
-        "FT": "FT", "AET": "FT", "PEN": "FT", "BT": "BT",
-        "SUSP": "SUSP", "INT": "INT", "LIVE": "LIVE",
-    }
-
-    batch_updates = []
-    errors = 0
-    live_api_ids = set()
-
-    # Optimization: Fetch existing fixtures in one go to get their internal IDs
-    api_ids = [str(lf.get("fixture", {}).get("id")) for lf in live_fixtures if lf.get("fixture", {}).get("id")]
-    existing_map = {}
-    if api_ids:
-        db_res = supabase.table("fixtures").select("id, api_fixture_id").in_("api_fixture_id", api_ids).execute()
-        existing_map = {str(item["api_fixture_id"]): item["id"] for item in db_res.data or []}
-
-    for lf in live_fixtures:
-        api_fixture_id = lf.get("fixture", {}).get("id")
-        if not api_fixture_id: continue
-
-        live_api_ids.add(api_fixture_id)
-        internal_id = existing_map.get(str(api_fixture_id))
-        if not internal_id: continue # Match not in our DB, ignore
-
-        goals = lf.get("goals", {})
-        status_short = lf.get("fixture", {}).get("status", {}).get("short", "")
-
-        update_data = {
-            "id": internal_id, # Required for upsert to update
-            "api_fixture_id": api_fixture_id,
-            "home_goals": goals.get("home"),
-            "away_goals": goals.get("away"),
-            "status": status_map.get(status_short, status_short),
-            "elapsed": lf.get("fixture", {}).get("status", {}).get("elapsed"),
-        }
-
-        # Detailed fetch (every 10 min)
-        if detail:
-            # Events
-            try:
-                events_resp = api_get("fixtures/events", {"fixture": api_fixture_id})
-                if events_resp and events_resp.get("response"):
-                    goals_list = []
-                    for ev in events_resp["response"]:
-                        if ev.get("type") == "Goal" and ev.get("comments") != "Penalty Shootout":
-                            assist = ev.get("assist", {}) or {}
-                            goals_list.append({
-                                "team": ev.get("team", {}).get("name", ""),
-                                "player": ev.get("player", {}).get("name", ""),
-                                "player_id": ev.get("player", {}).get("id"),
-                                "assist": assist.get("name"),
-                                "assist_id": assist.get("id"),
-                                "time": ev.get("time", {}).get("elapsed", ""),
-                                "detail": ev.get("detail", ""),
-                                "half": "1H" if (ev.get("time", {}).get("elapsed", 0) or 0) <= 45 else "2H",
-                            })
-                    update_data["events_json"] = goals_list
-            except Exception: pass
-
-            # Stats
-            try:
-                stats_resp = api_get("fixtures/statistics", {"fixture": api_fixture_id})
-                if stats_resp and stats_resp.get("response"):
-                    live_stats = {}
-                    for team_stats in stats_resp["response"]:
-                        team_name = team_stats.get("team", {}).get("name", "")
-                        side = "home" if team_name == lf.get("teams", {}).get("home", {}).get("name") else "away"
-                        stats_dict = {s.get("type", ""): s.get("value") for s in team_stats.get("statistics", [])}
-                        live_stats[side] = {
-                            "team": team_name,
-                            "shots_total": stats_dict.get("Total Shots"),
-                            "shots_on": stats_dict.get("Shots on Goal"),
-                            "possession": stats_dict.get("Ball Possession"),
-                            "corners": stats_dict.get("Corner Kicks"),
-                            "xg": stats_dict.get("expected_goals"),
-                        }
-                    update_data["live_stats_json"] = live_stats
-            except Exception: pass
-
-        batch_updates.append(update_data)
-
-    # Perform batch update
-    updated_count = 0
-    if batch_updates:
-        try:
-            supabase.table("fixtures").upsert(batch_updates).execute()
-            updated_count = len(batch_updates)
-        except Exception as e:
-            logger.error(f"[Live Scores] Batch update error: {e}")
-            errors = len(batch_updates)
-
-    # ── 2nd pass: detect recently finished matches (only in detail mode) ──
-    if not detail:
-        logger.info(f"[Live Scores] ✅ Quick update: {updated_count} fixtures synchronized.")
-        return {"status": "ok", "updated": updated_count, "finished": 0, "errors": errors, "total_live": len(live_fixtures)}
-
-    # Fixtures in our DB marked as live/NS but no longer in the API live response
-    today = datetime.now().strftime("%Y-%m-%d")
-    stale_statuses = ["1H", "2H", "HT", "ET", "LIVE", "BT", "NS"]
-    try:
-        stale_fixtures = (
-            supabase.table("fixtures")
-            .select("id, api_fixture_id, status")
-            .gte("date", f"{today}T00:00:00Z")
-            .lt("date", f"{today}T23:59:59Z")
-            .in_("status", stale_statuses)
-            .execute()
-            .data
-            or []
-        )
-    except Exception:
-        stale_fixtures = []
-
-    finished_count = 0
-    for sf in stale_fixtures:
-        sf_api_id = sf.get("api_fixture_id")
-        if not sf_api_id or sf_api_id in live_api_ids:
-            continue  # Still live or no API ID
-
-        # This match is marked live in DB but not in API — it just finished
-        try:
-            import time as _time
-
-            fix_resp = api_get("fixtures", {"id": sf_api_id})
-            _time.sleep(0.3)
-            if not fix_resp or not fix_resp.get("response"):
-                continue
-
-            fix_data = fix_resp["response"][0]
-            api_status = fix_data.get("fixture", {}).get("status", {}).get("short", "")
-            goals = fix_data.get("goals", {})
-
-            status_map = {
-                "FT": "FT",
-                "AET": "FT",
-                "PEN": "FT",
-                "NS": "NS",
-                "PST": "POST",
-                "CANC": "CANC",
-                "1H": "1H",
-                "2H": "2H",
-                "HT": "HT",
-            }
-            final_status = status_map.get(api_status, api_status)
-
-            update_data = {
-                "status": final_status,
-                "home_goals": goals.get("home"),
-                "away_goals": goals.get("away"),
-            }
-
-            # Also fetch events for the finished match
-            try:
-                events_resp = api_get("fixtures/events", {"fixture": sf_api_id})
-                _time.sleep(0.3)
-                if events_resp and events_resp.get("response"):
-                    raw_events = events_resp["response"]
-                    goals_list = []
-                    for ev in raw_events:
-                        if ev.get("type") == "Goal" and ev.get("comments") != "Penalty Shootout":
-                            goals_list.append(
-                                {
-                                    "team": ev.get("team", {}).get("name", ""),
-                                    "player": ev.get("player", {}).get("name", ""),
-                                    "player_id": ev.get("player", {}).get("id"),
-                                    "assist": ev.get("assist", {}).get("name", "")
-                                    if ev.get("assist")
-                                    else "",
-                                    "assist_id": ev.get("assist", {}).get("id")
-                                    if ev.get("assist")
-                                    else None,
-                                    "time": ev.get("time", {}).get("elapsed", ""),
-                                    "extra_time": ev.get("time", {}).get("extra"),
-                                    "detail": ev.get("detail", ""),
-                                    "half": "1H"
-                                    if (ev.get("time", {}).get("elapsed", 0) or 0) <= 45
-                                    else "2H",
-                                }
-                            )
-                    update_data["events_json"] = goals_list
-            except Exception:
-                pass
-
-            supabase.table("fixtures").update(update_data).eq("api_fixture_id", sf_api_id).execute()
-            finished_count += 1
-            logger.info(
-                f"[Live Scores] 🏁 Match {sf_api_id} terminé → {final_status} ({goals.get('home')}-{goals.get('away')})"
-            )
-        except Exception as e:
-            logger.error(f"[Live Scores] Error finishing {sf_api_id}: {e}")
-
-    logger.info(
-        f"[Live Scores] ✅ {updated_count} live mis à jour, {finished_count} terminés, {errors} erreurs"
-    )
-    return {
-        "status": "ok",
-        "updated": updated_count,
-        "finished": finished_count,
-        "errors": errors,
-        "total_live": len(live_fixtures),
-    }
+# POST /update-live-scores supprimé — duplicate de job_live (*/5 min, worker.py)
 
 
 @router.post("/evaluate-performance")
@@ -918,369 +718,13 @@ def _send_telegram_message(text: str) -> bool:
     return False
 
 
-# ─── 1. Automated Daily Pipeline ────────────────────────────────
+# POST /run-daily-pipeline supprimé — duplicate de job_data_pipeline (07:00) + job_brain (10:00, worker.py)
 
 
-@router.post("/run-daily-pipeline")
-def run_daily_pipeline():
-    """Run the full prediction pipeline (data collection + AI analysis) and send a Telegram summary."""
-    import time as _time
-
-    logger.info("[Pipeline] 🚀 Démarrage du pipeline automatique...")
-    start = _time.time()
-
-    try:
-        from run_pipeline import run_analysis, run_data_pipeline
-
-        run_data_pipeline()
-        run_analysis()
-    except Exception as e:
-        logger.error(f"[Pipeline] ❌ Erreur: {e}")
-        _send_telegram_message(f"❌ *Pipeline échoué*\n\nErreur: {e}")
-        return {"status": "error", "message": str(e)}
-
-    elapsed = round(_time.time() - start)
-
-    # Count today's predictions
-    today = datetime.now().strftime("%Y-%m-%d")
-    predictions = (
-        supabase.table("fixtures")
-        .select("id, home_team, away_team, proba_home, proba_draw, proba_away")
-        .gte("date", f"{today}T00:00:00Z")
-        .lt("date", f"{today}T23:59:59Z")
-        .not_.is_("proba_home", "null")
-        .execute()
-        .data
-        or []
-    )
-
-    # Build Telegram summary
-    summary_lines = [f"📋 *Pipeline terminé* ({elapsed}s)\n"]
-    summary_lines.append(f"📊 *{len(predictions)} matchs analysés*\n")
-
-    for p in predictions[:8]:  # Max 8 matches to keep message short
-        home_pct = p.get("proba_home", 0)
-        draw_pct = p.get("proba_draw", 0)
-        away_pct = p.get("proba_away", 0)
-        fav = p["home_team"] if home_pct >= away_pct else p["away_team"]
-        fav_pct = max(home_pct, away_pct)
-        summary_lines.append(f"⚽ {p['home_team']} vs {p['away_team']} → {fav} ({fav_pct}%)")
-
-    _send_telegram_message("\n".join(summary_lines))
-
-    logger.info(f"[Pipeline] ✅ Terminé en {elapsed}s — {len(predictions)} matchs")
-    return {"status": "ok", "elapsed_seconds": elapsed, "matches_analyzed": len(predictions)}
+# POST /daily-recap supprimé — duplicate du suivi résultats géré par job_results (*/15 min, worker.py)
 
 
-# ─── 2. Daily Recap (Evening) ───────────────────────────────────
-
-
-@router.post("/daily-recap")
-def daily_recap():
-    """Compare today's predictions vs actual results and send a Telegram recap."""
-    logger.info("[Recap] 📊 Bilan du jour...")
-
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    # Get all finished matches today with predictions
-    fixtures = (
-        supabase.table("fixtures")
-        .select(
-            "home_team, away_team, proba_home, proba_draw, proba_away, "
-            "proba_btts, proba_over_25, proba_over_15, "
-            "home_goals, away_goals, status"
-        )
-        .gte("date", f"{today}T00:00:00Z")
-        .lt("date", f"{today}T23:59:59Z")
-        .eq("status", "FT")
-        .not_.is_("proba_home", "null")
-        .execute()
-        .data
-        or []
-    )
-
-    if not fixtures:
-        msg = "📊 *Bilan du jour*\n\nAucun match terminé avec prédictions aujourd'hui."
-        _send_telegram_message(msg)
-        return {"status": "no_matches", "message": msg}
-
-    # Calculate accuracy per market
-    markets = {
-        "1X2": {"correct": 0, "total": 0},
-        "BTTS": {"correct": 0, "total": 0},
-        "Over 1.5": {"correct": 0, "total": 0},
-        "Over 2.5": {"correct": 0, "total": 0},
-    }
-
-    match_results = []
-
-    for f in fixtures:
-        hg = f.get("home_goals", 0) or 0
-        ag = f.get("away_goals", 0) or 0
-        total_goals = hg + ag
-
-        ph = f.get("proba_home", 0) or 0
-        pd = f.get("proba_draw", 0) or 0
-        pa = f.get("proba_away", 0) or 0
-
-        # 1X2
-        predicted = "home" if ph >= pd and ph >= pa else ("draw" if pd >= pa else "away")
-        actual = "home" if hg > ag else ("draw" if hg == ag else "away")
-        markets["1X2"]["total"] += 1
-        correct = predicted == actual
-        if correct:
-            markets["1X2"]["correct"] += 1
-        match_results.append(
-            f"{'✅' if correct else '❌'} {f['home_team']} {hg}-{ag} {f['away_team']}"
-        )
-
-        # BTTS
-        p_btts = f.get("proba_btts")
-        if p_btts is not None:
-            markets["BTTS"]["total"] += 1
-            btts_actual = hg > 0 and ag > 0
-            if (p_btts > 50) == btts_actual:
-                markets["BTTS"]["correct"] += 1
-
-        # Over 1.5
-        p_o15 = f.get("proba_over_15")
-        if p_o15 is not None:
-            markets["Over 1.5"]["total"] += 1
-            if (p_o15 > 50) == (total_goals > 1.5):
-                markets["Over 1.5"]["correct"] += 1
-
-        # Over 2.5
-        p_o25 = f.get("proba_over_25")
-        if p_o25 is not None:
-            markets["Over 2.5"]["total"] += 1
-            if (p_o25 > 50) == (total_goals > 2.5):
-                markets["Over 2.5"]["correct"] += 1
-
-    # Build Telegram recap
-    lines = [f"📊 *Bilan du jour — {today}*\n"]
-    lines.append(f"*{len(fixtures)} matchs terminés*\n")
-
-    for name, m in markets.items():
-        if m["total"] > 0:
-            pct = round(100 * m["correct"] / m["total"])
-            emoji = "🟢" if pct >= 70 else ("🟡" if pct >= 50 else "🔴")
-            lines.append(f"{emoji} *{name}* : {m['correct']}/{m['total']} ({pct}%)")
-
-    lines.append("")
-    lines.extend(match_results[:10])
-
-    msg = "\n".join(lines)
-    _send_telegram_message(msg)
-
-    logger.info(f"[Recap] ✅ Bilan envoyé : {len(fixtures)} matchs")
-    return {"status": "ok", "matches": len(fixtures), "markets": markets}
-
-
-# ─── 3. Value Bet Detection ─────────────────────────────────────
-
-
-@router.post("/detect-value-bets")
-def detect_value_bets():
-    """Compare model probabilities with bookmaker odds to find value bets.
-
-    Covers 1X2, BTTS, Over/Under 2.5, and Double Chance markets.
-    Filters out markets with historically negative ROI (< -5%).
-    """
-    logger.info("[Value Bets] Recherche de value bets...")
-
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    # Step 1: Get market performance to filter unprofitable markets
-    from api.routers.performance import _compute_market_performance
-
-    market_perf = _compute_market_performance(days=30)
-    disabled_markets = {k for k, v in market_perf.items() if not v.get("active", True)}
-    if disabled_markets:
-        logger.info(f"[Value Bets] Marches desactives (ROI negatif): {disabled_markets}")
-
-    # Step 2: Get today's fixtures with predictions
-    fixtures = (
-        supabase.table("fixtures")
-        .select(
-            "id, api_fixture_id, home_team, away_team, "
-            "proba_home, proba_draw, proba_away, "
-            "proba_btts, proba_over_25"
-        )
-        .gte("date", f"{today}T00:00:00Z")
-        .lt("date", f"{today}T23:59:59Z")
-        .in_("status", ["NS", "TBD"])
-        .not_.is_("proba_home", "null")
-        .execute()
-        .data
-        or []
-    )
-
-    if not fixtures:
-        return {"status": "no_matches", "value_bets": [], "disabled_markets": list(disabled_markets)}
-
-    # Step 3: Fetch stored odds from fixture_odds table
-    api_ids = [f["api_fixture_id"] for f in fixtures if f.get("api_fixture_id")]
-    stored_odds: dict[int, dict] = {}
-    if api_ids:
-        CHUNK = 50
-        for i in range(0, len(api_ids), CHUNK):
-            chunk = api_ids[i : i + CHUNK]
-            rows = (
-                supabase.table("fixture_odds")
-                .select("*")
-                .in_("fixture_api_id", chunk)
-                .execute()
-                .data
-                or []
-            )
-            for r in rows:
-                stored_odds[r["fixture_api_id"]] = r
-
-    value_bets = []
-    skipped_by_filter = 0
-    MIN_EV = 0.08  # 8% expected ROI threshold
-
-    for fix in fixtures:
-        api_id = fix.get("api_fixture_id")
-        if not api_id:
-            continue
-
-        odds = stored_odds.get(api_id, {})
-
-        # Fallback: fetch from API if no stored odds
-        if not odds:
-            odds_resp = api_get("odds", {"fixture": api_id})
-            if odds_resp and odds_resp.get("response"):
-                for bm in odds_resp["response"]:
-                    for bet in bm.get("bookmakers", []):
-                        for mkt in bet.get("bets", []):
-                            name = mkt.get("name", "")
-                            vals = {v["value"]: float(v["odd"]) for v in mkt.get("values", []) if v.get("odd")}
-                            if name == "Match Winner":
-                                odds["home_win_odds"] = vals.get("Home", 0)
-                                odds["draw_odds"] = vals.get("Draw", 0)
-                                odds["away_win_odds"] = vals.get("Away", 0)
-                            elif name == "Both Teams Score":
-                                odds["btts_yes_odds"] = vals.get("Yes", 0)
-                                odds["btts_no_odds"] = vals.get("No", 0)
-                            elif name in ("Goals Over/Under", "Over/Under 2.5"):
-                                odds["over_25_odds"] = vals.get("Over 2.5", 0)
-                                odds["under_25_odds"] = vals.get("Under 2.5", 0)
-                            elif name == "Double Chance":
-                                odds["dc_1x_odds"] = vals.get("Home/Draw", 0)
-                                odds["dc_x2_odds"] = vals.get("Draw/Away", 0)
-                                odds["dc_12_odds"] = vals.get("Home/Away", 0)
-                        break
-                    break
-
-        our_home = fix.get("proba_home", 0) or 0
-        our_draw = fix.get("proba_draw", 0) or 0
-        our_away = fix.get("proba_away", 0) or 0
-        our_btts = fix.get("proba_btts", 0) or 0
-        our_over25 = fix.get("proba_over_25", 0) or 0
-        match_label = f"{fix['home_team']} vs {fix['away_team']}"
-
-        # Build all market checks: (label, market_key, our_prob, odd)
-        checks: list[tuple[str, str, float, float]] = []
-
-        # 1X2 markets
-        home_odd = odds.get("home_win_odds", 0) or 0
-        draw_odd = odds.get("draw_odds", 0) or 0
-        away_odd = odds.get("away_win_odds", 0) or 0
-
-        if home_odd > 1:
-            checks.append(("Victoire " + fix["home_team"], "home_win", our_home, home_odd))
-        if draw_odd > 1:
-            checks.append(("Match Nul", "draw", our_draw, draw_odd))
-        if away_odd > 1:
-            checks.append(("Victoire " + fix["away_team"], "away_win", our_away, away_odd))
-
-        # BTTS market
-        btts_yes_odd = odds.get("btts_yes_odds", 0) or 0
-        if btts_yes_odd > 1:
-            checks.append(("BTTS Oui", "btts_yes", our_btts, btts_yes_odd))
-
-        # Over/Under 2.5
-        over25_odd = odds.get("over_25_odds", 0) or 0
-        under25_odd = odds.get("under_25_odds", 0) or 0
-        if over25_odd > 1:
-            checks.append(("Over 2.5 buts", "over_25", our_over25, over25_odd))
-        if under25_odd > 1 and our_over25 > 0:
-            checks.append(("Under 2.5 buts", "under_25", 100 - our_over25, under25_odd))
-
-        # Double Chance
-        dc_1x_odd = odds.get("dc_1x_odds", 0) or 0
-        dc_x2_odd = odds.get("dc_x2_odds", 0) or 0
-        if dc_1x_odd > 1:
-            checks.append(("Double Chance 1X", "dc_1x", our_home + our_draw, dc_1x_odd))
-        if dc_x2_odd > 1:
-            checks.append(("Double Chance X2", "dc_x2", our_draw + our_away, dc_x2_odd))
-
-        for label, market_key, our_prob, odd in checks:
-            # Filter by market performance
-            if market_key in disabled_markets:
-                ev = (our_prob / 100.0) * odd - 1 if odd > 0 else 0
-                if ev >= MIN_EV and our_prob >= 40:
-                    skipped_by_filter += 1
-                    logger.debug(f"[Value Bets] Skipped {label} ({match_label}) — market disabled")
-                continue
-
-            implied_prob = round(100 / odd) if odd > 0 else 0
-            ev = (our_prob / 100.0) * odd - 1 if odd > 0 else 0
-            edge = our_prob - implied_prob
-
-            if ev >= MIN_EV and our_prob >= 40:
-                perf = market_perf.get(market_key, {})
-                roi_history = perf.get("roi", 0)
-
-                value_bets.append(
-                    {
-                        "match": match_label,
-                        "bet": label,
-                        "market": market_key,
-                        "our_proba": round(our_prob, 1),
-                        "implied_proba": implied_prob,
-                        "edge": round(edge, 1),
-                        "ev": round(ev * 100, 1),
-                        "odd": odd,
-                        "market_roi_30d": roi_history,
-                        "confidence": "high" if roi_history > 10 else ("medium" if roi_history > 0 else "low"),
-                    }
-                )
-
-    # Sort: profitable markets first, then by EV
-    value_bets.sort(key=lambda vb: (-1 if vb.get("market_roi_30d", 0) > 0 else 1, -vb["ev"]))
-
-    # Send Telegram alert if value bets found
-    if value_bets:
-        lines = [f"*VALUE BETS — {today}*\n"]
-        for vb in value_bets:
-            confidence_emoji = {"high": "+", "medium": "~", "low": "?"}[vb["confidence"]]
-            roi_suffix = f" | ROI 30j: {vb['market_roi_30d']}%" if vb.get("market_roi_30d") else ""
-            lines.append(
-                f"[{confidence_emoji}] *{vb['match']}*\n"
-                f"   {vb['bet']} @ {vb['odd']}\n"
-                f"   Modele: {vb['our_proba']}% vs Marche: {vb['implied_proba']}% "
-                f"(EV: +{vb['ev']}%){roi_suffix}\n"
-            )
-        if skipped_by_filter:
-            lines.append(f"\n_{skipped_by_filter} paris filtres (marches non rentables)_")
-        _send_telegram_message("\n".join(lines))
-        logger.info(f"[Value Bets] {len(value_bets)} value bets detectes ! ({skipped_by_filter} filtres)")
-    else:
-        _send_telegram_message(
-            f"*Value Bets — {today}*\n\nAucun value bet detecte aujourd'hui."
-            + (f"\n_{skipped_by_filter} filtres par la strategie_" if skipped_by_filter else "")
-        )
-        logger.info(f"[Value Bets] Aucun value bet. ({skipped_by_filter} filtres)")
-
-    return {
-        "status": "ok",
-        "value_bets": value_bets,
-        "disabled_markets": list(disabled_markets),
-        "skipped_by_filter": skipped_by_filter,
-        "market_performance": market_perf,
-    }
+# POST /detect-value-bets supprimé — duplicate de job_football_picks (12:00, worker.py)
 
 
 # =============================================================================
@@ -1291,7 +735,7 @@ def detect_value_bets():
 @router.get("/nhl-daily-matches")
 def get_nhl_daily_matches():
     """Returns all NHL matches planned for today."""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     fixtures = (
         supabase.table("nhl_fixtures")
         .select("id, api_fixture_id, date, home_team, away_team")
@@ -1310,7 +754,7 @@ def nhl_value_bets():
     """Detect NHL value bets and send Telegram alerts with Top 5 players per category."""
     logger.info("[NHL Value Bets] 🏒 Recherche de value bets NHL...")
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # 1. Get today's NHL fixtures
     fixtures = (
@@ -1480,23 +924,7 @@ def nhl_value_bets():
     return {"status": "ok", "matches_analyzed": len(value_bets), "value_bets": value_bets}
 
 
-@router.post("/nhl-fetch-odds")
-def nhl_fetch_odds():
-    """Fetch NHL odds from API-Sports and update nhl_fixtures"""
-    import time
-
-    logger.info("[NHL Odds] 🏒 Démarrage fetch_nhl_odds...")
-    start = time.time()
-    try:
-        from src.fetchers.fetch_nhl_odds import fetch_nhl_odds
-
-        result = fetch_nhl_odds()
-    except Exception as e:
-        logger.error(f"[NHL Odds] ❌ Erreur: {e}")
-        return {"status": "error", "message": str(e)}
-
-    logger.info(f"[NHL Odds] ✅ Terminé en {round(time.time() - start)}s")
-    return result
+# POST /nhl-fetch-odds supprimé — duplicate de job_nhl_fetch_odds (16:15/23:15, worker.py)
 
 
 @router.post("/football-momentum")
@@ -1518,225 +946,9 @@ def football_momentum():
     return result
 
 
-@router.post("/nhl-update-live-scores")
-def nhl_update_live_scores():
-    """Fetch live NHL scores from official NHLE API and update nhl_fixtures table."""
-    import time as _time
-    from datetime import datetime, timedelta
-
-    import requests as _requests
-
-    logger.info("[NHL Live Scores] 🏒 Fetching live NHL scores from NHLE API...")
-
-    STATUS_MAP = {
-        "PRE": "NS",
-        "LIVE": "LIVE",
-        "CRIT": "LIVE",
-        "FINAL": "FT",
-        "OFF": "FT",
-    }
-
-    try:
-        # We fetch "now", "yesterday" and "2 days ago" to ensure games that just finished are flipped to FT
-        # especially given the UTC/US date shift.
-        t_now = datetime.now()
-        yesterday = (t_now - timedelta(days=1)).strftime("%Y-%m-%d")
-        two_days_ago = (t_now - timedelta(days=2)).strftime("%Y-%m-%d")
-
-        urls = [
-            "https://api-web.nhle.com/v1/score/now",
-            f"https://api-web.nhle.com/v1/score/{yesterday}",
-            f"https://api-web.nhle.com/v1/score/{two_days_ago}",
-        ]
-
-        all_games = []
-        for url in urls:
-            resp = _requests.get(url, timeout=15)
-            if resp.status_code == 200:
-                all_games.extend(resp.json().get("games", []))
-            _time.sleep(0.5)
-
-        if not all_games:
-            return {"status": "no_games", "updated": 0}
-
-        # Deduplicate by ID
-        seen_ids = set()
-        api_games = []
-        for g in all_games:
-            if g.get("id") not in seen_ids:
-                seen_ids.add(g.get("id"))
-                api_games.append(g)
-
-        updated = 0
-        for game in api_games:
-            api_id = game.get("id")
-            if not api_id:
-                continue
-
-            # Find matching DB fixture
-            db_fix_resp = (
-                supabase.table("nhl_fixtures")
-                .select("id, status, home_score, away_score, stats_json, home_team, away_team")
-                .eq("api_fixture_id", api_id)
-                .execute()
-            )
-            db_fix_data = db_fix_resp.data
-
-            if not db_fix_data:
-                continue
-
-            db_fix = db_fix_data[0]
-            db_home_name = db_fix.get("home_team", "")
-            db_away_name = db_fix.get("away_team", "")
-
-            # Skip if already finished in our DB
-            if db_fix.get("status") in ("FT", "CANC", "POST"):
-                continue
-
-            # Extract data
-            home_team = game.get("homeTeam", {})
-            away_team = game.get("awayTeam", {})
-            home_abbrev = home_team.get("abbrev")
-            away_abbrev = away_team.get("abbrev")
-            nhle_state = game.get("gameState")
-
-            curr_home_score = home_team.get("score")
-            curr_away_score = away_team.get("score")
-            our_status = STATUS_MAP.get(nhle_state, nhle_state)
-
-            # Period labels
-            period = game.get("period")
-            if our_status == "LIVE" and period:
-                if period == 1:
-                    our_status = "1P"
-                elif period == 2:
-                    our_status = "2P"
-                elif period == 3:
-                    our_status = "3P"
-                elif period > 3:
-                    our_status = "OT"
-
-            update_data = {"status": our_status}
-            if curr_home_score is not None:
-                update_data["home_score"] = curr_home_score
-            if curr_away_score is not None:
-                update_data["away_score"] = curr_away_score
-
-            # Check if we need to fetch events
-            score_changed = (curr_home_score != db_fix.get("home_score")) or (
-                curr_away_score != db_fix.get("away_score")
-            )
-            newly_finished = our_status == "FT" and db_fix.get("status") != "FT"
-
-            if score_changed or newly_finished:
-                logger.info(f"[NHL Live] Updating events for {api_id} ({our_status})")
-                try:
-                    landing_resp = _requests.get(
-                        f"https://api-web.nhle.com/v1/gamecenter/{api_id}/landing", timeout=10
-                    )
-                    if landing_resp.status_code == 200:
-                        l_data = landing_resp.json()
-                        summary = l_data.get("summary", {})
-                        scoring_periods = summary.get("scoring", [])
-
-                        goals_list = []
-                        for period_data in scoring_periods:
-                            p_num = period_data.get("periodDescriptor", {}).get("number")
-                            p_type = period_data.get("periodDescriptor", {}).get(
-                                "periodType", "REG"
-                            )
-                            p_label = str(p_num) if p_type == "REG" else p_type
-
-                            for goal in period_data.get("goals", []):
-                                g_abbrev = goal.get("teamAbbrev", {}).get("default", "")
-                                team_name = (
-                                    db_home_name
-                                    if g_abbrev == home_abbrev
-                                    else db_away_name
-                                    if g_abbrev == away_abbrev
-                                    else g_abbrev
-                                )
-
-                                goals_list.append(
-                                    {
-                                        "team": team_name,
-                                        "player": goal.get("name", {}).get("default", ""),
-                                        "assists": [
-                                            a.get("name", {}).get("default", "")
-                                            for a in goal.get("assists", [])
-                                        ],
-                                        "period": p_label,
-                                        "minute": goal.get("timeInPeriod", ""),
-                                        "comment": goal.get("goalModifier", ""),
-                                    }
-                                )
-
-                        existing_stats = db_fix.get("stats_json") or {}
-                        existing_stats["goals"] = goals_list
-                        update_data["stats_json"] = existing_stats
-                except Exception as e:
-                    logger.warning(f"[NHL Live] Events error for {api_id}: {e}")
-
-            supabase.table("nhl_fixtures").update(update_data).eq("id", db_fix["id"]).execute()
-            updated += 1
-            _time.sleep(0.1)
-
-        return {"status": "ok", "updated": updated}
-
-    except Exception as e:
-        logger.error(f"[NHL Live] Critical error: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-@router.post("/nhl-evaluate-performance")
-def nhl_evaluate_performance():
-    """Trigger the NHL performance evaluation script."""
-    logger.info("[NHL Performance] 📈 Démarrage de l'évaluation des performances...")
-    try:
-        from src.fetchers.fetch_nhl_results import evaluate_nhl_predictions
-
-        evaluate_nhl_predictions(days_back=7)
-        return {"status": "ok", "message": "Performance evaluation completed"}
-    except Exception as e:
-        logger.error(f"[NHL Performance] ❌ Erreur: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-@router.post("/nhl-run-pipeline")
-def nhl_run_pipeline():
-    """Run the full NHL pipeline (data collection + player scoring) and send a Telegram summary."""
-    import time as _time
-
-    logger.info("[NHL Pipeline] 🏒 Démarrage du pipeline NHL...")
-    start = _time.time()
-
-    try:
-        from src.fetchers.nhl_pipeline import run_nhl_pipeline
-
-        result = run_nhl_pipeline()
-    except Exception as e:
-        logger.error(f"[NHL Pipeline] ❌ Erreur: {e}")
-        _send_telegram_message(f"❌ *Pipeline NHL échoué*\n\nErreur: {e}")
-        return {"status": "error", "message": str(e)}
-
-    elapsed = round(_time.time() - start)
-
-    if result.get("status") == "no_games":
-        _send_telegram_message("🏒 *Pipeline NHL terminé*\n\nAucun match NHL aujourd'hui.")
-        return result
-
-    # Build Telegram summary
-    lines = [f"🏒 *Pipeline NHL terminé* ({elapsed}s)\n"]
-    lines.append(f"📊 *{result.get('matches', 0)} matchs analysés*")
-    lines.append(f"👥 *{result.get('players_analyzed', 0)} joueurs scorés*\n")
-
-    for f in result.get("fixtures", [])[:8]:
-        lines.append(f"⚽ {f['match']} → {f['home_pct']}% / {f['away_pct']}%")
-
-    _send_telegram_message("\n".join(lines))
-
-    logger.info(f"[NHL Pipeline] ✅ Terminé en {elapsed}s")
-    return result
+# POST /nhl-update-live-scores supprimé — duplicate de job_live (branche NHL, */5 min, worker.py)
+# POST /nhl-evaluate-performance supprimé — duplicate de job_nhl_evaluation (08:00, worker.py)
+# POST /nhl-run-pipeline supprimé — duplicate de job_nhl_pipeline (16:00/23:00, worker.py)
 
 
 @router.post("/nhl-ml-reminder")
@@ -1748,9 +960,9 @@ def nhl_ml_reminder():
         "🧠 *Rappel ProbaLab ML*\n\n"
         "Cela fait 2 semaines ! Il est temps d'entraîner tes modèles prédictifs NHL avec les nouvelles données récoltées.\n\n"
         "👉 *Commandes à lancer sur le serveur :*\n"
-        "`cd Projet_Football`\n"
-        "`python -m nhl.build_data`\n"
-        "`python -m nhl.train`\n\n"
+        "`cd ProbaLab`\n"
+        "`python -m src.nhl.build_data`\n"
+        "`python -m src.nhl.train`\n\n"
         "Une fois terminé, les nouveaux `.pkl` seront pris en compte automatiquement."
     )
     _send_telegram_message(msg)

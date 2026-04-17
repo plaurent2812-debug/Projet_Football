@@ -137,6 +137,41 @@ def job_nhl_evaluation() -> None:
         logger.exception("[job_nhl_eval] Error")
 
 
+def job_nhl_pipeline() -> None:
+    """16:00 & 23:00 — pipeline NHL complet (data + ML + IA).
+
+    Tourne 2 fois par jour :
+      - 16:00 → première analyse du matin, alimente job_nhl_picks (17:00)
+      - 23:00 → re-run avec compos officielles pour ajuster les probas
+               avant les matchs de soirée US (début ~01:00 Paris).
+
+    Écrit dans nhl_fixtures + nhl_data_lake.
+    """
+    try:
+        from src.fetchers.nhl_pipeline import run_nhl_pipeline
+        run_nhl_pipeline()
+        logger.info("[job_nhl_pipeline] Pipeline NHL terminé")
+    except Exception:
+        logger.exception("[job_nhl_pipeline] Error")
+
+
+def job_nhl_fetch_odds() -> None:
+    """16:15 & 23:15 — fetch cotes NHL (après le pipeline).
+
+    Doit tourner APRÈS job_nhl_pipeline : fetch_nhl_odds update
+    odds_json sur les lignes existantes de nhl_fixtures, donc les
+    fixtures doivent exister avant.
+
+    Critique : job_nhl_picks lit odds_json pour calculer l'EV.
+    """
+    try:
+        from src.fetchers.fetch_nhl_odds import fetch_nhl_odds
+        fetch_nhl_odds()
+        logger.info("[job_nhl_fetch_odds] Cotes NHL récupérées")
+    except Exception:
+        logger.exception("[job_nhl_fetch_odds] Error")
+
+
 def job_football_evaluation() -> None:
     """08:30 — évaluation foot + recalibration + draw factor audit."""
     try:
@@ -166,6 +201,15 @@ def job_drift_check() -> None:
             )
     except Exception:
         logger.exception("[job_drift_check] Error")
+
+
+def job_run_monitoring_alerts() -> None:
+    """08:30 UTC — Brier check + drift + persistance model_health_log."""
+    from run_pipeline import run_monitoring_alerts
+    try:
+        run_monitoring_alerts()
+    except Exception as e:
+        logger.exception("job_run_monitoring_alerts failed: %s", e)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -273,6 +317,13 @@ def main() -> None:
                       id="nhl_eval", max_instances=1, coalesce=True)
     scheduler.add_job(job_football_evaluation, CronTrigger(hour=8, minute=30),
                       id="football_eval", max_instances=1, coalesce=True)
+    scheduler.add_job(
+        job_run_monitoring_alerts,
+        CronTrigger(hour=8, minute=30, timezone="UTC"),
+        id="monitoring_alerts_daily",
+        max_instances=1,
+        coalesce=True,
+    )
     scheduler.add_job(job_drift_check, CronTrigger(hour=9, minute=0),
                       id="drift_check", max_instances=1, coalesce=True)
 
@@ -281,8 +332,18 @@ def main() -> None:
                       id="brain", max_instances=1, coalesce=True)
     scheduler.add_job(job_football_picks, CronTrigger(hour=12, minute=0),
                       id="football_picks", max_instances=1, coalesce=True)
+    scheduler.add_job(job_nhl_pipeline, CronTrigger(hour=16, minute=0),
+                      id="nhl_pipeline_afternoon", max_instances=1, coalesce=True)
+    scheduler.add_job(job_nhl_fetch_odds, CronTrigger(hour=16, minute=15),
+                      id="nhl_fetch_odds_afternoon", max_instances=1, coalesce=True)
     scheduler.add_job(job_nhl_picks, CronTrigger(hour=17, minute=0),
                       id="nhl_picks", max_instances=1, coalesce=True)
+    scheduler.add_job(job_nhl_pipeline, CronTrigger(hour=23, minute=0),
+                      id="nhl_pipeline_lineups", max_instances=1, coalesce=True)
+    scheduler.add_job(job_nhl_fetch_odds, CronTrigger(hour=23, minute=15),
+                      id="nhl_fetch_odds_lineups", max_instances=1, coalesce=True)
+    scheduler.add_job(job_nhl_picks, CronTrigger(hour=23, minute=30),
+                      id="nhl_picks_lineups", max_instances=1, coalesce=True)
 
     # ── Hebdomadaire ────────────────────────────────────────
     scheduler.add_job(job_weekly_retrain, CronTrigger(day_of_week="sun", hour=3, minute=0),
@@ -301,10 +362,16 @@ def main() -> None:
     logger.info("    07:45    Fetch cotes fraîches")
     logger.info("    08:00    Évaluation NHL")
     logger.info("    08:30    Évaluation foot + calibration")
+    logger.info("    08:30 UTC Monitoring alerts + persistance model_health_log")
     logger.info("    09:00    Drift detection")
     logger.info("    10:00    Brain IA (prédictions)")
     logger.info("    12:00    Value Bets football")
+    logger.info("    16:00    Pipeline NHL (analyse + probas)")
+    logger.info("    16:15    Fetch cotes NHL")
     logger.info("    17:00    Value Bets NHL")
+    logger.info("    23:00    Pipeline NHL (re-run avec compos officielles)")
+    logger.info("    23:15    Fetch cotes NHL (refresh)")
+    logger.info("    23:30    Value Bets NHL (re-run post-compos)")
     logger.info("  HEBDOMADAIRE")
     logger.info("    Dim 03:00  ML retrain complet")
     logger.info("=" * 56)

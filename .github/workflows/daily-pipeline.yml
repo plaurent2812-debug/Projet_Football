@@ -6,6 +6,10 @@ on:
     - cron: '0 8 * * *'
   workflow_dispatch:  # Permet le lancement manuel
 
+defaults:
+  run:
+    working-directory: ProbaLab
+
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
@@ -13,16 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('ProbaLab/requirements.txt') }}
           restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
@@ -31,7 +35,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run full pipeline (data + analysis + monitoring alerts)
-        run: cd Projet_Football && python run_pipeline.py full
+        run: python run_pipeline.py full
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -41,7 +45,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Evaluate predictions
-        run: cd Projet_Football && python -m training.evaluate
+        run: python -m src.training.evaluate
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -50,8 +54,8 @@ jobs:
       - name: Send notifications
         if: success()
         run: |
-          cd Projet_Football && python -c "
-          from notifications import notify_daily_summary
+          python -c "
+          from src.notifications import notify_daily_summary
           notify_daily_summary({'total_matches': 0, 'correct_1x2': 0})
           "
         env:

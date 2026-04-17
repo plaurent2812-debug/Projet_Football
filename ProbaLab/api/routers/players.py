@@ -157,6 +157,6 @@ def get_player_profile(player_id: int):
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting player {player_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error in players endpoint")
+        raise HTTPException(status_code=500, detail="Internal error")

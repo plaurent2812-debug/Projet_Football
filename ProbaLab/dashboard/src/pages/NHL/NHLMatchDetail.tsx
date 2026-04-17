@@ -34,24 +34,24 @@ function PlayerRow({ rank, player }) {
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold truncate">{player.player_name}</p>
                 <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                    <p className="text-[10px] text-muted-foreground">{player.team}</p>
+                    <p className="text-xs text-muted-foreground">{player.team}</p>
                     {reliance > 0.35 && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                        <Badge variant="outline" className="text-xs px-1 py-0 h-4 border-amber-500/30 text-amber-600 dark:text-amber-400">
                             ⚡ PP1
                         </Badge>
                     )}
                     {fatigue < 1.0 && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-red-500/30 text-red-500">
+                        <Badge variant="outline" className="text-xs px-1 py-0 h-4 border-red-500/30 text-red-500">
                             {fatigue < 0.90 ? "⚠️ 3-in-4" : "⚠️ B2B"}
                         </Badge>
                     )}
                     {regress > 1.05 && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                        <Badge variant="outline" className="text-xs px-1 py-0 h-4 border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
                             🎯 Due
                         </Badge>
                     )}
                     {regress < 0.95 && (
-                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-red-500/30 text-red-500">
+                        <Badge variant="outline" className="text-xs px-1 py-0 h-4 border-red-500/30 text-red-500">
                             📉 Sur-régime
                         </Badge>
                     )}
@@ -329,7 +329,7 @@ export default function NHLMatchDetailPage() {
                             <p className="text-xs text-muted-foreground mt-0.5">Avantage mathématique sur le bookmaker</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Cote Réelle</p>
+                            <p className="text-xs uppercase font-bold text-muted-foreground mb-0.5">Cote Réelle</p>
                             <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                                 @ {valueBet.odd.toFixed(2)}
                             </span>
@@ -366,7 +366,7 @@ export default function NHLMatchDetailPage() {
                             <CardTitle className="text-sm font-bold flex items-center gap-2">
                                 {predCorrect ? "✅" : "❌"} Bilan du Match
                                 <Badge className={cn(
-                                    "ml-auto text-[10px] border-0",
+                                    "ml-auto text-xs border-0",
                                     predCorrect
                                         ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                                         : "bg-red-500/10 text-red-500"
@@ -379,7 +379,7 @@ export default function NHLMatchDetailPage() {
                             {/* Predicted vs Actual */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="p-3 rounded-lg bg-card border border-border/30">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Prédit</p>
+                                    <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Prédit</p>
                                     <p className="text-sm font-bold">{predictedLabel}</p>
                                     {predHome != null && (
                                         <p className="text-xs text-muted-foreground mt-1">
@@ -388,7 +388,7 @@ export default function NHLMatchDetailPage() {
                                     )}
                                 </div>
                                 <div className="p-3 rounded-lg bg-card border border-border/30">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Résultat</p>
+                                    <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Résultat</p>
                                     <p className="text-sm font-bold">{actualLabel}</p>
                                     <p className="text-lg font-black text-primary mt-0.5">
                                         {hg} - {ag}
@@ -417,7 +417,7 @@ export default function NHLMatchDetailPage() {
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-bold flex items-center gap-2">
                                 🏒 Événements du match
-                                <Badge className="ml-auto text-[10px] border-0 bg-muted text-muted-foreground">
+                                <Badge className="ml-auto text-xs border-0 bg-muted text-muted-foreground">
                                     {goals.length} but{goals.length > 1 ? 's' : ''}
                                 </Badge>
                             </CardTitle>
@@ -440,8 +440,8 @@ export default function NHLMatchDetailPage() {
                                             )}
                                         >
                                             <div className="w-10 shrink-0 text-center">
-                                                <span className="text-[10px] font-bold text-muted-foreground block">{periodStr}</span>
-                                                {timeStr && <span className="text-[10px] text-muted-foreground/60">{timeStr}</span>}
+                                                <span className="text-xs font-bold text-muted-foreground block">{periodStr}</span>
+                                                {timeStr && <span className="text-xs text-muted-foreground/60">{timeStr}</span>}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-bold truncate">
@@ -449,12 +449,12 @@ export default function NHLMatchDetailPage() {
                                                     <span className="text-muted-foreground font-normal text-xs">{typeLabel}</span>
                                                 </p>
                                                 {goal.assists?.length > 0 && (
-                                                    <p className="text-[10px] text-muted-foreground truncate">
+                                                    <p className="text-xs text-muted-foreground truncate">
                                                         🎯 {goal.assists.join(', ')}
                                                     </p>
                                                 )}
                                             </div>
-                                            <span className="text-[10px] font-medium text-muted-foreground shrink-0">
+                                            <span className="text-xs font-medium text-muted-foreground shrink-0">
                                                 {goal.team}
                                             </span>
                                         </div>

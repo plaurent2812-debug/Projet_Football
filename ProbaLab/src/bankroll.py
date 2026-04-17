@@ -7,7 +7,7 @@ la résolution des résultats et les statistiques P&L.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from src.config import logger, supabase
@@ -139,7 +139,7 @@ def _place_bet_legacy(
             return {"error": "Stake exceeds bankroll"}
 
         row: dict[str, Any] = {
-            "date": date.today().isoformat(),
+            "date": datetime.now(timezone.utc).date().isoformat(),
             "ticket_type": ticket_type,
             "bet_description": description,
             "stake": round(stake, 2),
@@ -230,7 +230,7 @@ def resolve_bet(bet_id: int, won: bool) -> dict[str, Any]:
             "actual_gain": actual_gain,
             "bankroll_after": bankroll_after,
             "roi": roi,
-            "resolved_at": datetime.now().isoformat(),
+            "resolved_at": datetime.now(timezone.utc).isoformat(),
         }
 
         result = supabase.table(TABLE).update(update).eq("id", bet_id).execute()

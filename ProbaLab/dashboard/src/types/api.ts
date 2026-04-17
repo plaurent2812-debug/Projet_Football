@@ -554,6 +554,59 @@ export interface NHLTopPlayersResponse {
   [key: string]: unknown
 }
 
+// ─── Admin ───────────────────────────────────────────────────────────────────
+
+/** GET /api/trigger/admin/stats */
+export interface AdminStats {
+  total_predictions: number
+  total_fixtures: number
+  total_users: number
+  [key: string]: unknown
+}
+
+/** GET /api/trigger/admin/api-quota */
+export interface ApiQuota {
+  current: number
+  limit_day: number
+  [key: string]: unknown
+}
+
+/** One admin user row. */
+export interface AdminUser {
+  id: string
+  email: string | null
+  role: string | null
+  created_at: string | null
+  [key: string]: unknown
+}
+
+/** GET /api/admin/users */
+export interface AdminUsersResponse {
+  users: AdminUser[]
+  [key: string]: unknown
+}
+
+/** One league entry. */
+export interface League {
+  id: number
+  name: string
+  country: string | null
+  active: boolean
+  [key: string]: unknown
+}
+
+/** GET /api/admin/leagues */
+export interface LeaguesResponse {
+  leagues: League[]
+  [key: string]: unknown
+}
+
+/** Admin tool test result. */
+export interface AdminToolResult {
+  ok: boolean
+  data: Record<string, unknown>
+}
+
 // ─── Backward-compatible aliases ─────────────────────────────────────────────
 // These re-export under the names used by src/lib/api.ts before the rename.
 

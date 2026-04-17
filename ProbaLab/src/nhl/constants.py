@@ -54,9 +54,9 @@ def get_nhl_season_id() -> str:
     NHL seasons start in October. The season ID uses the calendar year
     the season started in followed by the next year.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     start_year = now.year if now.month >= 8 else now.year - 1
     return f"{start_year}{start_year + 1}"
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "probalab"
 version = "1.0.0"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.12"
 
 [tool.setuptools.packages.find]
 include = ["src*", "api*"]
@@ -19,7 +19,6 @@ omit = [
     "*/test_*",
     "*/tests/*",
     "*/__pycache__/*",
-    "src/Projet_Football/*",
     "src/dashboard/*",
 ]
 

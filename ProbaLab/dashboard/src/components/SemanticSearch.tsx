@@ -86,7 +86,7 @@ export default function SemanticSearch() {
       <button
         onClick={() => setOpen(true)}
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium",
+          "flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium",
           "text-muted-foreground bg-muted/50 hover:bg-muted hover:text-foreground",
           "transition-all duration-150 border border-border/50"
         )}
@@ -94,7 +94,7 @@ export default function SemanticSearch() {
       >
         <Search className="w-3 h-3" />
         <span className="hidden sm:inline">Recherche IA</span>
-        <kbd className="hidden md:inline-flex items-center gap-0.5 px-1 rounded text-[9px] font-mono bg-background/60 border border-border/60">
+        <kbd className="hidden md:inline-flex items-center gap-0.5 px-1 rounded text-xs font-mono bg-background/60 border border-border/60">
           ⌘K
         </kbd>
       </button>
@@ -143,7 +143,7 @@ export default function SemanticSearch() {
                   <p className="text-xs text-muted-foreground">
                     Recherche par <span className="font-bold text-primary/70">similarité sémantique</span>
                   </p>
-                  <p className="text-[11px] text-muted-foreground/60 mt-1">
+                  <p className="text-xs text-muted-foreground/60 mt-1">
                     Tape une description de match, un style de jeu, un scénario...
                   </p>
                   <div className="flex flex-wrap gap-1.5 justify-center mt-3">
@@ -151,7 +151,7 @@ export default function SemanticSearch() {
                       <button
                         key={ex}
                         onClick={() => { setQuery(ex); search(ex) }}
-                        className="px-2 py-1 rounded-full text-[10px] font-medium bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                        className="px-2 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
                       >
                         {ex}
                       </button>
@@ -178,7 +178,7 @@ export default function SemanticSearch() {
               {hasPredictions && (
                 <div>
                   <div className="px-4 py-2 bg-muted/30">
-                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">
+                    <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
                       ⚽ Matchs similaires ({results.predictions.length})
                     </span>
                   </div>
@@ -194,20 +194,20 @@ export default function SemanticSearch() {
                             {pred.home_team} vs {pred.away_team}
                           </span>
                           {pred.league && (
-                            <span className="text-[9px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded shrink-0">
+                            <span className="text-xs text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded shrink-0">
                               {pred.league}
                             </span>
                           )}
                         </div>
                         {pred.analysis_text && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                             {pred.analysis_text}
                           </p>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className={cn(
-                          "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                          "text-xs font-bold px-1.5 py-0.5 rounded",
                           pred.similarity >= 0.7 ? "bg-emerald-500/15 text-emerald-500" :
                           pred.similarity >= 0.5 ? "bg-amber-500/15 text-amber-500" :
                           "bg-muted text-muted-foreground"
@@ -225,7 +225,7 @@ export default function SemanticSearch() {
               {hasLearnings && (
                 <div>
                   <div className="px-4 py-2 bg-muted/30">
-                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">
+                    <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
                       📚 Enseignements ({results.learnings.length})
                     </span>
                   </div>
@@ -237,7 +237,7 @@ export default function SemanticSearch() {
                       <p className="text-xs text-foreground/90">{l.learning_text}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={cn(
-                          "text-[9px] font-bold px-1.5 py-0.5 rounded",
+                          "text-xs font-bold px-1.5 py-0.5 rounded",
                           l.similarity >= 0.7 ? "bg-emerald-500/15 text-emerald-500" :
                           l.similarity >= 0.5 ? "bg-amber-500/15 text-amber-500" :
                           "bg-muted text-muted-foreground"
@@ -245,7 +245,7 @@ export default function SemanticSearch() {
                           {Math.round(l.similarity * 100)}% match
                         </span>
                         {l.tags?.map((tag, j) => (
-                          <span key={j} className="text-[9px] text-muted-foreground/70 bg-muted/40 px-1 py-0.5 rounded">
+                          <span key={j} className="text-xs text-muted-foreground/70 bg-muted/40 px-1 py-0.5 rounded">
                             {tag}
                           </span>
                         ))}
@@ -258,10 +258,10 @@ export default function SemanticSearch() {
 
             {/* Footer */}
             <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-muted/20">
-              <span className="text-[9px] text-muted-foreground/50">
+              <span className="text-xs text-muted-foreground/50">
                 ProbaLab · Recherche sémantique
               </span>
-              <span className="text-[9px] text-muted-foreground/50">
+              <span className="text-xs text-muted-foreground/50">
                 ESC pour fermer
               </span>
             </div>

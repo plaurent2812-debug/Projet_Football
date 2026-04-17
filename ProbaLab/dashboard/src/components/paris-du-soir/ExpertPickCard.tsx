@@ -104,18 +104,18 @@ export function ExpertPickCard({ pick, isAdmin = false, onDelete }: ExpertPickCa
             <div className="flex items-center justify-between px-4 py-2.5 bg-[#151928] border-b border-white/5">
                 <div className="flex items-center gap-2">
                     <span className="text-sm">🎯</span>
-                    <span className="text-[11px] font-bold text-white/90 uppercase tracking-wider">
+                    <span className="text-xs font-bold text-white/90 uppercase tracking-wider">
                         Paris Expert
                     </span>
                     {pick.is_combine && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/20">
                             Combine {selections.length}
                         </span>
                     )}
                 </div>
                 <div className="flex items-center gap-2">
                     <span className={cn(
-                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border",
+                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border",
                         statusCls
                     )}>
                         <StatusIcon className="w-3 h-3" />
@@ -162,7 +162,7 @@ export function ExpertPickCard({ pick, isAdmin = false, onDelete }: ExpertPickCa
                                                 {sel.match || pick.match_label || ""}
                                             </p>
                                             {isMymatch && (
-                                                <span className="inline-flex items-center gap-0.5 mt-0.5 text-[9px] font-black tracking-wider text-amber-400 uppercase">
+                                                <span className="inline-flex items-center gap-0.5 mt-0.5 text-xs font-black tracking-wider text-amber-400 uppercase">
                                                     <span className="w-1 h-1 rounded-full bg-amber-400 inline-block" />
                                                     MYMATCH
                                                 </span>
@@ -199,7 +199,7 @@ export function ExpertPickCard({ pick, isAdmin = false, onDelete }: ExpertPickCa
                 <div className="flex items-center gap-3">
                     {pick.odds && selections.length > 1 && (
                         <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-white/40 uppercase font-medium">Cote totale</span>
+                            <span className="text-xs text-white/40 uppercase font-medium">Cote totale</span>
                             <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-sm font-bold font-mono">
                                 {formatOdds(pick.odds != null ? Number(pick.odds) : null)}
                             </span>
@@ -211,7 +211,7 @@ export function ExpertPickCard({ pick, isAdmin = false, onDelete }: ExpertPickCa
                         </span>
                     )}
                 </div>
-                <span className="text-[10px] text-white/30 tabular-nums">
+                <span className="text-xs text-white/30 tabular-nums">
                     📅 {pick.date}
                 </span>
             </div>
@@ -219,7 +219,7 @@ export function ExpertPickCard({ pick, isAdmin = false, onDelete }: ExpertPickCa
             {/* Expert note */}
             {pick.expert_note && !pick.expert_note.startsWith("[") && !pick.expert_note.startsWith("[odds=") && (
                 <div className="px-4 pb-3 -mt-1">
-                    <p className="text-[11px] text-amber-400/60 italic">&ldquo;{pick.expert_note}&rdquo;</p>
+                    <p className="text-xs text-amber-400/60 italic">&ldquo;{pick.expert_note}&rdquo;</p>
                 </div>
             )}
         </div>

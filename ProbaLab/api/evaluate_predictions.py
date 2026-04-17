@@ -1,5 +1,5 @@
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.config import supabase
 
@@ -64,12 +64,12 @@ def calculate_boolean_metrics(pred_prob, actual_boolean):
 def evaluate_recent_matches(days_back=7):
     """Récupère les matchs terminés récents et met à jour prediction_results dans Supabase."""
 
-    print(f"[{datetime.now()}] Démarrage de l'évaluation ML (Brier/LogLoss)...")
+    print(f"[{datetime.now(timezone.utc)}] Démarrage de l'évaluation ML (Brier/LogLoss)...")
 
     # 1. Récupérer les fixtures terminées récemment
-    from datetime import timedelta
+    from datetime import timedelta, timezone
 
-    cutoff = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
 
     fixtures_response = (
         supabase.table("fixtures")
@@ -182,7 +182,7 @@ def evaluate_recent_matches(days_back=7):
                     f"Match {fix['id']} ({actual_result}) -> Brier: {brier_1x2:.3f}, LogLoss: {ll_1x2:.3f}"
                 )
 
-    print(f"[{datetime.now()}] ✅ Terminé. {updates_count} matchs évalués/mis à jour.")
+    print(f"[{datetime.now(timezone.utc)}] ✅ Terminé. {updates_count} matchs évalués/mis à jour.")
 
     # ─── Backtest Reminder Logic ──────────────────────────────────
     # User requested a notification to run a backtest after 30-50 new matches.

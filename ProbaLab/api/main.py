@@ -12,7 +12,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from urllib.parse import urlparse as _urlparse
 
-# APScheduler removed — all scheduling handled by Trigger.dev
+# APScheduler (worker.py) est la SOURCE DE VÉRITÉ du scheduling automatique.
+# Les endpoints /api/trigger/* sont des déclenchements AD-HOC uniquement.
+# Ne pas créer de crons Trigger.dev en double — leçon 64 NHL (2026-04-17).
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse

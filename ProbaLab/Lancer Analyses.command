@@ -8,7 +8,7 @@ echo "║          ⚽ FOOTBALL IA — Lancement complet             ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
 
-cd /Users/pierrelaurent/Desktop/Projet_Football/Projet_Football
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
 # Activer l'environnement virtuel si présent
 if [ -f "venv/bin/activate" ]; then

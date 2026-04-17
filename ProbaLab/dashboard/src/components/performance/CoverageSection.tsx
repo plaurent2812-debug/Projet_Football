@@ -68,14 +68,14 @@ export function CoverageSection({
                     <div className="flex items-center gap-2.5 p-3 rounded-lg bg-secondary/30 border border-border/30">
                         <XCircle className="w-4 h-4 text-red-400 shrink-0" />
                         <div>
-                            <p className="text-[11px] text-muted-foreground">Probas manquantes</p>
+                            <p className="text-xs text-muted-foreground">Probas manquantes</p>
                             <p className="text-sm font-bold tabular-nums">{skippedNullProbas}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2.5 p-3 rounded-lg bg-secondary/30 border border-border/30">
                         <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
                         <div>
-                            <p className="text-[11px] text-muted-foreground">Egalites de probas</p>
+                            <p className="text-xs text-muted-foreground">Egalites de probas</p>
                             <p className="text-sm font-bold tabular-nums">{skippedTies}</p>
                         </div>
                     </div>
@@ -90,14 +90,14 @@ export function CoverageSection({
                             const pct = totalFinished > 0 ? Math.round((count / totalFinished) * 100) : 0
                             return (
                                 <div key={key} className="flex items-center gap-3">
-                                    <span className="text-[11px] text-muted-foreground w-14 shrink-0">{label}</span>
+                                    <span className="text-xs text-muted-foreground w-14 shrink-0">{label}</span>
                                     <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
                                         <div
                                             className={cn("h-full rounded-full transition-all duration-700", color)}
                                             style={{ width: `${pct}%` }}
                                         />
                                     </div>
-                                    <span className="text-[11px] tabular-nums text-muted-foreground w-16 text-right shrink-0">
+                                    <span className="text-xs tabular-nums text-muted-foreground w-16 text-right shrink-0">
                                         {count} ({pct}%)
                                     </span>
                                 </div>

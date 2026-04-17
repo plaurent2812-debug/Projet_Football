@@ -55,11 +55,11 @@ export default function ProfilePage() {
                         <div className="flex-1 text-center sm:text-left space-y-1 pb-2">
                             <h2 className="text-xl font-bold text-foreground">{user.email?.split('@')[0]}</h2>
                             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                                <Badge variant={isPremium ? "default" : "secondary"} className="uppercase text-[10px] tracking-wider">
+                                <Badge variant={isPremium ? "default" : "secondary"} className="uppercase text-xs tracking-wider">
                                     {isPremium ? "Membre Premium" : "Membre Gratuit"}
                                 </Badge>
                                 {role === 'admin' && (
-                                    <Badge variant="destructive" className="uppercase text-[10px] tracking-wider flex items-center gap-1">
+                                    <Badge variant="destructive" className="uppercase text-xs tracking-wider flex items-center gap-1">
                                         <Shield className="w-3 h-3" /> Admin
                                     </Badge>
                                 )}

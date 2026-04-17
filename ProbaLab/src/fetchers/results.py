@@ -135,7 +135,7 @@ def fetch_and_update_results(target_date: str | None = None) -> dict:
     # so this window may miss late-night matches or include previous-day ones near midnight.
     # Fenêtre élargie (-12h à +36h) pour s'affranchir des différences de timezone UTC/Paris
     from datetime import timedelta
-    target_dt = datetime.strptime(target_date, "%Y-%m-%d")
+    target_dt = datetime.strptime(target_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     date_start = (target_dt - timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%S")
     date_end = (target_dt + timedelta(hours=36)).strftime("%Y-%m-%dT%H:%M:%S")
 

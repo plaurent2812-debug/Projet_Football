@@ -7,7 +7,7 @@ Provides team match history, roster data, and football meta-analysis.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -24,7 +24,7 @@ def get_football_meta_analysis(
 ):
     """Return the DeepThink strategic meta-analysis for football matches."""
     if not date:
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Try dedicated table first
     try:

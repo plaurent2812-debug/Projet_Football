@@ -143,7 +143,7 @@ export function BetCard({ bet, sport, date, isAdmin, onResultUpdate }: BetCardPr
                     {kellyPct > 0 && localResult === "PENDING" && (
                         <div className="flex flex-col items-center">
                             <span className="text-xs font-bold text-primary">{kellyPct.toFixed(1)}%</span>
-                            <span className="text-[10px] text-muted-foreground">bankroll</span>
+                            <span className="text-xs text-muted-foreground">bankroll</span>
                         </div>
                     )}
                 </div>

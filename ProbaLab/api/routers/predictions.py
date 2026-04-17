@@ -8,7 +8,7 @@ views for a single fixture.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
@@ -37,7 +37,7 @@ def get_predictions(
 ):
     """Get predictions for a given date (defaults to today)."""
     if not date:
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Get fixtures for that date
     next_day = (datetime.fromisoformat(date) + timedelta(days=1)).strftime("%Y-%m-%d")

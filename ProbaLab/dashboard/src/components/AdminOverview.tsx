@@ -3,6 +3,7 @@ import { supabase } from '@/lib/auth'
 import { BarChart3, Users, Zap, Trophy, TrendingUp, Activity, RefreshCw, Globe, Target, AlertTriangle } from 'lucide-react'
 import { API_ROOT, fetchMonitoring } from '@/lib/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import type { AdminStats, ApiQuota, MonitoringResponse } from '@/types/api'
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
     const { data } = await supabase.auth.getSession()
@@ -26,9 +27,9 @@ function CLVTooltip({ active, payload, label }: any) {
 }
 
 export default function AdminOverview() {
-    const [stats, setStats] = useState<any>(null)
-    const [quota, setQuota] = useState<any>(null)
-    const [monitoring, setMonitoring] = useState<any>(null)
+    const [stats, setStats] = useState<AdminStats | null>(null)
+    const [quota, setQuota] = useState<ApiQuota | null>(null)
+    const [monitoring, setMonitoring] = useState<MonitoringResponse | null>(null)
     const [loading, setLoading] = useState(true)
     const [monLoading, setMonLoading] = useState(true)
 
@@ -112,7 +113,7 @@ export default function AdminOverview() {
                         <div key={kpi.label} className={`glass rounded-2xl border ${kpi.border} p-5 bg-gradient-to-br ${kpi.bg}`}>
                             <div className="flex items-center justify-between mb-3">
                                 <Icon className={`w-5 h-5 ${kpi.color}`} />
-                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{kpi.label}</span>
+                                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{kpi.label}</span>
                             </div>
                             {loading ? (
                                 <div className="h-9 w-16 rounded-lg bg-white/10 animate-pulse" />
@@ -144,7 +145,7 @@ export default function AdminOverview() {
                     <div className={`glass rounded-2xl border ${clvBorder} p-5 bg-gradient-to-br ${clvBg}`}>
                         <div className="flex items-center justify-between mb-3">
                             <TrendingUp className={`w-5 h-5 ${clvColor}`} />
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">CLV Moyen</span>
+                            <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">CLV Moyen</span>
                         </div>
                         {monLoading ? (
                             <div className="h-9 w-20 rounded-lg bg-white/10 animate-pulse" />
@@ -153,7 +154,7 @@ export default function AdminOverview() {
                                 <div className={`text-3xl font-black ${clvColor}`}>
                                     {clvMean >= 0 ? '+' : ''}{(clvMean * 100).toFixed(1)}%
                                 </div>
-                                <div className="text-[10px] text-muted-foreground mt-1">
+                                <div className="text-xs text-muted-foreground mt-1">
                                     {clv.n_matches || 0} matchs — {clv.verdict === 'BEATING_MARKET' ? 'Bat le marché' : clv.verdict === 'MATCHING_MARKET' ? 'Niveau marché' : clv.verdict === 'NO_DATA' ? 'Pas de données' : 'Sous le marché'}
                                 </div>
                             </>
@@ -163,14 +164,14 @@ export default function AdminOverview() {
                     <div className={`glass rounded-2xl border ${pctBorder} p-5 bg-gradient-to-br ${pctBg}`}>
                         <div className="flex items-center justify-between mb-3">
                             <Activity className={`w-5 h-5 ${pctColor}`} />
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">% CLV Positif</span>
+                            <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">% CLV Positif</span>
                         </div>
                         {monLoading ? (
                             <div className="h-9 w-16 rounded-lg bg-white/10 animate-pulse" />
                         ) : (
                             <>
                                 <div className={`text-3xl font-black ${pctColor}`}>{pctClv}%</div>
-                                <div className="text-[10px] text-muted-foreground mt-1">
+                                <div className="text-xs text-muted-foreground mt-1">
                                     {clv.n_positive_clv ?? 0} / {clv.n_matches ?? 0} paris
                                 </div>
                             </>
@@ -180,14 +181,14 @@ export default function AdminOverview() {
                     <div className={`glass rounded-2xl border ${brierBorder} p-5 bg-gradient-to-br ${brierBg}`}>
                         <div className="flex items-center justify-between mb-3">
                             <BarChart3 className={`w-5 h-5 ${brierColor}`} />
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Brier 1X2</span>
+                            <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Brier 1X2</span>
                         </div>
                         {monLoading ? (
                             <div className="h-9 w-16 rounded-lg bg-white/10 animate-pulse" />
                         ) : (
                             <>
                                 <div className={`text-3xl font-black ${brierColor}`}>{brierVal?.toFixed(4) ?? '—'}</div>
-                                <div className="text-[10px] text-muted-foreground mt-1">
+                                <div className="text-xs text-muted-foreground mt-1">
                                     {brier.brier_1x2_grade ?? '—'} — ECE: {brier.ece?.toFixed(3) ?? '—'}
                                     {brier.drift?.drift_detected && (
                                         <span className="text-red-400 ml-1 inline-flex items-center gap-0.5">
@@ -252,7 +253,7 @@ export default function AdminOverview() {
                                             <div key={lid} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
                                                 <span className="text-xs font-medium">{name}</span>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] text-muted-foreground">{info.n}m</span>
+                                                    <span className="text-xs text-muted-foreground">{info.n}m</span>
                                                     <span className={`text-xs font-bold ${val >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                                         {val >= 0 ? '+' : ''}{(val * 100).toFixed(1)}%
                                                     </span>
@@ -290,7 +291,7 @@ export default function AdminOverview() {
                             <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
                                 <div className={`h-full ${quotaBarColor} rounded-full transition-all duration-500`} style={{ width: `${quotaPct}%` }} />
                             </div>
-                            <div className="flex justify-between text-[11px] text-muted-foreground">
+                            <div className="flex justify-between text-xs text-muted-foreground">
                                 <span>Restant: <strong className="text-foreground">{quota.remaining?.toLocaleString()}</strong></span>
                                 <span>Plan: <strong className="text-foreground">{quota.plan}</strong></span>
                             </div>

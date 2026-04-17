@@ -7,7 +7,7 @@ submitted via the Telegram bot.
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from typing import Annotated
 
@@ -40,7 +40,7 @@ def get_expert_picks(
     import json as _json
 
     if not date:
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         query = (
             supabase.table("expert_picks")

@@ -260,7 +260,7 @@ export default function MatchDetailPage() {
                     <div className="flex items-center justify-between gap-4 mt-3">
                         <div className="flex-1 text-center">
                             {fixture?.home_logo && (
-                                <img src={fixture.home_logo} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
+                                <img src={fixture.home_logo} alt="" role="presentation" className="w-10 h-10 mx-auto mb-1 object-contain" />
                             )}
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                 <p
@@ -299,7 +299,7 @@ export default function MatchDetailPage() {
                         </div>
                         <div className="flex-1 text-center">
                             {fixture?.away_logo && (
-                                <img src={fixture.away_logo} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
+                                <img src={fixture.away_logo} alt="" role="presentation" className="w-10 h-10 mx-auto mb-1 object-contain" />
                             )}
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                 <p

@@ -11,7 +11,7 @@ import json
 import os
 import pickle
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -232,7 +232,7 @@ def train_model(df: pd.DataFrame, target: str, model_name: str) -> dict | None:
             "roc_auc": float(auc),
             "n_samples": len(df),
         },
-        "training_date": datetime.now().isoformat(),
+        "training_date": datetime.now(timezone.utc).isoformat(),
         "serialization": "ubj"
     }
 
@@ -245,7 +245,7 @@ def train_model(df: pd.DataFrame, target: str, model_name: str) -> dict | None:
     final_model.save_model(model_ubj_path)
 
     # Timestamped snapshot
-    date_tag = datetime.now().strftime("%Y%m%d")
+    date_tag = datetime.now(timezone.utc).strftime("%Y%m%d")
     versioned_path = str(output_path).replace(".pkl", f"_{date_tag}.pkl")
     with open(versioned_path, "wb") as f:
         pickle.dump(metadata, f)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/auth'
 import { Users, Crown, Shield, User, Trash2, Search, RefreshCw, ChevronDown } from 'lucide-react'
 import { API_ROOT } from '@/lib/api'
+import type { AdminUser } from '@/types/api'
 
 const ROLE_CONFIG = {
     admin: { label: 'Admin', color: 'text-red-400 bg-red-500/15 border-red-500/30', icon: Shield },
@@ -19,7 +20,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 export default function AdminUsers() {
-    const [users, setUsers] = useState<any[]>([])
+    const [users, setUsers] = useState<AdminUser[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [roleFilter, setRoleFilter] = useState('all')
@@ -115,7 +116,7 @@ export default function AdminUsers() {
                 ].map(s => (
                     <div key={s.label} className={`rounded-xl border p-3 text-center ${s.bg}`}>
                         <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-                        <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mt-0.5">{s.label}</div>
+                        <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider mt-0.5">{s.label}</div>
                     </div>
                 ))}
             </div>
@@ -165,22 +166,22 @@ export default function AdminUsers() {
                                 <tr key={user.id} className="hover:bg-white/5 transition-colors">
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-sm truncate max-w-[200px]">{user.email || '—'}</div>
-                                        <div className="text-[10px] text-muted-foreground/60 font-mono truncate max-w-[200px]">{user.id?.slice(0, 8)}...</div>
+                                        <div className="text-xs text-muted-foreground/60 font-mono truncate max-w-[200px]">{user.id?.slice(0, 8)}...</div>
                                     </td>
                                     <td className="px-4 py-3">
                                         {editingId === user.id ? (
                                             <div className="flex items-center gap-1">
                                                 {['free', 'premium', 'admin'].map(r => (
                                                     <button key={r} onClick={() => updateRole(user.id, r)}
-                                                        className={`px-2 py-1 rounded text-[10px] font-bold uppercase border transition-all hover:scale-105 ${r === user.role ? 'ring-2 ring-violet-500' : ''} ${(ROLE_CONFIG as any)[r]?.color}`}>
+                                                        className={`px-2 py-1 rounded text-xs font-bold uppercase border transition-all hover:scale-105 ${r === user.role ? 'ring-2 ring-violet-500' : ''} ${(ROLE_CONFIG as any)[r]?.color}`}>
                                                         {r}
                                                     </button>
                                                 ))}
-                                                <button onClick={() => setEditingId(null)} className="text-[10px] text-muted-foreground ml-1 hover:text-foreground">✕</button>
+                                                <button onClick={() => setEditingId(null)} className="text-xs text-muted-foreground ml-1 hover:text-foreground">✕</button>
                                             </div>
                                         ) : (
                                             <button onClick={() => setEditingId(user.id)}
-                                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border cursor-pointer hover:opacity-80 transition-opacity ${rc.color}`}>
+                                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold border cursor-pointer hover:opacity-80 transition-opacity ${rc.color}`}>
                                                 <RoleIcon className="w-3 h-3" />
                                                 {rc.label}
                                                 <ChevronDown className="w-2.5 h-2.5 opacity-50" />

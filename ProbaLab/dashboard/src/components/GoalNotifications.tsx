@@ -49,11 +49,11 @@ function GoalToast({ toast, onDismiss }) {
                     {toast.homeTeam} <span className="text-emerald-500 font-black">{toast.homeGoals} – {toast.awayGoals}</span> {toast.awayTeam}
                 </p>
                 {toast.scorer && (
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                         ⚽ {toast.scorer} {toast.minute ? `(${toast.minute}')` : ""}
                     </p>
                 )}
-                <p className="text-[10px] text-primary/60 mt-1">Cliquer pour voir le match →</p>
+                <p className="text-xs text-primary/60 mt-1">Cliquer pour voir le match →</p>
             </div>
 
             {/* Close */}

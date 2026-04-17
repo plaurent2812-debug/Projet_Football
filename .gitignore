@@ -51,3 +51,4 @@ htmlcov/
 /fetch_players.py
 /scorer_engine.py
 /google_apps_script/
+.audit-notes/

@@ -60,15 +60,15 @@ export function ValueBetExplainer({ defaultOpen = false }: { defaultOpen?: boole
                         <div className="grid grid-cols-3 gap-2 mb-3">
                             <div className="text-center p-2 rounded-lg bg-muted/50">
                                 <div className="text-lg font-black text-foreground tabular-nums">2.10</div>
-                                <div className="text-[10px] text-muted-foreground">Cote Bet365</div>
+                                <div className="text-xs text-muted-foreground">Cote Bet365</div>
                             </div>
                             <div className="text-center p-2 rounded-lg bg-muted/50">
                                 <div className="text-lg font-black text-foreground tabular-nums">55%</div>
-                                <div className="text-[10px] text-muted-foreground">Notre mod&egrave;le</div>
+                                <div className="text-xs text-muted-foreground">Notre mod&egrave;le</div>
                             </div>
                             <div className="text-center p-2 rounded-lg bg-primary/10 border border-primary/30">
                                 <div className="text-lg font-black text-primary tabular-nums">+7.4%</div>
-                                <div className="text-[10px] text-primary/80 font-semibold">Edge</div>
+                                <div className="text-xs text-primary/80 font-semibold">Edge</div>
                             </div>
                         </div>
 

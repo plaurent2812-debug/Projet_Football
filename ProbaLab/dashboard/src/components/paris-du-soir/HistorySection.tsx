@@ -46,7 +46,7 @@ function HistoryTable({ filteredHistory, filteredHistoryStats }: {
                     <span className="text-muted-foreground">{filteredHistoryStats.resolved} resolus / {filteredHistoryStats.total} total</span>
                     {filteredHistoryStats.resolved > 0 && (
                         <span className={cn(
-                            "font-bold px-1.5 py-0.5 rounded text-[10px]",
+                            "font-bold px-1.5 py-0.5 rounded text-xs",
                             filteredHistoryStats.win_rate >= 60 ? "bg-emerald-500/15 text-emerald-400" :
                                 filteredHistoryStats.win_rate >= 45 ? "bg-amber-500/15 text-amber-400" :
                                     "bg-red-500/15 text-red-400"
@@ -91,14 +91,14 @@ function HistoryTable({ filteredHistory, filteredHistoryStats }: {
                                             {pick.bet_label || pick.player_name || "—"}
                                         </span>
                                         {isExpert && (
-                                            <span className="shrink-0 self-start px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20 mt-0.5">
+                                            <span className="shrink-0 self-start px-1.5 py-0.5 rounded text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20 mt-0.5">
                                                 🎯 Expert
                                             </span>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-1.5 mt-1">
-                                        <span className="text-[9px] text-muted-foreground">{pick.date}</span>
-                                        <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">
+                                        <span className="text-xs text-muted-foreground">{pick.date}</span>
+                                        <span className="text-xs px-1 py-0.5 rounded bg-muted text-muted-foreground">
                                             {pick.sport === "nhl" ? "🏒" : "⚽"} {pick.market || "—"}
                                         </span>
                                     </div>
@@ -110,7 +110,7 @@ function HistoryTable({ filteredHistory, filteredHistoryStats }: {
                                         @{formatOdds(pick.odds ? parseFloat(String(pick.odds)) : null)}
                                     </div>
                                     <div className={cn(
-                                        "text-[10px] font-semibold tabular-nums",
+                                        "text-xs font-semibold tabular-nums",
                                         isWin ? "text-emerald-500" :
                                             isLoss ? "text-red-500" :
                                                 "text-muted-foreground"
@@ -132,17 +132,17 @@ function HistoryTable({ filteredHistory, filteredHistoryStats }: {
                     <button
                         onClick={() => setPage(p => Math.max(0, p - 1))}
                         disabled={page === 0}
-                        className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-muted/50 hover:bg-muted text-muted-foreground disabled:opacity-30 transition-colors"
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-muted/50 hover:bg-muted text-muted-foreground disabled:opacity-30 transition-colors"
                     >
                         Precedent
                     </button>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                         Page {page + 1} / {totalPages}
                     </span>
                     <button
                         onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                         disabled={page >= totalPages - 1}
-                        className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-muted/50 hover:bg-muted text-muted-foreground disabled:opacity-30 transition-colors"
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-muted/50 hover:bg-muted text-muted-foreground disabled:opacity-30 transition-colors"
                     >
                         Suivant
                     </button>
@@ -189,7 +189,7 @@ export function HistorySection({
                 </div>
                 <div className="flex gap-2">
                     <div className="flex-1">
-                        <label className="text-[10px] text-muted-foreground mb-0.5 block">Du</label>
+                        <label className="text-xs text-muted-foreground mb-0.5 block">Du</label>
                         <input
                             type="date"
                             value={historyDateFrom}
@@ -198,7 +198,7 @@ export function HistorySection({
                         />
                     </div>
                     <div className="flex-1">
-                        <label className="text-[10px] text-muted-foreground mb-0.5 block">Au</label>
+                        <label className="text-xs text-muted-foreground mb-0.5 block">Au</label>
                         <input
                             type="date"
                             value={historyDateTo}
@@ -209,7 +209,7 @@ export function HistorySection({
                     {(historyDateFrom || historyDateTo) && (
                         <button
                             onClick={onResetDates}
-                            className="self-end px-2 py-1.5 rounded-lg text-[10px] font-bold text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted transition-colors"
+                            className="self-end px-2 py-1.5 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted transition-colors"
                         >
                             Reset
                         </button>
@@ -228,7 +228,7 @@ export function HistorySection({
                         key={key}
                         onClick={() => onSourceFilterChange(key)}
                         className={cn(
-                            "flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                            "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all",
                             historySourceFilter === key
                                 ? "bg-card shadow-sm text-foreground border border-border/60"
                                 : "bg-muted/50 text-muted-foreground hover:text-foreground"

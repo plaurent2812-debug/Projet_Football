@@ -103,7 +103,7 @@ function MetaAnalysisCard({ date }) {
                         <span className="text-sm font-bold">Analyse Stratégique</span>
                         <Sparkles className="w-3 h-3 text-purple-400" />
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                         Méta-analyse de la soirée — spots à haute value
                     </p>
                 </div>
@@ -250,7 +250,7 @@ function NHLMatchRow({ match, isStarred, onToggleStar }) {
                 {isLive ? (
                     <span className="fs-live-badge">{periodLabel}</span>
                 ) : isFinished ? (
-                    <span className="text-[10px] font-semibold text-emerald-500">FT</span>
+                    <span className="text-xs font-semibold text-emerald-500">FT</span>
                 ) : (
                     <span>{time}</span>
                 )}
@@ -296,12 +296,12 @@ function NHLMatchRow({ match, isStarred, onToggleStar }) {
                 <div className="flex items-center gap-1.5">
                     {/* Match Style Tags */}
                     {probaOver55 != null && probaOver55 >= 57 && (
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 whitespace-nowrap">
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-500 whitespace-nowrap">
                             🔥 Offensif
                         </span>
                     )}
                     {probaOver55 != null && probaOver55 <= 47 && (
-                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400 whitespace-nowrap">
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400 whitespace-nowrap">
                             🛡️ Défensif
                         </span>
                     )}
@@ -324,7 +324,7 @@ function NHLMatchRow({ match, isStarred, onToggleStar }) {
 
                 {/* Mini prediction */}
                 {miniPred && (
-                    <span className="text-[9px] text-muted-foreground/70 font-medium">
+                    <span className="text-xs text-muted-foreground/70 font-medium">
                         {miniPred}
                     </span>
                 )}

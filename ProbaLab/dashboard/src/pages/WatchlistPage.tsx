@@ -46,11 +46,11 @@ function MiniMatchRow({ match, isStarred, onToggleStar, sport = "football" }) {
                 {isLive ? (
                     <span className="fs-live-badge">LIVE</span>
                 ) : isFinished ? (
-                    <span className="text-[10px] font-semibold text-emerald-500">FT</span>
+                    <span className="text-xs font-semibold text-emerald-500">FT</span>
                 ) : (
                     <div className="flex flex-col items-center">
                         <span>{time}</span>
-                        {dayLabel && <span className="text-[8px] text-muted-foreground/60">{dayLabel}</span>}
+                        {dayLabel && <span className="text-xs text-muted-foreground/60">{dayLabel}</span>}
                     </div>
                 )}
             </div>
@@ -117,7 +117,7 @@ function SportSection({ title, emoji, starredList, favTeamMatches, loading, togg
                 <>
                     {starredList.length > 0 && (
                         <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground px-3 pt-2 pb-1 flex items-center gap-1">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-3 pt-2 pb-1 flex items-center gap-1">
                                 <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" /> Étoilés
                             </p>
                             {starredList.map(m => (
@@ -127,7 +127,7 @@ function SportSection({ title, emoji, starredList, favTeamMatches, loading, togg
                     )}
                     {favTeamMatches.length > 0 && (
                         <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground px-3 pt-2 pb-1 flex items-center gap-1">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-3 pt-2 pb-1 flex items-center gap-1">
                                 <Trophy className="w-2.5 h-2.5" /> Équipes favorites
                             </p>
                             {favTeamMatches.map(m => (
@@ -200,7 +200,7 @@ export default function WatchlistPage() {
             <div className="fs-summary-bar">
                 <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                 <span className="font-bold">Mes Favoris</span>
-                <span className="text-[10px] text-muted-foreground ml-1">7 prochains jours</span>
+                <span className="text-xs text-muted-foreground ml-1">7 prochains jours</span>
             </div>
 
             {/* Football */}
@@ -219,7 +219,7 @@ export default function WatchlistPage() {
                     <Trophy className="w-3.5 h-3.5 text-primary" />
                     <span className="text-xs font-bold">Équipes favorites</span>
                     {favTeams.size > 0 && (
-                        <Badge variant="outline" className="ml-auto text-[10px]">{favTeams.size}</Badge>
+                        <Badge variant="outline" className="ml-auto text-xs">{favTeams.size}</Badge>
                     )}
                 </div>
 
@@ -227,7 +227,7 @@ export default function WatchlistPage() {
                 {favTeams.size > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                         {[...favTeams].map(team => (
-                            <span key={team} className="flex items-center gap-1 text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded">
+                            <span key={team} className="flex items-center gap-1 text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded">
                                 {team}
                                 <button onClick={() => toggleTeam(team)} className="hover:text-red-500 transition-colors">
                                     <X className="w-2.5 h-2.5" />

@@ -12,6 +12,7 @@ select = [
     "B",    # flake8-bugbear
     "SIM",  # flake8-simplify
     "C4",   # flake8-comprehensions
+    "DTZ",  # flake8-datetimez : enforce timezone-aware datetimes (lesson 22)
 ]
 ignore = [
     "E501",   # line too long (géré par formatter)
@@ -29,7 +30,8 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-"Projet_Football/tests/*" = ["N802", "N803", "N806", "B011"]
+"tests/**" = ["DTZ", "B011"]  # tests may use naive datetimes for controlled fixtures
+"migrations/**" = ["DTZ"]     # SQL migrations are not Python — safety valve
 
 [format]
 quote-style = "double"

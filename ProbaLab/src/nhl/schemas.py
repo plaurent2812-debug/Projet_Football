@@ -37,6 +37,12 @@ class BrainPrediction(BaseModel):
 
 class BrainResponse(BaseModel):
     predictions: list[BrainPrediction]
+    ml_fallback_used: dict[str, bool] = {
+        "shot": False,
+        "assist": False,
+        "goal": False,
+        "point": False,
+    }
 
 
 class GameWinProbRequest(BaseModel):

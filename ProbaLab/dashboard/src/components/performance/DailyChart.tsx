@@ -91,11 +91,11 @@ export function DailyChart({ chartData }: DailyChartProps) {
                 <div className="flex items-center justify-center gap-6 mt-3">
                     <div className="flex items-center gap-1.5">
                         <div className="w-3 h-3 rounded-sm" style={{ background: "oklch(0.35 0.01 260)" }} />
-                        <span className="text-[11px] text-muted-foreground">Matchs analyses</span>
+                        <span className="text-xs text-muted-foreground">Matchs analyses</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-3 h-3 rounded-sm" style={{ background: "oklch(0.7 0.18 155)" }} />
-                        <span className="text-[11px] text-muted-foreground">Corrects</span>
+                        <span className="text-xs text-muted-foreground">Corrects</span>
                     </div>
                 </div>
             </CardContent>

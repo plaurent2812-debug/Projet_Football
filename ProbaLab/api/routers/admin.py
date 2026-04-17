@@ -9,16 +9,24 @@ import logging
 import subprocess
 import sys
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 
-from api.auth import verify_cron_auth
+from api.auth import verify_cron_auth, verify_internal_auth
 from api.schemas import RunPipelineRequest
 from src.config import supabase
+
+
+def _require_internal_auth(
+    authorization: str | None = Header(None),
+    x_cron_secret: str | None = Header(None, alias="X-Cron-Secret"),
+) -> None:
+    """FastAPI dependency wrapping verify_internal_auth with both headers."""
+    verify_internal_auth(authorization=authorization, x_cron_secret=x_cron_secret)
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +123,7 @@ def _run_pipeline_background(mode: str) -> None:
             else:
                 _pipeline_state["status"] = "done" if process.returncode == 0 else "error"
             _pipeline_state["return_code"] = process.returncode
-            _pipeline_state["finished_at"] = datetime.now().isoformat()
+            _pipeline_state["finished_at"] = datetime.now(timezone.utc).isoformat()
             _pipeline_state["process"] = None
 
     except Exception as e:
@@ -123,7 +131,7 @@ def _run_pipeline_background(mode: str) -> None:
         with _pipeline_lock:
             _pipeline_state["status"] = "error"
             _pipeline_state["logs"] += f"\nInternal Error: {str(e)}"
-            _pipeline_state["finished_at"] = datetime.now().isoformat()
+            _pipeline_state["finished_at"] = datetime.now(timezone.utc).isoformat()
             _pipeline_state["process"] = None
 
 
@@ -147,7 +155,7 @@ def cron_run_pipeline(body: Annotated[RunPipelineRequest, Body()], request: Requ
 
         _pipeline_state["status"] = "running"
         _pipeline_state["mode"] = mode
-        _pipeline_state["started_at"] = datetime.now().isoformat()
+        _pipeline_state["started_at"] = datetime.now(timezone.utc).isoformat()
         _pipeline_state["finished_at"] = None
         _pipeline_state["logs"] = ""
         _pipeline_state["return_code"] = None
@@ -182,7 +190,7 @@ def admin_run_pipeline(
 
         _pipeline_state["status"] = "running"
         _pipeline_state["mode"] = mode
-        _pipeline_state["started_at"] = datetime.now().isoformat()
+        _pipeline_state["started_at"] = datetime.now(timezone.utc).isoformat()
         _pipeline_state["finished_at"] = None
         _pipeline_state["logs"] = ""
         _pipeline_state["return_code"] = None
@@ -214,7 +222,7 @@ def admin_stop_pipeline(request: Request, authorization: str | None = Header(Non
 
         # Fallback if status is running but no process found
         _pipeline_state["status"] = "cancelled"
-        _pipeline_state["finished_at"] = datetime.now().isoformat()
+        _pipeline_state["finished_at"] = datetime.now(timezone.utc).isoformat()
 
     return {"message": "Pipeline annulé"}
 
@@ -231,25 +239,21 @@ def admin_pipeline_status(request: Request, authorization: str | None = Header(N
         return state
 
 
-@router.post("/api/admin/update-scores")
+@router.post(
+    "/api/admin/update-scores",
+    dependencies=[Depends(_require_internal_auth)],
+)
 def admin_update_scores(
     request: Request,
     date: str | None = Query(None, description="Date YYYY-MM-DD (default: today)"),
-    authorization: str | None = Header(None),
 ):
     """
     Update match scores for a given date from API Football.
     Designed to be called by a CRON job every 15 minutes during match hours.
-    No auth required when called internally (Railway CRON), but JWT accepted.
+    Requires either a valid CRON_SECRET (Authorization: Bearer or X-Cron-Secret
+    header) or an admin Supabase JWT — enforced by verify_internal_auth to
+    protect the paid API-Football quota against unauthenticated DoS.
     """
-    # Allow unauthenticated calls from Railway CRON (internal network)
-    # If Authorization header is present, validate it
-    if authorization:
-        try:
-            _require_admin(authorization)
-        except HTTPException:
-            raise
-
     import threading as _threading
 
     def _run_scores():
@@ -263,7 +267,7 @@ def admin_update_scores(
     t = _threading.Thread(target=_run_scores, daemon=True)
     t.start()
 
-    from datetime import date as _date
+    from datetime import datetime as _dt, timezone
 
-    target = date or _date.today().isoformat()
+    target = date or _dt.now(timezone.utc).date().isoformat()
     return {"message": f"Score update started for {target}"}

@@ -2,15 +2,15 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Configuration
-PROJECT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Projet_Football")
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 PYTHON_CMD = sys.executable
 
 
 def log(msg):
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
+    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
 
 
 def run_pipeline(mode="data"):
@@ -42,7 +42,7 @@ def main():
     last_day_run = -1
 
     while True:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         # 1. Hourly Data Update (at minute 0)
         if now.minute == 0 and now.hour != last_hour_run:

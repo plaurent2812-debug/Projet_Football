@@ -197,7 +197,7 @@ function Header() {
             {!isPremium && !isAdmin && (
               <button
                 onClick={() => navigate('/premium')}
-                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded text-xs font-bold text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
               >
                 <Trophy className="w-3 h-3" />
                 PRO
@@ -292,7 +292,7 @@ function Footer() {
           <p className="disclaimer-text text-center max-w-md">
             Analyses statistiques à titre informatif. Pas un conseil en paris. 18+
           </p>
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <NavLink to="/cgu" className="hover:text-foreground transition-colors">CGU</NavLink>
             <NavLink to="/confidentialite" className="hover:text-foreground transition-colors">Confidentialité</NavLink>
             <span className="text-muted-foreground/60">·</span>

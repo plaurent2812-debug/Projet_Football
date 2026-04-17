@@ -19,7 +19,7 @@ export function ResultBadge({ result, betDate }: { result?: string; betDate?: st
     }
     if (effectiveResult === "_DONE") {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-blue-400 bg-blue-500/15">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-blue-400 bg-blue-500/15">
                 <Clock className="w-3 h-3" />
                 Termine
             </span>
@@ -27,7 +27,7 @@ export function ResultBadge({ result, betDate }: { result?: string; betDate?: st
     }
     const { icon: Icon, label, cls } = cfg[effectiveResult] || cfg.PENDING
     return (
-        <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold", cls)}>
+        <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold", cls)}>
             <Icon className="w-3 h-3" />
             {label}
         </span>
@@ -72,7 +72,7 @@ const MARKET_LABEL_MAP: Record<string, string> = {
 export function MarketBadge({ market }: { market: string }) {
     const label = MARKET_LABEL_MAP[market] || market
     return (
-        <span className={cn("px-2 py-0.5 rounded text-[10px] font-semibold", MARKET_COLORS[market] || "bg-primary/15 text-primary")}>
+        <span className={cn("px-2 py-0.5 rounded text-xs font-semibold", MARKET_COLORS[market] || "bg-primary/15 text-primary")}>
             {label}
         </span>
     )

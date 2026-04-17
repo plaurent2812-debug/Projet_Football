@@ -64,18 +64,29 @@ class EnhancedGoalPredictor:
     """
     Prédicteur utilisant un modèle XGBoost entraîné.
     Fallback sur Poisson si le modèle n'est pas disponible.
+
+    Attributes:
+        loaded: True uniquement si .load() a réussi. Utiliser comme source de
+                vérité pour décider du fallback Poisson (plus fiable que
+                model is not None qui peut être truthy même après un load partiel).
     """
 
     def __init__(self, target_stat: str = "goal"):
         self.target_stat = target_stat  # goal, assist, point, shot
         self.model = None
+        self.loaded: bool = False
         self.feature_names: list[str] = []
         self.model_metadata: dict[str, Any] = {}
 
     def load(self, path: str) -> bool:
         """Charge le modèle depuis un fichier (pickle pour metadata + ubj pour booster)."""
         if not os.path.isfile(path):
-            logger.warning("   Modele non trouve: %s", path)
+            logger.warning(
+                "EnhancedGoalPredictor(%s) model not found at %s — fallback to Poisson.",
+                self.target_stat,
+                path,
+            )
+            self.loaded = False
             return False
         try:
             # 1. Load metadata from pickle
@@ -109,10 +120,17 @@ class EnhancedGoalPredictor:
             auc = self.model_metadata.get("roc_auc", 0)
             if acc > 0:
                 logger.info("      Acc=%.2f%%, AUC=%.3f, Features=%d", 100 * acc, auc, len(self.feature_names))
+            self.loaded = True
             return True
         except Exception as e:
-            logger.error("   Erreur chargement %s: %s", path, e)
+            logger.warning(
+                "EnhancedGoalPredictor(%s) load failed at %s — fallback to Poisson. Reason: %s",
+                self.target_stat,
+                path,
+                e,
+            )
             self.model = None
+            self.loaded = False
             return False
 
     def _build_features(self, data: dict[str, Any]) -> pd.DataFrame:

@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.brain import ask_gemini, build_prompt, extract_json
 from src.config import supabase
@@ -83,7 +83,7 @@ def run_historical_backfill(limit=500):
                 "ai_features": final_features,
                 "analysis_text": final_features.get("analysis_text", ""),
                 "model_version": "v2",
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
 
             # Insertion Supabase

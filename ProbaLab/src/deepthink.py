@@ -9,7 +9,7 @@ Responsibilities:
     ``football_meta_analysis`` table.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from google import genai
 from google.genai import types
@@ -29,7 +29,7 @@ def generate_football_deepthink(matches: list[dict], league_names: dict[int, str
         matches: List of fixture dicts processed by the current brain run.
         league_names: Mapping of ``league_id`` → ``league_name`` strings.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today = now.strftime("%Y-%m-%d")
     # Cover matches from NOW until tomorrow at 18:00 UTC (19:00 Paris)
     cutoff = (now + timedelta(days=1)).replace(hour=18, minute=0, second=0)

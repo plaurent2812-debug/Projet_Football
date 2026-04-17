@@ -15,7 +15,7 @@ import logging
 import os
 import pickle  # noqa: S301 — metadata only, no user data
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -208,9 +208,9 @@ def train_market_model(df: pd.DataFrame, market: str, label_col: str, output_pat
             "roc_auc": float(auc),
             "n_train": len(X_train),
             "n_test": len(X_test),
-            "training_date": datetime.now().isoformat()[:10],
+            "training_date": datetime.now(timezone.utc).isoformat()[:10],
         },
-        "training_date": datetime.now().isoformat(),
+        "training_date": datetime.now(timezone.utc).isoformat(),
         "n_samples": len(X),
         "best_params": best_params,
         "serialization": "ubj"

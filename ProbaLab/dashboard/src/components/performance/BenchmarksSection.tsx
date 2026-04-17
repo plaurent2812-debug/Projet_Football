@@ -84,18 +84,18 @@ export function BenchmarksSection({ benchmarks, modelAccuracy }: BenchmarksSecti
                                             {label}
                                         </span>
                                         {isModel && (
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">
+                                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">
                                                 Modele
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground/70 mt-0.5">{description}</p>
+                                    <p className="text-xs text-muted-foreground/70 mt-0.5">{description}</p>
                                 </div>
                                 <div className="text-right shrink-0 ml-3">
                                     <p className={cn("text-xl font-black tabular-nums", isModel ? "text-primary" : "text-foreground")}>
                                         {accuracy}%
                                     </p>
-                                    <p className="text-[10px] text-muted-foreground tabular-nums">{total} matchs</p>
+                                    <p className="text-xs text-muted-foreground tabular-nums">{total} matchs</p>
                                 </div>
                             </div>
                             <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
@@ -107,7 +107,7 @@ export function BenchmarksSection({ benchmarks, modelAccuracy }: BenchmarksSecti
                                     style={{ width: `${barWidth}%` }}
                                 />
                             </div>
-                            <p className="text-[10px] text-muted-foreground/60 mt-1 tabular-nums">{wilsonLabel}</p>
+                            <p className="text-xs text-muted-foreground/60 mt-1 tabular-nums">{wilsonLabel}</p>
                         </div>
                     )
                 })}

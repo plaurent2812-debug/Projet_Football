@@ -69,8 +69,30 @@ def _load_models():
             try:
                 with open(path, "rb") as f:
                     data = _safe_pickle_load(f)
+                # Load actual XGBoost model from sibling .ubj file when needed.
+                # The .pkl contains only metadata (feature_names, metrics) and
+                # tells us via `serialization` field where the model weights live.
+                if data.get("serialization") == "ubj" and "model" not in data:
+                    import xgboost as xgb
+                    ubj_path = MODEL_DIR / f"nhl_match_{name}.ubj"
+                    if not ubj_path.exists():
+                        logger.warning(
+                            f"  ⚠️ NHL ML model '{name}': .pkl OK mais .ubj manquant ({ubj_path})"
+                        )
+                        continue
+                    clf = xgb.XGBClassifier()
+                    clf.load_model(str(ubj_path))
+                    data["model"] = clf
+
+                if "model" not in data:
+                    logger.warning(
+                        f"  ⚠️ NHL ML model '{name}': structure inattendue (pas de clé 'model')"
+                    )
+                    continue
+
                 _models[name] = data
-                logger.info(f"  ✅ NHL ML model '{name}' chargé ({data['metrics']['n_samples']} samples)")
+                n_samples = data.get("metrics", {}).get("n_samples", "?")
+                logger.info(f"  ✅ NHL ML model '{name}' chargé ({n_samples} samples)")
             except Exception as e:
                 logger.warning(f"  ⚠️ Erreur chargement modèle NHL {name}: {e}")
         else:

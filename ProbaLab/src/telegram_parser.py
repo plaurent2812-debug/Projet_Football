@@ -16,7 +16,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger("telegram_parser")
 
@@ -179,7 +179,7 @@ def parse_winamax_screenshot(image_bytes: bytes, caption: str = "") -> dict:
 
         # Ensure date fallback to today
         if not parsed.get("date"):
-            parsed["date"] = datetime.utcnow().strftime("%Y-%m-%d")
+            parsed["date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         # Add expert note from caption
         parsed["expert_note"] = caption or ""

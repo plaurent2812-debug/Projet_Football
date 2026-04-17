@@ -23,7 +23,7 @@ Usage :
 """
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -121,7 +121,7 @@ def evaluate_nhl_predictions(days_back: int = 3) -> dict:
     # Step 0: Update fixture scores first
     update_nhl_fixture_results(days_back)
 
-    today = datetime.now()
+    today = datetime.now(timezone.utc)
     start_date = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
 
     # Step 1: Fetch completed fixtures

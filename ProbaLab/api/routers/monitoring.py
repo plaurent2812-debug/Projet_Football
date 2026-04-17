@@ -7,7 +7,7 @@ Provides CLV, Brier score, calibration health and data-quality checks.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter
 
@@ -95,8 +95,8 @@ def monitoring_health():
     coverage, and a simple boolean ``healthy`` flag.
     """
     try:
-        today = datetime.now().strftime("%Y-%m-%d")
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
 
         # Today's predictions
         preds_today_resp = (
@@ -161,7 +161,7 @@ def monitoring_health():
         )
 
         # Quick healthy heuristic
-        healthy = preds_today > 0 or datetime.now().hour < 10
+        healthy = preds_today > 0 or datetime.now(timezone.utc).hour < 10
 
         return {
             "healthy": healthy,
@@ -171,8 +171,8 @@ def monitoring_health():
             "yesterday_fixtures": fix_count,
             "yesterday_predictions": preds_yesterday,
             "evaluated_results_total": evaluated_total,
-            "checked_at": datetime.now().isoformat(),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
         }
     except Exception:
         logger.exception("Monitoring health check error")
-        return {"healthy": False, "error": "Internal error", "checked_at": datetime.now().isoformat()}
+        return {"healthy": False, "error": "Internal error", "checked_at": datetime.now(timezone.utc).isoformat()}

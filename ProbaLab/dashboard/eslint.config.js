@@ -24,6 +24,13 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "Literal[value=/text-\\[(9|10|11)px\\]/]",
+          message: 'Forbidden: text-[<12px] is unreadable on mobile. Use text-xs (12px) or text-sm (14px).',
+        },
+      ],
     },
   },
 ])

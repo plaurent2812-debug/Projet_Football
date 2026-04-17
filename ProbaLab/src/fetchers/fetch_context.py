@@ -10,7 +10,7 @@ fetch_context.py — Récupère le contexte des matchs à venir :
 """
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 
@@ -293,7 +293,7 @@ def fetch_weather():
             match_dt = datetime.fromisoformat(fix["date"].replace("Z", "+00:00"))
             closest = min(
                 weather_data.get("list", []),
-                key=lambda w: abs(datetime.fromtimestamp(w["dt"]).timestamp() - match_dt.timestamp()),
+                key=lambda w: abs(datetime.fromtimestamp(w["dt"], tz=timezone.utc).timestamp() - match_dt.timestamp()),
                 default=None
             )
 

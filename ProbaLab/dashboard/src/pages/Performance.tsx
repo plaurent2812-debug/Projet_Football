@@ -6,7 +6,7 @@ import {
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
-import type { MarketROIResponse, MarketROIEntry } from "@/types/api"
+import type { PerformanceResponse, MarketROIResponse, MarketROIEntry } from "@/types/api"
 
 import { StatTile, MarketCard, InfoTooltip } from "@/components/performance/ui"
 import { BrierCard } from "@/components/performance/BrierCard"
@@ -68,7 +68,7 @@ function MarketStrategyRow({ data }: { data: MarketROIEntry }) {
    Performance Page
    ═══════════════════════════════════════════════════════════ */
 export default function PerformancePage() {
-    const [data, setData] = useState<any>(null)
+    const [data, setData] = useState<PerformanceResponse | null>(null)
     const [marketROI, setMarketROI] = useState<MarketROIResponse | null>(null)
     const [jours, setJours] = useState(90)
     const [sport, setSport] = useState("football")

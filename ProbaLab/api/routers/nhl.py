@@ -76,6 +76,7 @@ try:
         goal_predictor,
         load_all_models,
         point_predictor,
+        shot_predictor,
     )
 
     ENHANCED_ML_AVAILABLE = True
@@ -289,6 +290,13 @@ def apply_calibration(req: CalibrateProbaRequest):
 def brain_quick(req: BrainRequest):
     """Endpoint unifié pour les prédictions rapides."""
     predictions = []
+    # ml_fallback_used reflects predictor.loaded state (same for all players in a batch)
+    ml_fallback_used: dict[str, bool] = {
+        "shot": False,
+        "assist": False,
+        "goal": False,
+        "point": False,
+    }
 
     for player in req.players:
         raw = player.dict()
@@ -308,10 +316,15 @@ def brain_quick(req: BrainRequest):
         opp_factor = clamp(player.opp_shots_allowed_avg / 30.0, 0.8, 1.2)
         lam_shots = player.spg * home_factor * opp_factor
 
-        if ENHANCED_ML_AVAILABLE and shot_predictor and shot_predictor.model is not None:
+        if shot_predictor is not None and shot_predictor.loaded:
             raw_prob_shot = shot_predictor.predict_proba(raw)
         else:
+            logger.warning(
+                "ML fallback (Poisson) used for SHOT prediction — player %s",
+                player.id,
+            )
             raw_prob_shot = 1.0 - math.exp(-lam_shots)
+            ml_fallback_used["shot"] = True
 
         cal_prob_shot = probability_calibrator.calibrate_probability("SHOT", raw_prob_shot)
         ratio = cal_prob_shot / max(0.01, raw_prob_shot)
@@ -320,20 +333,28 @@ def brain_quick(req: BrainRequest):
         # --- POINT ---
         apg = player.apg if player.apg and player.apg > 0 else player.gpg * 0.8
 
-        if ENHANCED_ML_AVAILABLE and point_predictor and point_predictor.model is not None:
+        if point_predictor is not None and point_predictor.loaded:
             raw_prob_point = point_predictor.predict_proba(raw)
         else:
+            logger.warning(
+                "ML fallback (Poisson) used for POINT prediction — player %s",
+                player.id,
+            )
             raw_prob_point = 1.0 - math.exp(-(player.gpg + apg) * home_factor)
+            ml_fallback_used["point"] = True
 
         prob_point = probability_calibrator.calibrate_probability("POINT", raw_prob_point)
 
         # --- ASSIST ---
-        if ENHANCED_ML_AVAILABLE and assist_predictor and assist_predictor.model is not None:
+        if assist_predictor is not None and assist_predictor.loaded:
             raw_prob_assist = assist_predictor.predict_proba(raw)
         else:
+            logger.warning(
+                "ML fallback (Poisson) used for ASSIST prediction — player %s",
+                player.id,
+            )
             raw_prob_assist = 1.0 - math.exp(-apg * home_factor)
-
-        prob_assist = probability_calibrator.calibrate_probability("ASSIST", raw_prob_assist)
+            ml_fallback_used["assist"] = True
 
         confidence = "high" if prob_goal_raw > 0.4 else ("medium" if prob_goal_raw > 0.2 else "low")
 
@@ -348,7 +369,7 @@ def brain_quick(req: BrainRequest):
             )
         )
 
-    return BrainResponse(predictions=predictions)
+    return BrainResponse(predictions=predictions, ml_fallback_used=ml_fallback_used)
 
 
 @router.post("/brain_enhanced", response_model=BrainResponse)

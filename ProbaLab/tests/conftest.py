@@ -1,8 +1,19 @@
 """
 Fixtures pytest partagées pour tous les tests du projet Football IA.
 """
+# ── Env stubs — must be set BEFORE any project import ────────────
+# src/config.py calls supabase.create_client() at module-import time.
+# Without these stubs, running a single test file that imports src.config
+# (directly or transitively) crashes with SupabaseException.
+# Tests that need a real client must use @pytest.mark.integration.
+import os
 
-from unittest.mock import MagicMock
+os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
+os.environ.setdefault("SUPABASE_KEY", "test-key")
+os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key")
+os.environ.setdefault("CRON_SECRET", "test-cron-secret")
+
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -92,6 +103,59 @@ class MockSupabase:
 def mock_supabase():
     """Retourne un MockSupabase configurable."""
     return MockSupabase()
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  SESSION MOCK : SUPABASE (offline safety net)
+# ═══════════════════════════════════════════════════════════════════
+
+
+def _build_offline_supabase_mock() -> MagicMock:
+    """Build a fully-chainable Supabase mock that always returns empty data.
+
+    This ensures that any module importing ``src.config.supabase`` and
+    executing queries during unit tests never attempts a real network call.
+    Tests that require live Supabase access must be marked
+    ``@pytest.mark.integration``.
+    """
+    chain = MagicMock()
+    execute_result = MagicMock()
+    execute_result.data = []
+    execute_result.count = 0
+    chain.execute.return_value = execute_result
+    for method in (
+        "select", "eq", "neq", "gte", "lte", "gt", "lt",
+        "in_", "or_", "order", "limit", "range",
+        "insert", "upsert", "update", "delete", "filter",
+        "single", "desc",
+    ):
+        getattr(chain, method).return_value = chain
+
+    mock = MagicMock()
+    mock.table.return_value = chain
+    mock.rpc.return_value = chain
+    mock.auth = MagicMock()
+    return mock
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _patch_supabase_offline(request: pytest.FixtureRequest):
+    """Autouse session fixture: patch Supabase client for all unit tests.
+
+    Patches ``src.config.supabase`` and ``src.models.stats_engine.supabase``
+    so that modules using the client at call-time receive a no-op mock.
+    Integration tests (marked ``integration``) are excluded.
+    """
+    offline_mock = _build_offline_supabase_mock()
+    patches = [
+        patch("src.config.supabase", offline_mock),
+        patch("src.models.stats_engine.supabase", offline_mock),
+    ]
+    for p in patches:
+        p.start()
+    yield
+    for p in patches:
+        p.stop()
 
 
 # ═══════════════════════════════════════════════════════════════════

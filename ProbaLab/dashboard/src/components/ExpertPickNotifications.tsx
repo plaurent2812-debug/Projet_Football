@@ -50,16 +50,16 @@ function ExpertPickToast({ toast, onDismiss }) {
                     {toast.market}
                 </p>
                 {toast.matchLabel && (
-                    <p className="text-[11px] text-white/40 truncate mt-0.5">
+                    <p className="text-xs text-white/40 truncate mt-0.5">
                         {toast.matchLabel}
                     </p>
                 )}
                 {toast.odds && (
-                    <p className="text-[11px] font-bold text-emerald-400 mt-0.5">
+                    <p className="text-xs font-bold text-emerald-400 mt-0.5">
                         Cote : {toast.odds}
                     </p>
                 )}
-                <p className="text-[10px] text-amber-500/60 mt-1">Cliquer pour voir →</p>
+                <p className="text-xs text-amber-500/60 mt-1">Cliquer pour voir →</p>
             </div>
 
             {/* Close */}
@@ -122,20 +122,20 @@ function PushToggle() {
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-white/90">Notifications push 🔔</p>
-                        <p className="text-[11px] text-white/50 mt-0.5">
+                        <p className="text-xs text-white/50 mt-0.5">
                             Reçois une alerte dès qu'un nouveau prono expert est publié !
                         </p>
                         <div className="flex items-center gap-2 mt-2">
                             <button
                                 onClick={handleSubscribe}
                                 disabled={loading}
-                                className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
                             >
                                 {loading ? "..." : "Activer"}
                             </button>
                             <button
                                 onClick={handleDismiss}
-                                className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
                             >
                                 Plus tard
                             </button>

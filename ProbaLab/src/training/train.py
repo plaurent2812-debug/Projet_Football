@@ -383,14 +383,24 @@ def train_classifier(
 
     logger.info(f"  Split calibration : fit={len(X_train_fit)}, cal={len(X_cal)}, test={len(X_test)}")
 
+    # Validation split from training set (separate from test set)
+    # Used for early stopping — never touches the holdout test set
+    # Temporal slice to preserve time-series ordering
+    val_size = max(int(len(X_train_fit) * 0.15), 20)
+    X_train_early = X_train_fit[:-val_size]
+    X_val = X_train_fit[-val_size:]
+    y_train_early = y_train_fit[:-val_size]
+    y_val = y_train_fit[-val_size:]
+    weight_early = weight_fit[:-val_size]
+
     # Entraînement final
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
         warnings.filterwarnings("ignore", category=FutureWarning)
         model.fit(
-            X_train_fit, y_train_fit,
-            sample_weight=weight_fit,
-            eval_set=[(X_test, y_test)],
+            X_train_early, y_train_early,
+            sample_weight=weight_early,
+            eval_set=[(X_val, y_val)],
             verbose=False,
         )
 
@@ -549,6 +559,15 @@ def train_regressor(
 
     logger.info(f"  TimeSeriesSplit : train={len(X_train)}, test={len(X_test)}")
 
+    # Validation split from training set (separate from test set)
+    # Used for early stopping — never touches the holdout test set
+    # Temporal slice to preserve time-series ordering
+    val_size_reg = max(int(len(X_train) * 0.15), 20)
+    X_train_reg = X_train[:-val_size_reg]
+    X_val_reg = X_train[-val_size_reg:]
+    y_train_reg = y_train[:-val_size_reg]
+    y_val_reg = y_train[-val_size_reg:]
+
     model = xgb.XGBRegressor(
         n_estimators=200,
         max_depth=5,
@@ -561,7 +580,7 @@ def train_regressor(
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
         warnings.filterwarnings("ignore", category=FutureWarning)
-        model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
+        model.fit(X_train_reg, y_train_reg, eval_set=[(X_val_reg, y_val_reg)], verbose=False)
 
     y_pred = model.predict(X_test)
     mae: float = float(np.mean(np.abs(y_pred - y_test)))

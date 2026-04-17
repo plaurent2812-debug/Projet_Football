@@ -5,6 +5,7 @@ import {
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import type { PerformanceResponse } from "@/types/api"
 
 import { StatTile, MarketCard, InfoTooltip } from "@/components/performance/ui"
 import { BrierCard } from "@/components/performance/BrierCard"
@@ -17,7 +18,7 @@ import { DailyChart } from "@/components/performance/DailyChart"
    Performance Page
    ═══════════════════════════════════════════════════════════ */
 export default function PerformancePage() {
-    const [data, setData] = useState<any>(null)
+    const [data, setData] = useState<PerformanceResponse | null>(null)
     const [jours, setJours] = useState(90)
     const [sport, setSport] = useState("football")
     const [loading, setLoading] = useState(true)

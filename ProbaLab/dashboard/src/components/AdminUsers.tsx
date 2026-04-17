@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/auth'
 import { Users, Crown, Shield, User, Trash2, Search, RefreshCw, ChevronDown } from 'lucide-react'
 import { API_ROOT } from '@/lib/api'
+import type { AdminUser } from '@/types/api'
 
 const ROLE_CONFIG = {
     admin: { label: 'Admin', color: 'text-red-400 bg-red-500/15 border-red-500/30', icon: Shield },
@@ -19,7 +20,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 export default function AdminUsers() {
-    const [users, setUsers] = useState<any[]>([])
+    const [users, setUsers] = useState<AdminUser[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [roleFilter, setRoleFilter] = useState('all')

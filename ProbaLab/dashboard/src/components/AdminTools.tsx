@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { supabase } from '@/lib/auth'
 import { Wrench, Trash2, Zap, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { API_ROOT } from '@/lib/api'
+import type { AdminToolResult } from '@/types/api'
 
 export default function AdminTools() {
     const [testFixtureId, setTestFixtureId] = useState('')
-    const [testResult, setTestResult] = useState<any>(null)
+    const [testResult, setTestResult] = useState<AdminToolResult | null>(null)
     const [testLoading, setTestLoading] = useState(false)
     const [cacheMsg, setCacheMsg] = useState('')
     const [cacheLoading, setCacheLoading] = useState(false)

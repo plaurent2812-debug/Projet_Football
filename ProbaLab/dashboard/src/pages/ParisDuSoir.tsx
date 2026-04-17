@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth"
 import { API_ROOT } from "@/lib/api"
+import type { BestBetsResponse, ExpertPickItem } from "@/types/api"
 
 import { BetCard } from "@/components/paris-du-soir/BetCard"
 import { StatsDashboard } from "@/components/paris-du-soir/StatsDashboard"
@@ -84,14 +85,14 @@ export default function ParisDuSoir() {
     const { hasAccess, isAdmin } = useAuth()
     const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
     const [sportFilter, setSportFilter] = useState("both")
-    const [bets, setBets] = useState<any>(null)
-    const [stats, setStats] = useState<any>(null)
+    const [bets, setBets] = useState<BestBetsResponse | null>(null)
+    const [stats, setStats] = useState<Record<string, unknown> | null>(null)
     const [loading, setLoading] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
     const [showHistory, setShowHistory] = useState(false)
-    const [history, setHistory] = useState<any>(null)
+    const [history, setHistory] = useState<Record<string, unknown> | null>(null)
     const [historyLoading, setHistoryLoading] = useState(false)
-    const [expertPicks, setExpertPicks] = useState<any[]>([])
+    const [expertPicks, setExpertPicks] = useState<ExpertPickItem[]>([])
     const [historyDateFrom, setHistoryDateFrom] = useState("")
     const [historyDateTo, setHistoryDateTo] = useState("")
     const [historySourceFilter, setHistorySourceFilter] = useState("all")

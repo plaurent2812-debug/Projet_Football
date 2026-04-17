@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/auth'
 import { Globe, RefreshCw } from 'lucide-react'
 import { API_ROOT } from '@/lib/api'
+import type { League } from '@/types/api'
 
 const FLAGS: Record<string, string> = {
     France: '🇫🇷', England: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', Spain: '🇪🇸', Italy: '🇮🇹', Germany: '🇩🇪', World: '🏆',
 }
 
 export default function AdminLeagues() {
-    const [leagues, setLeagues] = useState<any[]>([])
+    const [leagues, setLeagues] = useState<League[]>([])
     const [loading, setLoading] = useState(true)
 
     const fetchLeagues = async () => {

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/auth'
 import { BarChart3, Users, Zap, Trophy, TrendingUp, Activity, RefreshCw, Globe, Target, AlertTriangle } from 'lucide-react'
 import { API_ROOT, fetchMonitoring } from '@/lib/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import type { AdminStats, ApiQuota, MonitoringResponse } from '@/types/api'
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
     const { data } = await supabase.auth.getSession()
@@ -26,9 +27,9 @@ function CLVTooltip({ active, payload, label }: any) {
 }
 
 export default function AdminOverview() {
-    const [stats, setStats] = useState<any>(null)
-    const [quota, setQuota] = useState<any>(null)
-    const [monitoring, setMonitoring] = useState<any>(null)
+    const [stats, setStats] = useState<AdminStats | null>(null)
+    const [quota, setQuota] = useState<ApiQuota | null>(null)
+    const [monitoring, setMonitoring] = useState<MonitoringResponse | null>(null)
     const [loading, setLoading] = useState(true)
     const [monLoading, setMonLoading] = useState(true)
 

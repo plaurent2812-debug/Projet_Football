@@ -7,6 +7,7 @@ import AdminUsers from '@/components/AdminUsers'
 import AdminOverview from '@/components/AdminOverview'
 import AdminLeagues from '@/components/AdminLeagues'
 import AdminTools from '@/components/AdminTools'
+import type { PipelineStatusResponse } from '@/types/api'
 
 const TABS = [
     { id: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
@@ -20,7 +21,7 @@ const TABS = [
 type TabId = typeof TABS[number]['id']
 
 function AdminDashboard() {
-    const [status, setStatus] = useState<any>(null)
+    const [status, setStatus] = useState<PipelineStatusResponse | null>(null)
     const [loading, setLoading] = useState(false)
     const [msg, setMsg] = useState('')
     const [nhlLoading, setNhlLoading] = useState(false)

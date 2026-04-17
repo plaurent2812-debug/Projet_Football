@@ -369,6 +369,26 @@ export interface PerformanceResponse {
   [key: string]: unknown
 }
 
+// ─── Market ROI ──────────────────────────────────────────────────────────────
+
+export interface MarketROIEntry {
+  label: string
+  total: number
+  wins: number
+  losses: number
+  winrate: number
+  roi: number
+  profitable: boolean
+  active: boolean
+}
+
+export interface MarketROIResponse {
+  days: number
+  markets: Record<string, MarketROIEntry>
+  active_markets: string[]
+  disabled_markets: string[]
+}
+
 // ─── Predictions ─────────────────────────────────────────────────────────────
 
 /** The nested prediction object inside a match item. */

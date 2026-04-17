@@ -356,3 +356,201 @@ def get_performance(days: int = Query(0, description="Rolling window in days (0 
     except Exception:
         logger.exception("get_performance failed")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ─── Market ROI (Value Betting Strategy) ─────────────────────
+
+
+def _compute_market_performance(days: int = 30) -> dict:
+    """Compute per-market win rate and simulated ROI from predictions + odds.
+
+    Reusable by both the endpoint and the value bet detection filter.
+    """
+    from src.constants import LEAGUES_TO_FETCH
+
+    cutoff = None
+    if days > 0:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    # Paginated fetch of finished fixtures
+    finished: list[dict] = []
+    page_size = 1000
+    offset = 0
+    while True:
+        q = (
+            supabase.table("fixtures")
+            .select("id, api_fixture_id, home_goals, away_goals, date, status")
+            .in_("status", ["FT", "AET", "PEN"])
+            .in_("league_id", LEAGUES_TO_FETCH)
+        )
+        if cutoff:
+            q = q.gte("date", cutoff)
+        q = q.order("date").range(offset, offset + page_size - 1)
+        batch = q.execute().data or []
+        finished.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    if not finished:
+        return {}
+
+    fixture_ids = [f["id"] for f in finished]
+
+    # Fetch predictions in chunks
+    CHUNK = 100
+    predictions: list[dict] = []
+    for i in range(0, len(fixture_ids), CHUNK):
+        chunk = fixture_ids[i : i + CHUNK]
+        page = (
+            supabase.table("predictions")
+            .select("fixture_id, proba_home, proba_draw, proba_away, proba_btts, proba_over_2_5, proba_over_25, stats_json")
+            .in_("fixture_id", chunk)
+            .order("created_at")
+            .execute()
+            .data
+            or []
+        )
+        predictions.extend(page)
+
+    # Deduplicate: keep first prediction per fixture
+    pred_map: dict[str, dict] = {}
+    for p in predictions:
+        fid = str(p["fixture_id"])
+        if fid not in pred_map:
+            pred_map[fid] = p
+
+    # Fetch odds
+    api_ids = [f["api_fixture_id"] for f in finished if f.get("api_fixture_id")]
+    odds_map: dict[int, dict] = {}
+    for i in range(0, len(api_ids), CHUNK):
+        chunk = api_ids[i : i + CHUNK]
+        rows = (
+            supabase.table("fixture_odds")
+            .select("*")
+            .in_("fixture_api_id", chunk)
+            .execute()
+            .data
+            or []
+        )
+        for r in rows:
+            if r["fixture_api_id"] not in odds_map:
+                odds_map[r["fixture_api_id"]] = r
+
+    # Track per market-type
+    perf: dict[str, dict] = {}
+
+    def _track(key: str, label: str, won: bool, odd: float):
+        if key not in perf:
+            perf[key] = {"label": label, "wins": 0, "total": 0, "staked": 0.0, "returned": 0.0}
+        perf[key]["total"] += 1
+        perf[key]["staked"] += 1.0
+        if won:
+            perf[key]["wins"] += 1
+            perf[key]["returned"] += odd
+
+    for f in finished:
+        pred = pred_map.get(str(f["id"]))
+        if not pred:
+            continue
+        sj = pred.get("stats_json") or {}
+
+        def _gv(key, default=None):
+            v = pred.get(key)
+            return v if v is not None else sj.get(key, default)
+
+        hg = f.get("home_goals", 0) or 0
+        ag = f.get("away_goals", 0) or 0
+        total_goals = hg + ag
+        actual = "H" if hg > ag else ("D" if hg == ag else "A")
+        actual_btts = hg > 0 and ag > 0
+        odds = odds_map.get(f.get("api_fixture_id"), {})
+
+        ph = _gv("proba_home", 0) or 0
+        pd_v = _gv("proba_draw", 0) or 0
+        pa = _gv("proba_away", 0) or 0
+
+        # 1X2 markets
+        if ph > pd_v and ph > pa and ph >= 50 and (odds.get("home_win_odds") or 0) > 1:
+            _track("home_win", "Victoire domicile", actual == "H", float(odds["home_win_odds"]))
+        if pa > pd_v and pa > ph and pa >= 50 and (odds.get("away_win_odds") or 0) > 1:
+            _track("away_win", "Victoire exterieur", actual == "A", float(odds["away_win_odds"]))
+        if pd_v > ph and pd_v > pa and pd_v >= 40 and (odds.get("draw_odds") or 0) > 1:
+            _track("draw", "Match Nul", actual == "D", float(odds["draw_odds"]))
+
+        # BTTS
+        p_btts = _gv("proba_btts", 0) or 0
+        if p_btts > 55 and (odds.get("btts_yes_odds") or 0) > 1:
+            _track("btts_yes", "BTTS (Oui)", actual_btts, float(odds["btts_yes_odds"]))
+        if p_btts < 40 and (odds.get("btts_no_odds") or 0) > 1:
+            _track("btts_no", "BTTS (Non)", not actual_btts, float(odds["btts_no_odds"]))
+
+        # Over/Under 2.5
+        p_o25 = _gv("proba_over_2_5") or _gv("proba_over_25")
+        if p_o25 is not None and p_o25 > 55 and (odds.get("over_25_odds") or 0) > 1:
+            _track("over_25", "Over 2.5 buts", total_goals > 2.5, float(odds["over_25_odds"]))
+        if p_o25 is not None and p_o25 < 40 and (odds.get("under_25_odds") or 0) > 1:
+            _track("under_25", "Under 2.5 buts", total_goals < 2.5, float(odds["under_25_odds"]))
+
+        # Over 1.5 / 3.5
+        p_o15 = _gv("proba_over_15")
+        if p_o15 is not None and p_o15 > 60 and (odds.get("over_15_odds") or 0) > 1:
+            _track("over_15", "Over 1.5 buts", total_goals > 1.5, float(odds["over_15_odds"]))
+        p_o35 = _gv("proba_over_35")
+        if p_o35 is not None and p_o35 > 55 and (odds.get("over_35_odds") or 0) > 1:
+            _track("over_35", "Over 3.5 buts", total_goals > 3.5, float(odds["over_35_odds"]))
+
+        # Double Chance
+        dc_1x = ph + pd_v
+        if dc_1x >= 65 and (odds.get("dc_1x_odds") or 0) > 1:
+            _track("dc_1x", "Double Chance 1X", actual in ("H", "D"), float(odds["dc_1x_odds"]))
+        dc_x2 = pd_v + pa
+        if dc_x2 >= 65 and (odds.get("dc_x2_odds") or 0) > 1:
+            _track("dc_x2", "Double Chance X2", actual in ("D", "A"), float(odds["dc_x2_odds"]))
+        dc_12 = ph + pa
+        if dc_12 >= 70 and (odds.get("dc_12_odds") or 0) > 1:
+            _track("dc_12", "Double Chance 12", actual in ("H", "A"), float(odds["dc_12_odds"]))
+
+    # Compute final metrics
+    result = {}
+    for key, m in perf.items():
+        if m["total"] < 3:
+            continue
+        winrate = round(m["wins"] / m["total"] * 100, 1)
+        roi = round((m["returned"] - m["staked"]) / m["staked"] * 100, 1) if m["staked"] > 0 else 0
+        result[key] = {
+            "label": m["label"],
+            "total": m["total"],
+            "wins": m["wins"],
+            "losses": m["total"] - m["wins"],
+            "winrate": winrate,
+            "roi": roi,
+            "profitable": roi > 0,
+            "active": roi > -5,
+        }
+
+    return dict(sorted(result.items(), key=lambda x: x[1]["roi"], reverse=True))
+
+
+@router.get(
+    "/market-roi",
+    summary="Get per-market ROI for value betting strategy",
+    responses={500: {"description": "Internal server error"}},
+)
+def get_market_roi(days: int = Query(30, description="Rolling window in days (0 = all-time)")):
+    """Compute per-market win rate and simulated ROI from predictions + odds.
+
+    Used to determine which markets are profitable for value betting
+    and to filter future value bet recommendations.
+    """
+    try:
+        markets = _compute_market_performance(days)
+        return {
+            "days": days,
+            "markets": markets,
+            "active_markets": [k for k, v in markets.items() if v["active"]],
+            "disabled_markets": [k for k, v in markets.items() if not v["active"]],
+        }
+    except Exception:
+        logger.exception("get_market_roi failed")
+        raise HTTPException(status_code=500, detail="Internal server error")

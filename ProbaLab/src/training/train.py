@@ -39,6 +39,20 @@ from sklearn.utils.class_weight import compute_sample_weight
 
 from src.config import logger, supabase
 from src.constants import FEATURE_COLS
+from src.training.variants import get_variant
+
+
+def get_feature_cols_for_variant(variant_name: str = "baseline") -> list[str]:
+    """Retourne FEATURE_COLS pour la variante demandée.
+
+    Args:
+        variant_name: "baseline" | "rebalanced" | "pure" | "pure_rebalanced"
+
+    Utilisé par backtest_variants.py pour entraîner les 4 variantes en parallèle.
+    Le train.py en prod continue d'utiliser FEATURE_COLS directement pour compat.
+    """
+    return list(get_variant(variant_name).feature_cols)
+
 
 # Silence Optuna's verbose output
 optuna.logging.set_verbosity(optuna.logging.WARNING)

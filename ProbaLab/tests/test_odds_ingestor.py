@@ -249,3 +249,115 @@ def test_fetch_odds_retries_on_5xx_even_if_remaining_header_zero(monkeypatch):
     )
     assert result == []
     assert len(attempts) == 3
+
+
+def test_parse_btts_market():
+    sample = [
+        {
+            "id": "fx1",
+            "sport_key": "soccer_epl",
+            "commence_time": "2026-04-20T15:00:00Z",
+            "home_team": "Arsenal",
+            "away_team": "Chelsea",
+            "bookmakers": [
+                {
+                    "key": "pinnacle",
+                    "title": "Pinnacle",
+                    "last_update": "2026-04-19T10:00:00Z",
+                    "markets": [
+                        {
+                            "key": "btts",
+                            "outcomes": [
+                                {"name": "Yes", "price": 1.65},
+                                {"name": "No", "price": 2.30},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+    rows = parse_odds_response(sample, sport="football", snapshot_type="opening",
+                               source_request_id="req-btts")
+    assert len(rows) == 2
+    yes_row = next(r for r in rows if r["selection"] == "yes")
+    assert yes_row["market"] == "btts"
+    assert yes_row["odds"] == 1.65
+
+
+def test_parse_totals_over_2_5():
+    sample = [
+        {
+            "id": "fx2",
+            "sport_key": "soccer_epl",
+            "commence_time": "2026-04-20T15:00:00Z",
+            "home_team": "A",
+            "away_team": "B",
+            "bookmakers": [
+                {
+                    "key": "betclic",
+                    "markets": [
+                        {
+                            "key": "totals",
+                            "outcomes": [
+                                {"name": "Over", "price": 1.85, "point": 2.5},
+                                {"name": "Under", "price": 1.95, "point": 2.5},
+                                {"name": "Over", "price": 1.45, "point": 1.5},
+                                {"name": "Under", "price": 2.60, "point": 1.5},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+    rows = parse_odds_response(sample, sport="football", snapshot_type="opening",
+                               source_request_id="req-totals")
+    over_25 = [r for r in rows if r["market"] == "over_2_5" and r["selection"] == "over"]
+    assert len(over_25) == 1
+    assert over_25[0]["line"] == 2.5
+    assert over_25[0]["odds"] == 1.85
+    # Over 1.5 aussi
+    over_15 = [r for r in rows if r["market"] == "over_1_5"]
+    assert len(over_15) == 2  # over + under
+
+
+def test_parse_nhl_moneyline_and_totals():
+    sample = [
+        {
+            "id": "nhl1",
+            "sport_key": "icehockey_nhl",
+            "commence_time": "2026-04-20T23:00:00Z",
+            "home_team": "Boston Bruins",
+            "away_team": "Montreal Canadiens",
+            "bookmakers": [
+                {
+                    "key": "pinnacle",
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": "Boston Bruins", "price": 1.70},
+                                {"name": "Montreal Canadiens", "price": 2.20},
+                            ],
+                        },
+                        {
+                            "key": "totals",
+                            "outcomes": [
+                                {"name": "Over", "price": 1.95, "point": 6.5},
+                                {"name": "Under", "price": 1.90, "point": 6.5},
+                            ],
+                        },
+                    ],
+                }
+            ],
+        }
+    ]
+    rows = parse_odds_response(sample, sport="nhl", snapshot_type="opening",
+                               source_request_id="req-nhl")
+    ml = [r for r in rows if r["market"] == "moneyline"]
+    assert len(ml) == 2
+    tot = [r for r in rows if r["market"] == "totals_nhl"]
+    assert len(tot) == 2
+    over_row = next(r for r in tot if r["selection"] == "over")
+    assert over_row["line"] == 6.5

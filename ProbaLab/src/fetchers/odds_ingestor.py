@@ -51,6 +51,40 @@ def _parse_h2h_market(
     return out
 
 
+def _build_row(
+    sport: str,
+    fixture_id: str,
+    match_start: datetime,
+    bookmaker: str,
+    market: str,
+    selection: str,
+    line: float | None,
+    odds: float,
+    overround: float,
+    snapshot_type: str,
+    source_request_id: str,
+) -> dict:
+    return {
+        "sport": sport,
+        "fixture_id": fixture_id,
+        "match_start": match_start,
+        "bookmaker": bookmaker,
+        "market": market,
+        "selection": selection,
+        "line": line,
+        "odds": odds,
+        "implied_prob": to_implied_prob(odds),
+        "overround": overround,
+        "snapshot_type": snapshot_type,
+        "source_request_id": source_request_id,
+    }
+
+
+def _totals_football_market(line: float) -> str | None:
+    mapping = {1.5: "over_1_5", 2.5: "over_2_5", 3.5: "over_3_5"}
+    return mapping.get(line)
+
+
 def parse_odds_response(
     events: list[dict],
     *,
@@ -89,29 +123,76 @@ def parse_odds_response(
             for market_block in bk_block.get("markets", []):
                 mkey = market_block["key"]
                 outcomes = market_block.get("outcomes", [])
+
                 if mkey == "h2h" and sport == "football":
                     parsed = _parse_h2h_market(outcomes, home_team, away_team)
                     if len(parsed) != 3:
                         continue
                     overround = sum(to_implied_prob(p) for _, p in parsed)
                     for selection, odds in parsed:
-                        rows.append(
-                            {
-                                "sport": sport,
-                                "fixture_id": fixture_id,
-                                "match_start": match_start,
-                                "bookmaker": bk,
-                                "market": "1x2",
-                                "selection": selection,
-                                "line": None,
-                                "odds": odds,
-                                "implied_prob": to_implied_prob(odds),
-                                "overround": overround,
-                                "snapshot_type": snapshot_type,
-                                "source_request_id": source_request_id,
-                            }
-                        )
-                # Marchés BTTS / Over / NHL seront ajoutés Task 5.
+                        rows.append(_build_row(
+                            sport, fixture_id, match_start, bk, "1x2",
+                            selection, None, odds, overround, snapshot_type,
+                            source_request_id,
+                        ))
+
+                elif mkey == "h2h" and sport == "nhl":
+                    parsed_nhl: list[tuple[str, float]] = []
+                    for o in outcomes:
+                        if o["name"] == home_team:
+                            parsed_nhl.append(("home", float(o["price"])))
+                        elif o["name"] == away_team:
+                            parsed_nhl.append(("away", float(o["price"])))
+                    if len(parsed_nhl) != 2:
+                        continue
+                    overround = sum(to_implied_prob(p) for _, p in parsed_nhl)
+                    for selection, odds in parsed_nhl:
+                        rows.append(_build_row(
+                            sport, fixture_id, match_start, bk, "moneyline",
+                            selection, None, odds, overround, snapshot_type,
+                            source_request_id,
+                        ))
+
+                elif mkey == "btts":
+                    btts_parsed = []
+                    for o in outcomes:
+                        nm = o["name"].lower()
+                        if nm in ("yes", "no"):
+                            btts_parsed.append((nm, float(o["price"])))
+                    if len(btts_parsed) != 2:
+                        continue
+                    overround = sum(to_implied_prob(p) for _, p in btts_parsed)
+                    for selection, odds in btts_parsed:
+                        rows.append(_build_row(
+                            sport, fixture_id, match_start, bk, "btts",
+                            selection, None, odds, overround, snapshot_type,
+                            source_request_id,
+                        ))
+
+                elif mkey == "totals":
+                    by_line: dict[float, list[tuple[str, float]]] = {}
+                    for o in outcomes:
+                        nm = o["name"].lower()
+                        if nm not in ("over", "under"):
+                            continue
+                        point = float(o.get("point", 0.0))
+                        by_line.setdefault(point, []).append((nm, float(o["price"])))
+                    for line, pair in by_line.items():
+                        if len(pair) != 2:
+                            continue
+                        overround = sum(to_implied_prob(p) for _, p in pair)
+                        if sport == "football":
+                            market_name = _totals_football_market(line)
+                            if market_name is None:
+                                continue
+                        else:
+                            market_name = "totals_nhl"
+                        for selection, odds in pair:
+                            rows.append(_build_row(
+                                sport, fixture_id, match_start, bk, market_name,
+                                selection, line, odds, overround, snapshot_type,
+                                source_request_id,
+                            ))
     return rows
 
 

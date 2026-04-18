@@ -37,3 +37,50 @@ def test_no_test_set_in_eval_set():
             f"Data leakage at {TRAIN_PATH}:{lineno} — eval_set uses {x_name} "
             f"which is the test set. Use a separate X_val from train split instead."
         )
+
+
+def test_team_strengths_computed_with_match_date_filter():
+    """Anti-leakage : team_strengths doit filtrer par match_date < fixture.date.
+
+    Sans ce filtre, les forces d'équipe d'une fin de saison fuitent dans un
+    match du début de saison → backtest Brier artificiellement bas.
+    Audit §2.5 — leakage subtil non détecté.
+    """
+    import ast
+
+    with open("src/models/stats_engine.py") as f:
+        source = f.read()
+
+    tree = ast.parse(source)
+
+    # On cherche des fonctions/méthodes qui calculent team_strengths
+    # et on vérifie qu'elles reçoivent un paramètre de date pour filtrer.
+    def _funcs_containing(name: str):
+        out = []
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                func_src = ast.get_source_segment(source, node) or ""
+                if name in func_src:
+                    out.append(node)
+        return out
+
+    target_funcs = _funcs_containing("team_strengths")
+    assert target_funcs, "Aucune fonction ne calcule team_strengths"
+
+    # Au moins une doit filtrer par match_date OU recevoir un kickoff_date
+    found_guard = False
+    for fn in target_funcs:
+        src = ast.get_source_segment(source, fn) or ""
+        if (
+            "match_date" in src
+            or "kickoff_date" in src
+            or "fixture_date" in src
+            or "as_of_date" in src
+        ):
+            found_guard = True
+            break
+    assert found_guard, (
+        "Aucune fonction team_strengths ne semble filtrer par date — "
+        "risque de future-leak temporel. Ajouter un paramètre as_of_date "
+        "et filtrer match_team_stats.match_date < as_of_date."
+    )

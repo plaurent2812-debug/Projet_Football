@@ -220,6 +220,18 @@ def job_schedule_closing_snapshots() -> None:
         logger.exception("[job_schedule_closing_snapshots] Error")
 
 
+def job_daily_clv_snapshot() -> None:
+    """09:00 UTC — calcul CLV J-1 vs Pinnacle + moyenne FR, upsert model_health_log."""
+    try:
+        from src.monitoring.clv_engine import run_daily_clv_snapshot
+        out = run_daily_clv_snapshot()
+        logger.info(
+            "[job_daily_clv_snapshot] n_matches=%d", out.get("n_matches_clv", 0)
+        )
+    except Exception:
+        logger.exception("[job_daily_clv_snapshot] Error")
+
+
 def job_drift_check() -> None:
     """09:00 — détection drift Brier 7j vs 30j."""
     try:
@@ -358,6 +370,10 @@ def main() -> None:
                       CronTrigger(hour=10, minute=15, timezone="UTC"),
                       id="schedule_closing_snapshots", max_instances=1, coalesce=True,
                       misfire_grace_time=1800, replace_existing=True)
+    scheduler.add_job(job_daily_clv_snapshot,
+                      CronTrigger(hour=9, minute=0, timezone="UTC"),
+                      id="daily_clv_snapshot", max_instances=1, coalesce=True,
+                      misfire_grace_time=1800, replace_existing=True)
     scheduler.add_job(job_nhl_evaluation, CronTrigger(hour=8, minute=0),
                       id="nhl_eval", max_instances=1, coalesce=True)
     scheduler.add_job(job_football_evaluation, CronTrigger(hour=8, minute=30),
@@ -409,6 +425,7 @@ def main() -> None:
     logger.info("    08:30    Évaluation foot + calibration")
     logger.info("    08:30 UTC Monitoring alerts + persistance model_health_log")
     logger.info("    09:00    Drift detection")
+    logger.info("    09:00 UTC Daily CLV snapshot")
     logger.info("    10:00    Brain IA (prédictions)")
     logger.info("    10:15 UTC Planification closing snapshots T-30min par match")
     logger.info("    12:00    Value Bets football")

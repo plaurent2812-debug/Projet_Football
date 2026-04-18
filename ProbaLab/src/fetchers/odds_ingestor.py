@@ -12,7 +12,11 @@ Les fonctions I/O utilisent supabase + httpx ; les helpers sont testables sans r
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
+from typing import Any
+
+import httpx
 
 from src.fetchers.bookmaker_registry import get_bookmaker_from_api_key
 
@@ -109,3 +113,81 @@ def parse_odds_response(
                         )
                 # Marchés BTTS / Over / NHL seront ajoutés Task 5.
     return rows
+
+
+ODDS_API_BASE = "https://api.the-odds-api.com/v4"
+_MAX_RETRIES = 3
+_RETRY_DELAYS = [1.0, 2.0, 4.0]
+_HTTP_TIMEOUT = 30.0
+
+
+def fetch_odds(
+    *,
+    sport_key: str,
+    markets: str,
+    api_key: str,
+    bookmakers: str | None = None,
+    regions: str = "eu",
+    odds_format: str = "decimal",
+) -> list[dict]:
+    """Fetch /v4/sports/{sport_key}/odds avec retry exponential.
+
+    Raises:
+        OddsAPIQuotaExhausted: si 429 ou header x-requests-remaining=0
+        RuntimeError: après _MAX_RETRIES échecs consécutifs
+    """
+    url = f"{ODDS_API_BASE}/sports/{sport_key}/odds"
+    params: dict[str, Any] = {
+        "apiKey": api_key,
+        "regions": regions,
+        "markets": markets,
+        "oddsFormat": odds_format,
+    }
+    if bookmakers:
+        params["bookmakers"] = bookmakers
+
+    last_error: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            resp = httpx.get(url, params=params, timeout=_HTTP_TIMEOUT)
+        except Exception as exc:
+            last_error = exc
+            logger.warning("fetch_odds attempt %d exception: %s", attempt + 1, exc)
+            time.sleep(_RETRY_DELAYS[attempt])
+            continue
+
+        if resp.status_code == 429:
+            raise OddsAPIQuotaExhausted(
+                f"The Odds API quota exhausted for sport={sport_key}"
+            )
+        remaining_header = resp.headers.get("x-requests-remaining")
+        if remaining_header is not None and str(remaining_header) == "0":
+            raise OddsAPIQuotaExhausted(
+                f"x-requests-remaining=0 for sport={sport_key}"
+            )
+
+        if resp.status_code >= 500:
+            last_error = RuntimeError(f"HTTP {resp.status_code}")
+            logger.warning(
+                "fetch_odds attempt %d got %d, retrying",
+                attempt + 1,
+                resp.status_code,
+            )
+            time.sleep(_RETRY_DELAYS[attempt])
+            continue
+
+        resp.raise_for_status()
+        if remaining_header is not None:
+            try:
+                logger.info(
+                    "The Odds API quota remaining=%s for sport=%s",
+                    remaining_header,
+                    sport_key,
+                )
+            except Exception:
+                pass
+        return resp.json()
+
+    raise RuntimeError(
+        f"fetch_odds exhausted retries for sport={sport_key}: {last_error}"
+    )

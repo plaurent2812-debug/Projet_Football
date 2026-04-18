@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 import pytest
 
@@ -142,3 +143,78 @@ def test_parse_raises_on_naive_commence_time():
 
 def test_quota_exhausted_is_an_exception():
     assert issubclass(OddsAPIQuotaExhausted, Exception)
+
+
+class _FakeResp:
+    def __init__(self, status_code: int, json_data: Any = None,
+                 headers: dict | None = None):
+        self.status_code = status_code
+        self._json = json_data
+        self.headers = headers or {}
+        self.text = ""
+
+    def json(self):
+        return self._json
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+
+def test_fetch_odds_retries_on_500(monkeypatch):
+    """3 retries sur 500, succès au 3e try."""
+    from src.fetchers import odds_ingestor
+
+    attempts: list[int] = []
+
+    def fake_get(url, params=None, timeout=None):
+        attempts.append(1)
+        if len(attempts) < 3:
+            return _FakeResp(500)
+        return _FakeResp(
+            200,
+            json_data=[],
+            headers={"x-requests-remaining": "19000"},
+        )
+
+    monkeypatch.setattr(odds_ingestor.httpx, "get", fake_get)
+    monkeypatch.setattr(odds_ingestor.time, "sleep", lambda s: None)
+
+    result = odds_ingestor.fetch_odds(
+        sport_key="soccer_epl",
+        markets="h2h",
+        api_key="FAKE",
+    )
+    assert result == []
+    assert len(attempts) == 3
+
+
+def test_fetch_odds_raises_quota_exhausted_on_429(monkeypatch):
+    from src.fetchers import odds_ingestor
+
+    def fake_get(url, params=None, timeout=None):
+        return _FakeResp(429, headers={"x-requests-remaining": "0"})
+
+    monkeypatch.setattr(odds_ingestor.httpx, "get", fake_get)
+    monkeypatch.setattr(odds_ingestor.time, "sleep", lambda s: None)
+
+    with pytest.raises(OddsAPIQuotaExhausted):
+        odds_ingestor.fetch_odds(
+            sport_key="soccer_epl", markets="h2h", api_key="FAKE"
+        )
+
+
+def test_fetch_odds_gives_up_after_max_retries(monkeypatch):
+    """4 échecs 500 consécutifs → RuntimeError (pas OddsAPIQuotaExhausted)."""
+    from src.fetchers import odds_ingestor
+
+    def fake_get(url, params=None, timeout=None):
+        return _FakeResp(500)
+
+    monkeypatch.setattr(odds_ingestor.httpx, "get", fake_get)
+    monkeypatch.setattr(odds_ingestor.time, "sleep", lambda s: None)
+
+    with pytest.raises(RuntimeError):
+        odds_ingestor.fetch_odds(
+            sport_key="soccer_epl", markets="h2h", api_key="FAKE"
+        )

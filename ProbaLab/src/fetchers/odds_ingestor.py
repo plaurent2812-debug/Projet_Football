@@ -311,9 +311,12 @@ def upsert_odds(rows: list[dict]) -> int:
             copy["match_start"] = ms.isoformat()
         serialized.append(copy)
 
+    # Each chunk is its own transaction. Partial failures are safe because
+    # ignore_duplicates=True makes re-runs idempotent.
     total = 0
     for i in range(0, len(serialized), _UPSERT_CHUNK):
         chunk = serialized[i : i + _UPSERT_CHUNK]
+        chunk_idx = i // _UPSERT_CHUNK
         (
             supabase.table("closing_odds")
             .upsert(
@@ -322,6 +325,9 @@ def upsert_odds(rows: list[dict]) -> int:
                 ignore_duplicates=True,
             )
             .execute()
+        )
+        logger.debug(
+            "upsert_odds chunk=%d rows=%d", chunk_idx, len(chunk)
         )
         total += len(chunk)
     return total

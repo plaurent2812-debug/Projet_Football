@@ -120,6 +120,10 @@ _MAX_RETRIES = 3
 _RETRY_DELAYS = [1.0, 2.0, 4.0]
 _HTTP_TIMEOUT = 30.0
 
+assert len(_RETRY_DELAYS) >= _MAX_RETRIES, (
+    "_RETRY_DELAYS must have at least _MAX_RETRIES entries"
+)
+
 
 def fetch_odds(
     *,
@@ -160,11 +164,6 @@ def fetch_odds(
             raise OddsAPIQuotaExhausted(
                 f"The Odds API quota exhausted for sport={sport_key}"
             )
-        remaining_header = resp.headers.get("x-requests-remaining")
-        if remaining_header is not None and str(remaining_header) == "0":
-            raise OddsAPIQuotaExhausted(
-                f"x-requests-remaining=0 for sport={sport_key}"
-            )
 
         if resp.status_code >= 500:
             last_error = RuntimeError(f"HTTP {resp.status_code}")
@@ -176,8 +175,17 @@ def fetch_odds(
             time.sleep(_RETRY_DELAYS[attempt])
             continue
 
+        # remaining-header check runs only on 2xx/4xx responses to avoid
+        # CDN-stale 0-quota headers on 5xx turning transient errors fatal.
+        remaining_header = resp.headers.get("x-requests-remaining")
+        if remaining_header is not None and str(remaining_header) == "0":
+            raise OddsAPIQuotaExhausted(
+                f"x-requests-remaining=0 for sport={sport_key}"
+            )
+
         resp.raise_for_status()
         if remaining_header is not None:
+            # defensive: logger misconfig must not fail the happy path
             try:
                 logger.info(
                     "The Odds API quota remaining=%s for sport=%s",

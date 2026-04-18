@@ -205,7 +205,7 @@ def test_fetch_odds_raises_quota_exhausted_on_429(monkeypatch):
 
 
 def test_fetch_odds_gives_up_after_max_retries(monkeypatch):
-    """4 échecs 500 consécutifs → RuntimeError (pas OddsAPIQuotaExhausted)."""
+    """3 échecs 500 consécutifs → RuntimeError (pas OddsAPIQuotaExhausted)."""
     from src.fetchers import odds_ingestor
 
     def fake_get(url, params=None, timeout=None):
@@ -218,3 +218,34 @@ def test_fetch_odds_gives_up_after_max_retries(monkeypatch):
         odds_ingestor.fetch_odds(
             sport_key="soccer_epl", markets="h2h", api_key="FAKE"
         )
+
+
+def test_fetch_odds_retries_on_5xx_even_if_remaining_header_zero(monkeypatch):
+    """CDN-stale x-requests-remaining:0 on a 502 must not short-circuit retry.
+
+    Regression for I1 of H2-SS1 Task 4 code review.
+    """
+    from src.fetchers import odds_ingestor
+
+    attempts: list[int] = []
+
+    def fake_get(url, params=None, timeout=None):
+        attempts.append(1)
+        if len(attempts) < 3:
+            return _FakeResp(
+                502, headers={"x-requests-remaining": "0"}
+            )
+        return _FakeResp(
+            200,
+            json_data=[],
+            headers={"x-requests-remaining": "19000"},
+        )
+
+    monkeypatch.setattr(odds_ingestor.httpx, "get", fake_get)
+    monkeypatch.setattr(odds_ingestor.time, "sleep", lambda s: None)
+
+    result = odds_ingestor.fetch_odds(
+        sport_key="soccer_epl", markets="h2h", api_key="FAKE"
+    )
+    assert result == []
+    assert len(attempts) == 3

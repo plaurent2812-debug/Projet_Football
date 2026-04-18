@@ -50,6 +50,10 @@ def check_and_alert(
     if volume_alert:
         alerts.append(volume_alert)
 
+    clv_alert = _check_clv_drift(supabase)
+    if clv_alert:
+        alerts.append(clv_alert)
+
     if alerts:
         msg = "\u26a0\ufe0f <b>ALERTES MONITORING</b>\n\n" + "\n\n".join(alerts)
         logger.warning("Monitoring alerts (%d): %s", len(alerts), alerts)
@@ -165,3 +169,47 @@ def _check_prediction_volume(supabase) -> str | None:
     except Exception as e:
         logger.error("Prediction volume check failed: %s", e)
         return None
+
+
+def _check_clv_drift(supabase_client) -> str | None:
+    """Retourne un message alerte si CLV 1X2 vs Pinnacle sur 7 jours est négatif.
+
+    Thresholds:
+      - 7d mean CLV < -3% → CRITICAL
+      - 7d mean CLV < -1% → WARNING
+      - sinon None
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    try:
+        rows = (
+            supabase_client.table("model_health_log")
+            .select("clv_vs_pinnacle_1x2")
+            .gte("recorded_at", cutoff)
+            .order("recorded_at", desc=True)
+            .limit(7)
+            .execute()
+            .data
+        ) or []
+    except Exception:
+        logger.exception("_check_clv_drift load failed")
+        return None
+
+    valid = [
+        float(r["clv_vs_pinnacle_1x2"])
+        for r in rows
+        if r.get("clv_vs_pinnacle_1x2") is not None
+    ]
+    if len(valid) < 3:
+        return None
+    mean_clv = sum(valid) / len(valid)
+    if mean_clv < -0.03:
+        return (
+            f"\U0001f534 <b>CRITICAL — CLV 7j négatif</b>\n"
+            f"Mean CLV vs Pinnacle 1X2 = {mean_clv:+.2%} sur {len(valid)} jours"
+        )
+    if mean_clv < -0.01:
+        return (
+            f"\u26a0\ufe0f <b>WARNING — CLV 7j dégradé</b>\n"
+            f"Mean CLV vs Pinnacle 1X2 = {mean_clv:+.2%} sur {len(valid)} jours"
+        )
+    return None

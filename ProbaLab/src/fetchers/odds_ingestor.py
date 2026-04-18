@@ -18,7 +18,7 @@ from typing import Any
 
 import httpx
 
-from src.fetchers.bookmaker_registry import get_bookmaker_from_api_key
+from src.fetchers.bookmaker_registry import get_bookmaker_from_api_key, teams_match
 
 logger = logging.getLogger("football_ia.odds_ingestor")
 
@@ -37,16 +37,19 @@ def to_implied_prob(odds: float) -> float:
 def _parse_h2h_market(
     outcomes: list[dict], home_team: str, away_team: str
 ) -> list[tuple[str, float]]:
-    """Retourne [(selection, odds), ...] pour un marché h2h (1X2 foot)."""
+    """Retourne [(selection, odds), ...] pour un marché h2h (1X2 foot).
+
+    Matching tolérant via teams_match pour robustesse cross-provider (lesson 69).
+    """
     out: list[tuple[str, float]] = []
     for o in outcomes:
-        name = o["name"]
+        name = o.get("name", "")
         price = float(o["price"])
-        if name == home_team:
+        if teams_match(name, home_team):
             out.append(("home", price))
-        elif name == away_team:
+        elif teams_match(name, away_team):
             out.append(("away", price))
-        elif name.lower() == "draw":
+        elif name.strip().lower() == "draw":
             out.append(("draw", price))
     return out
 
@@ -139,9 +142,10 @@ def parse_odds_response(
                 elif mkey == "h2h" and sport == "nhl":
                     parsed_nhl: list[tuple[str, float]] = []
                     for o in outcomes:
-                        if o["name"] == home_team:
+                        nm = o.get("name", "")
+                        if teams_match(nm, home_team):
                             parsed_nhl.append(("home", float(o["price"])))
-                        elif o["name"] == away_team:
+                        elif teams_match(nm, away_team):
                             parsed_nhl.append(("away", float(o["price"])))
                     if len(parsed_nhl) != 2:
                         continue
@@ -175,7 +179,12 @@ def parse_odds_response(
                         nm = o["name"].lower()
                         if nm not in ("over", "under"):
                             continue
-                        point = float(o.get("point", 0.0))
+                        raw_point = o.get("point")
+                        if raw_point is None:
+                            continue
+                        point = float(raw_point)
+                        if point <= 0:
+                            continue
                         by_line.setdefault(point, []).append((nm, float(o["price"])))
                     for line, pair in by_line.items():
                         if len(pair) != 2:

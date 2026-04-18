@@ -52,3 +52,37 @@ def test_sport_keys_cover_foot_and_nhl():
     # 8 ligues foot + 1 NHL
     assert len(SPORT_KEYS["football"]) == 8
     assert len(SPORT_KEYS["nhl"]) == 1
+
+
+def test_normalize_team_name_handles_punctuation_and_case():
+    from src.fetchers.bookmaker_registry import normalize_team_name
+
+    assert normalize_team_name("St. Louis Blues") == normalize_team_name("St Louis Blues")
+    assert normalize_team_name("St. LOUIS Blues") == normalize_team_name("st louis blues")
+
+
+def test_normalize_team_name_drops_hockey_club_suffix():
+    from src.fetchers.bookmaker_registry import teams_match
+
+    # Lesson 69 — Utah rename 2025-26
+    assert teams_match("Utah Hockey Club", "Utah Mammoth")
+    assert teams_match("Utah Hockey Club", "Utah")
+
+
+def test_normalize_team_name_handles_psg_variant():
+    from src.fetchers.bookmaker_registry import teams_match
+
+    assert teams_match("Paris Saint Germain", "Paris Saint-Germain")
+
+
+def test_normalize_team_name_returns_empty_on_non_string():
+    from src.fetchers.bookmaker_registry import normalize_team_name
+
+    assert normalize_team_name(None) == ""  # type: ignore[arg-type]
+    assert normalize_team_name(123) == ""  # type: ignore[arg-type]
+
+
+def test_teams_match_false_for_different_teams():
+    from src.fetchers.bookmaker_registry import teams_match
+
+    assert not teams_match("Arsenal", "Chelsea")

@@ -361,3 +361,73 @@ def test_parse_nhl_moneyline_and_totals():
     assert len(tot) == 2
     over_row = next(r for r in tot if r["selection"] == "over")
     assert over_row["line"] == 6.5
+
+
+def test_parse_nhl_team_name_divergence_matches_via_normalization():
+    """Lesson 69 regression — 'St. Louis Blues' vs 'St Louis Blues'."""
+    sample = [
+        {
+            "id": "nhl_div",
+            "sport_key": "icehockey_nhl",
+            "commence_time": "2026-04-20T23:00:00Z",
+            "home_team": "St. Louis Blues",  # point, spaces
+            "away_team": "Utah Mammoth",
+            "bookmakers": [
+                {
+                    "key": "pinnacle",
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": "St Louis Blues", "price": 1.70},  # no point
+                                {"name": "Utah Hockey Club", "price": 2.20},  # old name
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+    rows = parse_odds_response(sample, sport="nhl", snapshot_type="opening",
+                               source_request_id="req-div")
+    ml = [r for r in rows if r["market"] == "moneyline"]
+    assert len(ml) == 2, (
+        "Both NHL teams must match despite provider name divergence"
+    )
+    home_row = next(r for r in ml if r["selection"] == "home")
+    away_row = next(r for r in ml if r["selection"] == "away")
+    assert home_row["odds"] == 1.70
+    assert away_row["odds"] == 2.20
+
+
+def test_parse_totals_skips_outcomes_without_point():
+    """I2 regression — missing 'point' field must not produce line=0 rows."""
+    sample = [
+        {
+            "id": "nhl_no_point",
+            "sport_key": "icehockey_nhl",
+            "commence_time": "2026-04-20T23:00:00Z",
+            "home_team": "A",
+            "away_team": "B",
+            "bookmakers": [
+                {
+                    "key": "pinnacle",
+                    "markets": [
+                        {
+                            "key": "totals",
+                            "outcomes": [
+                                {"name": "Over", "price": 1.95},   # no point!
+                                {"name": "Under", "price": 1.90},  # no point!
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+    rows = parse_odds_response(sample, sport="nhl", snapshot_type="opening",
+                               source_request_id="req-nopoint")
+    totals = [r for r in rows if r["market"] == "totals_nhl"]
+    assert totals == [], (
+        "Outcomes without 'point' must be skipped to avoid line=0 garbage rows"
+    )

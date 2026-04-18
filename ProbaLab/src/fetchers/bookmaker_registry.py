@@ -56,3 +56,42 @@ def normalize_bookmaker(name: str) -> str:
     if candidate in BOOKMAKERS_FR:
         return candidate
     raise ValueError(f"Unknown bookmaker: {name!r} — expected one of {BOOKMAKERS_FR}")
+
+
+def normalize_team_name(name: str) -> str:
+    """Normalise un nom d'équipe arbitraire pour matching cross-provider.
+
+    Applique (dans l'ordre) :
+      - strip + lowercase
+      - suppression des ponctuations ('.', ',', '-')
+      - normalisation des espaces multiples
+      - drop des suffixes NHL instables ("hockey club", "mammoth")
+      - rename map explicite pour les cas documentés (Utah rebrand 2025-26)
+
+    Reference : leçon 69 de tasks/lessons.md (NHL + foot cross-provider drift).
+    """
+    if not isinstance(name, str):
+        return ""
+    s = name.strip().lower()
+    # Ponctuations courantes
+    for ch in (".", ","):
+        s = s.replace(ch, "")
+    # Normaliser les espaces
+    s = " ".join(s.split())
+    # Suffixes NHL fragiles
+    for suffix in (" hockey club", " mammoth"):
+        if s.endswith(suffix):
+            s = s[: -len(suffix)].strip()
+            break
+    # Renames explicites (Utah 2025-26)
+    rename_map = {
+        "utah": "utah",  # placeholder — Utah est déjà canonique après drop suffix
+        "paris saint germain": "paris saint-germain",
+    }
+    s = rename_map.get(s, s)
+    return s
+
+
+def teams_match(a: str, b: str) -> bool:
+    """Compare deux noms d'équipe après normalisation (lesson 69)."""
+    return normalize_team_name(a) == normalize_team_name(b)

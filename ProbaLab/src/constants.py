@@ -339,8 +339,9 @@ BASE_RATE_AWAY: float = 28.0  # Average away win rate %
 # ═══════════════════════════════════════════════════════════════════
 #  KELLY CRITERION / VALUE BETTING
 # ═══════════════════════════════════════════════════════════════════
+# NOTE: KELLY_FRACTION is defined above in the H2-SS1 block (line ~225).
+# Do not redeclare here — the duplicate would silently shadow the first.
 
-KELLY_FRACTION: float = 0.25  # Quart-Kelly (conservateur)
 KELLY_MAX_BET_FRACTION: float = 0.05  # Max 5% du bankroll par pari
 MIN_VALUE_EDGE: float = 0.05  # Edge minimum pour considérer un value bet (5%)
 

@@ -4,7 +4,11 @@ worker.py — Cron worker pour Railway (service séparé du web).
 Schedule optimisé pour le Smart Betting Assistant (value bets).
 Flux : Data → Odds → Predict → Edge → Picks → Alertes.
 
-Toutes les heures sont en Europe/Paris.
+Scheduling conventions:
+  - Legacy jobs: Europe/Paris (scheduler default)
+  - H2-SS1 jobs (odds/CLV/drift): explicit timezone="UTC" per CronTrigger
+    to align with CLAUDE.md "Timezones: tout en UTC sans exception"
+  - DST transitions may shift the relative order of Paris/UTC jobs
 
 Usage :
   python worker.py
@@ -466,6 +470,16 @@ def main() -> None:
     logger.info("  HEBDOMADAIRE")
     logger.info("    Dim 03:00  ML retrain complet")
     logger.info("=" * 56)
+
+    # H2-SS1: catchup — re-plan closing snapshots in case of mid-day worker restart
+    # APScheduler MemoryJobStore loses date triggers across restarts; this call
+    # rebuilds them for the remaining fixtures of the current day.
+    try:
+        from src.fetchers.odds_ingestor import schedule_closing_snapshots_for_today
+        n = schedule_closing_snapshots_for_today(scheduler)
+        logger.info("[startup] closing_snapshots catchup scheduled=%d", n)
+    except Exception:
+        logger.exception("[startup] closing_snapshots catchup failed (non-fatal)")
 
     try:
         scheduler.start()

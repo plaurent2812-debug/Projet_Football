@@ -557,47 +557,47 @@ def _load_today_fixtures_for_closing() -> list[dict]:
     horizon = now + timedelta(hours=24)
 
     out: list[dict] = []
-    # Football fixtures
+    # Football fixtures — utilise fixtures.id (interne) pour matcher closing_odds.fixture_id
     try:
         rows = (
             supabase.table("fixtures")
-            .select("api_fixture_id,date")
+            .select("id,date")
             .gte("date", now.isoformat())
             .lt("date", horizon.isoformat())
             .execute()
             .data
         ) or []
         for r in rows:
-            if not r.get("date") or not r.get("api_fixture_id"):
+            if not r.get("date") or not r.get("id"):
                 continue
             k = datetime.fromisoformat(str(r["date"]).replace("Z", "+00:00"))
             if k.tzinfo is None:
                 continue
             out.append({
-                "fixture_id": str(r["api_fixture_id"]),
+                "fixture_id": str(r["id"]),
                 "kickoff_utc": k.astimezone(timezone.utc),
             })
     except Exception:
         logger.exception("[_load_today_fixtures_for_closing] football load failed")
 
-    # NHL fixtures (separate table, same column names as football)
+    # NHL fixtures — utilise game_id (matche le resolver _resolve_fixture_id)
     try:
         rows = (
             supabase.table("nhl_fixtures")
-            .select("api_fixture_id,date")
-            .gte("date", now.isoformat())
-            .lt("date", horizon.isoformat())
+            .select("game_id,game_date")
+            .gte("game_date", now.isoformat())
+            .lt("game_date", horizon.isoformat())
             .execute()
             .data
         ) or []
         for r in rows:
-            if not r.get("date") or not r.get("api_fixture_id"):
+            if not r.get("game_date") or not r.get("game_id"):
                 continue
-            k = datetime.fromisoformat(str(r["date"]).replace("Z", "+00:00"))
+            k = datetime.fromisoformat(str(r["game_date"]).replace("Z", "+00:00"))
             if k.tzinfo is None:
                 continue
             out.append({
-                "fixture_id": str(r["api_fixture_id"]),
+                "fixture_id": str(r["game_id"]),
                 "kickoff_utc": k.astimezone(timezone.utc),
             })
     except Exception:

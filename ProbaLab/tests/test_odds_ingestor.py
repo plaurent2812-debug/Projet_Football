@@ -696,6 +696,57 @@ def test_schedule_closing_snapshots_registers_date_triggers(monkeypatch):
         assert s["run_date"] == expected_fx["kickoff_utc"] - timedelta(minutes=30)
 
 
+def test_load_today_fixtures_uses_internal_id_for_football(monkeypatch):
+    """Regression C1 downstream — load_today_fixtures must return fixtures.id (internal)
+    so the ID matches closing_odds.fixture_id after the resolver fix."""
+    from datetime import timedelta
+
+    from src.fetchers import odds_ingestor
+
+    future = datetime.now(timezone.utc) + timedelta(hours=6)
+
+    football_rows = [
+        {"id": 999888, "date": future.isoformat()},
+    ]
+    nhl_rows = [
+        {"game_id": 2026020500, "game_date": future.isoformat()},
+    ]
+
+    call_order = []
+
+    class FakeTable:
+        def __init__(self, name):
+            self.name = name
+
+        def select(self, _cols):
+            return self
+
+        def gte(self, _col, _val):
+            return self
+
+        def lt(self, _col, _val):
+            return self
+
+        def execute(self):
+            call_order.append(self.name)
+            data = football_rows if self.name == "fixtures" else nhl_rows
+            return MagicMock(data=data)
+
+    class FakeSupabase:
+        def table(self, name):
+            return FakeTable(name)
+
+    monkeypatch.setattr(odds_ingestor, "supabase", FakeSupabase())
+
+    fixtures = odds_ingestor._load_today_fixtures_for_closing()
+    assert len(fixtures) == 2
+    football = next(f for f in fixtures if f["fixture_id"] == "999888")
+    nhl = next(f for f in fixtures if f["fixture_id"] == "2026020500")
+    # football.fixture_id is str(id), NOT str(api_fixture_id)
+    assert football["fixture_id"] == "999888"
+    assert nhl["fixture_id"] == "2026020500"
+
+
 # ---------------------------------------------------------------------------
 # C1 regression — _resolve_fixture_id maps Odds API teams/kickoff → fixtures.id
 # ---------------------------------------------------------------------------

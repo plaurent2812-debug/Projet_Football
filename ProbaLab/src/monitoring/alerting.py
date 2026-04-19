@@ -195,9 +195,7 @@ def _check_clv_drift(supabase_client) -> str | None:
         return None
 
     valid = [
-        float(r["clv_vs_pinnacle_1x2"])
-        for r in rows
-        if r.get("clv_vs_pinnacle_1x2") is not None
+        float(r["clv_vs_pinnacle_1x2"]) for r in rows if r.get("clv_vs_pinnacle_1x2") is not None
     ]
     if len(valid) < 3:
         return None

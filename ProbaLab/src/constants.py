@@ -222,9 +222,9 @@ WEIGHT_ML: float = 0.50
 
 USE_MARKET_FEATURES: bool = True  # Active variant baseline; False → pure
 MIN_BOOKMAKERS_FOR_VALUE: int = 3  # skip si < 3 bookmakers sur un marché
-KELLY_FRACTION: float = 0.25       # Kelly fractional conservateur
+KELLY_FRACTION: float = 0.25  # Kelly fractional conservateur
 VALUE_EDGE_USER_FACING: float = 0.05  # 5% — affichage user
-VALUE_EDGE_ADMIN: float = 0.03     # 3% — monitoring interne
+VALUE_EDGE_ADMIN: float = 0.03  # 3% — monitoring interne
 
 
 # ═══════════════════════════════════════════════════════════════════

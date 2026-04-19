@@ -1,4 +1,5 @@
 """Tests pour odds_ingestor — client The Odds API Dev."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -30,8 +31,10 @@ def _patch_resolver(monkeypatch):
     `resolved-<home[:3]>-<away[:3]>`.
     """
     from src.fetchers import odds_ingestor
+
     monkeypatch.setattr(
-        odds_ingestor, "_resolve_fixture_id",
+        odds_ingestor,
+        "_resolve_fixture_id",
         lambda sport, h, a, ms: f"resolved-{(h or '')[:3]}-{(a or '')[:3]}",
     )
 
@@ -125,8 +128,9 @@ def test_parse_skips_unknown_bookmakers():
             ],
         }
     ]
-    rows = parse_odds_response(sample, sport="football", snapshot_type="opening",
-                               source_request_id="req-2")
+    rows = parse_odds_response(
+        sample, sport="football", snapshot_type="opening", source_request_id="req-2"
+    )
     assert rows == []
 
 
@@ -160,7 +164,9 @@ def test_parse_raises_on_naive_commence_time():
     ]
     with pytest.raises(ValueError, match="timezone-aware"):
         parse_odds_response(
-            sample, sport="football", snapshot_type="opening",
+            sample,
+            sport="football",
+            snapshot_type="opening",
             source_request_id="req-naive",
         )
 
@@ -170,8 +176,7 @@ def test_quota_exhausted_is_an_exception():
 
 
 class _FakeResp:
-    def __init__(self, status_code: int, json_data: Any = None,
-                 headers: dict | None = None):
+    def __init__(self, status_code: int, json_data: Any = None, headers: dict | None = None):
         self.status_code = status_code
         self._json = json_data
         self.headers = headers or {}
@@ -223,9 +228,7 @@ def test_fetch_odds_raises_quota_exhausted_on_429(monkeypatch):
     monkeypatch.setattr(odds_ingestor.time, "sleep", lambda s: None)
 
     with pytest.raises(OddsAPIQuotaExhausted):
-        odds_ingestor.fetch_odds(
-            sport_key="soccer_epl", markets="h2h", api_key="FAKE"
-        )
+        odds_ingestor.fetch_odds(sport_key="soccer_epl", markets="h2h", api_key="FAKE")
 
 
 def test_fetch_odds_gives_up_after_max_retries(monkeypatch):
@@ -239,9 +242,7 @@ def test_fetch_odds_gives_up_after_max_retries(monkeypatch):
     monkeypatch.setattr(odds_ingestor.time, "sleep", lambda s: None)
 
     with pytest.raises(RuntimeError):
-        odds_ingestor.fetch_odds(
-            sport_key="soccer_epl", markets="h2h", api_key="FAKE"
-        )
+        odds_ingestor.fetch_odds(sport_key="soccer_epl", markets="h2h", api_key="FAKE")
 
 
 def test_fetch_odds_retries_on_5xx_even_if_remaining_header_zero(monkeypatch):
@@ -256,9 +257,7 @@ def test_fetch_odds_retries_on_5xx_even_if_remaining_header_zero(monkeypatch):
     def fake_get(url, params=None, timeout=None):
         attempts.append(1)
         if len(attempts) < 3:
-            return _FakeResp(
-                502, headers={"x-requests-remaining": "0"}
-            )
+            return _FakeResp(502, headers={"x-requests-remaining": "0"})
         return _FakeResp(
             200,
             json_data=[],
@@ -268,9 +267,7 @@ def test_fetch_odds_retries_on_5xx_even_if_remaining_header_zero(monkeypatch):
     monkeypatch.setattr(odds_ingestor.httpx, "get", fake_get)
     monkeypatch.setattr(odds_ingestor.time, "sleep", lambda s: None)
 
-    result = odds_ingestor.fetch_odds(
-        sport_key="soccer_epl", markets="h2h", api_key="FAKE"
-    )
+    result = odds_ingestor.fetch_odds(sport_key="soccer_epl", markets="h2h", api_key="FAKE")
     assert result == []
     assert len(attempts) == 3
 
@@ -301,8 +298,9 @@ def test_parse_btts_market():
             ],
         }
     ]
-    rows = parse_odds_response(sample, sport="football", snapshot_type="opening",
-                               source_request_id="req-btts")
+    rows = parse_odds_response(
+        sample, sport="football", snapshot_type="opening", source_request_id="req-btts"
+    )
     assert len(rows) == 2
     yes_row = next(r for r in rows if r["selection"] == "yes")
     assert yes_row["market"] == "btts"
@@ -335,8 +333,9 @@ def test_parse_totals_over_2_5():
             ],
         }
     ]
-    rows = parse_odds_response(sample, sport="football", snapshot_type="opening",
-                               source_request_id="req-totals")
+    rows = parse_odds_response(
+        sample, sport="football", snapshot_type="opening", source_request_id="req-totals"
+    )
     over_25 = [r for r in rows if r["market"] == "over_2_5" and r["selection"] == "over"]
     assert len(over_25) == 1
     assert over_25[0]["line"] == 2.5
@@ -377,8 +376,9 @@ def test_parse_nhl_moneyline_and_totals():
             ],
         }
     ]
-    rows = parse_odds_response(sample, sport="nhl", snapshot_type="opening",
-                               source_request_id="req-nhl")
+    rows = parse_odds_response(
+        sample, sport="nhl", snapshot_type="opening", source_request_id="req-nhl"
+    )
     ml = [r for r in rows if r["market"] == "moneyline"]
     assert len(ml) == 2
     tot = [r for r in rows if r["market"] == "totals_nhl"]
@@ -412,12 +412,11 @@ def test_parse_nhl_team_name_divergence_matches_via_normalization():
             ],
         }
     ]
-    rows = parse_odds_response(sample, sport="nhl", snapshot_type="opening",
-                               source_request_id="req-div")
-    ml = [r for r in rows if r["market"] == "moneyline"]
-    assert len(ml) == 2, (
-        "Both NHL teams must match despite provider name divergence"
+    rows = parse_odds_response(
+        sample, sport="nhl", snapshot_type="opening", source_request_id="req-div"
     )
+    ml = [r for r in rows if r["market"] == "moneyline"]
+    assert len(ml) == 2, "Both NHL teams must match despite provider name divergence"
     home_row = next(r for r in ml if r["selection"] == "home")
     away_row = next(r for r in ml if r["selection"] == "away")
     assert home_row["odds"] == 1.70
@@ -440,7 +439,7 @@ def test_parse_totals_skips_outcomes_without_point():
                         {
                             "key": "totals",
                             "outcomes": [
-                                {"name": "Over", "price": 1.95},   # no point!
+                                {"name": "Over", "price": 1.95},  # no point!
                                 {"name": "Under", "price": 1.90},  # no point!
                             ],
                         }
@@ -449,12 +448,11 @@ def test_parse_totals_skips_outcomes_without_point():
             ],
         }
     ]
-    rows = parse_odds_response(sample, sport="nhl", snapshot_type="opening",
-                               source_request_id="req-nopoint")
-    totals = [r for r in rows if r["market"] == "totals_nhl"]
-    assert totals == [], (
-        "Outcomes without 'point' must be skipped to avoid line=0 garbage rows"
+    rows = parse_odds_response(
+        sample, sport="nhl", snapshot_type="opening", source_request_id="req-nopoint"
     )
+    totals = [r for r in rows if r["market"] == "totals_nhl"]
+    assert totals == [], "Outcomes without 'point' must be skipped to avoid line=0 garbage rows"
 
 
 def test_upsert_odds_calls_supabase_with_on_conflict_ignore(monkeypatch):
@@ -479,11 +477,17 @@ def test_upsert_odds_calls_supabase_with_on_conflict_ignore(monkeypatch):
 
     rows = [
         {
-            "sport": "football", "fixture_id": "fx1",
+            "sport": "football",
+            "fixture_id": "fx1",
             "match_start": datetime(2026, 4, 20, 15, tzinfo=timezone.utc),
-            "bookmaker": "pinnacle", "market": "1x2", "selection": "home",
-            "line": None, "odds": 1.50, "implied_prob": 0.6667,
-            "overround": 1.05, "snapshot_type": "opening",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "home",
+            "line": None,
+            "odds": 1.50,
+            "implied_prob": 0.6667,
+            "overround": 1.05,
+            "snapshot_type": "opening",
             "source_request_id": "req-upsert",
         }
     ]
@@ -515,8 +519,9 @@ def test_run_snapshot_iterates_all_sports(monkeypatch):
     fetched_calls: list[tuple[str, str]] = []
     upserted: list[int] = []
 
-    def fake_fetch(sport_key, markets, api_key, bookmakers=None, regions="eu",
-                   odds_format="decimal"):
+    def fake_fetch(
+        sport_key, markets, api_key, bookmakers=None, regions="eu", odds_format="decimal"
+    ):
         fetched_calls.append((sport_key, markets))
         return []
 
@@ -654,8 +659,7 @@ def test_run_snapshot_for_fixtures_empty_list_noop(monkeypatch):
     from src.fetchers import odds_ingestor
 
     called = []
-    monkeypatch.setattr(odds_ingestor, "fetch_odds",
-                        lambda **kw: called.append(1) or [])
+    monkeypatch.setattr(odds_ingestor, "fetch_odds", lambda **kw: called.append(1) or [])
 
     n = odds_ingestor.run_snapshot_for_fixtures([])
     assert n == 0
@@ -673,14 +677,14 @@ def test_schedule_closing_snapshots_registers_date_triggers(monkeypatch):
         {"fixture_id": "fx2", "kickoff_utc": now + timedelta(hours=8)},
         {"fixture_id": "fx_past", "kickoff_utc": now - timedelta(hours=1)},
     ]
-    monkeypatch.setattr(odds_ingestor, "_load_today_fixtures_for_closing",
-                        lambda: fixtures)
+    monkeypatch.setattr(odds_ingestor, "_load_today_fixtures_for_closing", lambda: fixtures)
 
     scheduled = []
 
     class FakeScheduler:
-        def add_job(self, func, *, trigger, run_date, args, id, replace_existing,
-                    misfire_grace_time):
+        def add_job(
+            self, func, *, trigger, run_date, args, id, replace_existing, misfire_grace_time
+        ):
             scheduled.append({"id": id, "run_date": run_date, "args": args})
 
     n = odds_ingestor.schedule_closing_snapshots_for_today(FakeScheduler())
@@ -766,12 +770,22 @@ def test_resolve_fixture_id_matches_by_teams_and_date(monkeypatch):
             return self
 
         def execute(self):
-            return MagicMock(data=[
-                {"id": 42, "home_team": "Arsenal", "away_team": "Chelsea",
-                 "date": "2026-04-20T15:00:00Z"},
-                {"id": 43, "home_team": "Tottenham", "away_team": "Fulham",
-                 "date": "2026-04-20T15:30:00Z"},
-            ])
+            return MagicMock(
+                data=[
+                    {
+                        "id": 42,
+                        "home_team": "Arsenal",
+                        "away_team": "Chelsea",
+                        "date": "2026-04-20T15:00:00Z",
+                    },
+                    {
+                        "id": 43,
+                        "home_team": "Tottenham",
+                        "away_team": "Fulham",
+                        "date": "2026-04-20T15:30:00Z",
+                    },
+                ]
+            )
 
     class FakeSupabase:
         def table(self, name):
@@ -782,7 +796,9 @@ def test_resolve_fixture_id_matches_by_teams_and_date(monkeypatch):
 
     # Call the real resolver directly (autouse fixture patches the module attribute)
     resolved = _real_resolve_fixture_id(
-        "football", "Arsenal", "Chelsea",
+        "football",
+        "Arsenal",
+        "Chelsea",
         datetime(2026, 4, 20, 15, 0, tzinfo=timezone.utc),
     )
     assert resolved == "42"
@@ -811,7 +827,9 @@ def test_resolve_fixture_id_returns_none_when_no_match(monkeypatch):
     monkeypatch.setattr(odds_ingestor, "supabase", FakeSupabase())
 
     resolved = _real_resolve_fixture_id(
-        "football", "NoMatch FC", "NeverHeardOf",
+        "football",
+        "NoMatch FC",
+        "NeverHeardOf",
         datetime(2026, 4, 20, 15, 0, tzinfo=timezone.utc),
     )
     assert resolved is None
@@ -832,11 +850,16 @@ def test_resolve_fixture_id_uses_teams_match_normalization(monkeypatch):
             return self
 
         def execute(self):
-            return MagicMock(data=[
-                {"game_id": 2026020500, "home_team": "St Louis Blues",
-                 "away_team": "Utah Mammoth",
-                 "game_date": "2026-04-20T23:00:00Z"},
-            ])
+            return MagicMock(
+                data=[
+                    {
+                        "game_id": 2026020500,
+                        "home_team": "St Louis Blues",
+                        "away_team": "Utah Mammoth",
+                        "game_date": "2026-04-20T23:00:00Z",
+                    },
+                ]
+            )
 
     class FakeSupabase:
         def table(self, name):
@@ -846,7 +869,9 @@ def test_resolve_fixture_id_uses_teams_match_normalization(monkeypatch):
     monkeypatch.setattr(odds_ingestor, "supabase", FakeSupabase())
 
     resolved = _real_resolve_fixture_id(
-        "nhl", "St. Louis Blues", "Utah Hockey Club",
+        "nhl",
+        "St. Louis Blues",
+        "Utah Hockey Club",
         datetime(2026, 4, 20, 23, 0, tzinfo=timezone.utc),
     )
     assert resolved == "2026020500"
@@ -858,7 +883,8 @@ def test_parse_skips_event_when_fixture_not_resolved(monkeypatch):
 
     # Override the autouse patch to simulate a failed resolution
     monkeypatch.setattr(
-        odds_ingestor, "_resolve_fixture_id",
+        odds_ingestor,
+        "_resolve_fixture_id",
         lambda sport, h, a, ms: None,
     )
 
@@ -887,7 +913,9 @@ def test_parse_skips_event_when_fixture_not_resolved(monkeypatch):
         }
     ]
     rows = odds_ingestor.parse_odds_response(
-        sample, sport="football", snapshot_type="opening",
+        sample,
+        sport="football",
+        snapshot_type="opening",
         source_request_id="req-skip",
     )
     assert rows == []

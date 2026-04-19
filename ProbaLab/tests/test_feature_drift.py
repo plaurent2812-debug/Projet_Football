@@ -1,4 +1,5 @@
 """Tests pour feature_drift — KS test training vs prod."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -49,11 +50,13 @@ def test_run_feature_drift_check_aggregates(monkeypatch):
     from src.monitoring import feature_drift
 
     rng = np.random.default_rng(seed=123)
+
     def _fake_train():
         return {
             "elo_diff": rng.normal(0, 100, 500),
             "home_form": rng.normal(2, 1, 500),
         }
+
     def _fake_prod(window_days=30):
         return {
             "elo_diff": rng.normal(0, 100, 200),
@@ -78,8 +81,7 @@ def test_drift_result_to_alert_triggers_when_many_drifted():
         "n_features": 43,
         "alpha": 0.01,
         "per_feature": {
-            f"feat_{i}": {"drift_detected": True, "p_value": 1e-5,
-                          "n_train": 1000, "n_prod": 200}
+            f"feat_{i}": {"drift_detected": True, "p_value": 1e-5, "n_train": 1000, "n_prod": 200}
             for i in range(6)
         },
     }
@@ -113,10 +115,13 @@ def test_load_prod_distribution_reads_stats_json_features(monkeypatch):
     class FakeTable:
         def select(self, _cols):
             return self
+
         def gte(self, _col, _val):
             return self
+
         def limit(self, _n):
             return self
+
         def execute(self):
             return MagicMock(data=fake_rows)
 

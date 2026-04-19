@@ -1,4 +1,5 @@
 """GET /api/value-bets — consommé par SS3 UI (homepage + page match)."""
+
 from __future__ import annotations
 
 import logging
@@ -36,11 +37,7 @@ def _load_day_matches(target: _date) -> list[dict]:
         return []
 
     odds_rows = (
-        supabase.table("closing_odds")
-        .select("*")
-        .in_("fixture_id", fixture_ids)
-        .execute()
-        .data
+        supabase.table("closing_odds").select("*").in_("fixture_id", fixture_ids).execute().data
     ) or []
     odds_by_fixture: dict[str, list[dict]] = {}
     for r in odds_rows:
@@ -82,7 +79,9 @@ def _load_day_matches(target: _date) -> list[dict]:
             if not probs:
                 continue
             vbets = detect_value_bets(
-                model_probs=probs, odds_rows=market_odds, market=market,
+                model_probs=probs,
+                odds_rows=market_odds,
+                market=market,
                 edge_threshold=VALUE_EDGE_USER_FACING,
             )
             for vb in vbets:

@@ -1,4 +1,5 @@
 """Tests end-to-end : 4 variantes entraînées sur dataset synthétique."""
+
 from __future__ import annotations
 
 from src.training.backtest_variants import (

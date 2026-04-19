@@ -152,7 +152,7 @@ def test_brain_py_writes_features_to_stats_json():
     import pathlib
 
     src = pathlib.Path("src/brain.py").read_text()
-    assert "stats_json\"][\"features\"]" in src or 'stats_json"]["features"]' in src, (
+    assert 'stats_json"]["features"]' in src or 'stats_json"]["features"]' in src, (
         "brain.py must write stats_json['features'] so monitoring/feature_drift "
         "can read prod feature distributions. See C2 in H2-SS1 review."
     )

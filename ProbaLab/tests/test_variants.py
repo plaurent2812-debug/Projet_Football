@@ -1,4 +1,5 @@
 """Tests pour src/training/variants.py — configs des 4 variantes ML."""
+
 from __future__ import annotations
 
 import pytest

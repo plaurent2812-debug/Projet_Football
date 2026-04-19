@@ -1,4 +1,5 @@
 """Tests pour value_detector — best odds, edge, Kelly fractional."""
+
 from __future__ import annotations
 
 import pytest
@@ -63,7 +64,9 @@ def test_detect_value_bets_flags_above_5pct_edge():
         {"bookmaker": "winamax", "market": "1x2", "selection": "away", "odds": 6.00},
     ]
     bets = detect_value_bets(
-        model_probs=model_probs, odds_rows=rows, market="1x2",
+        model_probs=model_probs,
+        odds_rows=rows,
+        market="1x2",
     )
     # home: 0.60 * 1.80 - 1 = 0.08 (8%, value)
     # draw: 0.25 * 4.50 - 1 = 0.125 (12.5%, value)
@@ -82,7 +85,9 @@ def test_detect_value_bets_skips_when_less_than_min_bookmakers():
         {"bookmaker": "betclic", "market": "1x2", "selection": "home", "odds": 1.80},
     ]
     bets = detect_value_bets(
-        model_probs=model_probs, odds_rows=rows, market="1x2",
+        model_probs=model_probs,
+        odds_rows=rows,
+        market="1x2",
     )
     assert bets == []
 
@@ -105,11 +110,15 @@ def test_detect_value_bets_uses_admin_threshold_when_requested():
     # away edge = 0.20 * 4.50 - 1 = -0.10 → pas value
     # Avec threshold=0.03, home reste value
     bets_admin = detect_value_bets(
-        model_probs=model_probs, odds_rows=rows, market="1x2",
+        model_probs=model_probs,
+        odds_rows=rows,
+        market="1x2",
         edge_threshold=0.03,
     )
     bets_user = detect_value_bets(
-        model_probs=model_probs, odds_rows=rows, market="1x2",
+        model_probs=model_probs,
+        odds_rows=rows,
+        market="1x2",
     )
     selections_admin = [b["selection"] for b in bets_admin]
     selections_user = [b["selection"] for b in bets_user]

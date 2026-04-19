@@ -1,4 +1,5 @@
 """Tests pour clv_engine — math CLV per-market, overround removal."""
+
 from __future__ import annotations
 
 import math
@@ -84,19 +85,55 @@ def test_aggregate_clv_by_market_1x2():
     ]
     closing_odds = [
         # fx1 Pinnacle h/d/a : 1.80 / 3.60 / 4.80 (fair ~55/27/17)
-        {"fixture_id": "fx1", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "home", "odds": 1.80, "line": None},
-        {"fixture_id": "fx1", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "draw", "odds": 3.60, "line": None},
-        {"fixture_id": "fx1", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "away", "odds": 4.80, "line": None},
+        {
+            "fixture_id": "fx1",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "home",
+            "odds": 1.80,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx1",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "draw",
+            "odds": 3.60,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx1",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "away",
+            "odds": 4.80,
+            "line": None,
+        },
         # fx2 Pinnacle 2.50 / 3.20 / 2.80 (fair ~38/30/33)
-        {"fixture_id": "fx2", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "home", "odds": 2.50, "line": None},
-        {"fixture_id": "fx2", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "draw", "odds": 3.20, "line": None},
-        {"fixture_id": "fx2", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "away", "odds": 2.80, "line": None},
+        {
+            "fixture_id": "fx2",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "home",
+            "odds": 2.50,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx2",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "draw",
+            "odds": 3.20,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx2",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "away",
+            "odds": 2.80,
+            "line": None,
+        },
     ]
 
     result = aggregate_clv_by_market(
@@ -118,8 +155,15 @@ def test_aggregate_clv_by_market_1x2():
 def test_aggregate_clv_returns_zero_n_when_no_closing():
     from src.monitoring.clv_engine import aggregate_clv_by_market
 
-    predictions = [{"fixture_id": "fx99", "pred_home": 50, "pred_draw": 30,
-                    "pred_away": 20, "actual_result": "H"}]
+    predictions = [
+        {
+            "fixture_id": "fx99",
+            "pred_home": 50,
+            "pred_draw": 30,
+            "pred_away": 20,
+            "actual_result": "H",
+        }
+    ]
     result = aggregate_clv_by_market(
         predictions=predictions,
         closing_odds_rows=[],

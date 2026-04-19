@@ -13,6 +13,7 @@ Design:
     - ks_test_feature: numeric KS test on two samples, ignoring NaNs
     - run_feature_drift_check: loads training + last N days prod, returns per-feature stats
 """
+
 from __future__ import annotations
 
 import logging
@@ -64,11 +65,7 @@ def ks_test_feature(
 def _load_training_distribution() -> dict[str, np.ndarray]:
     """Load feature values from training_data table."""
     rows = (
-        supabase.table("training_data")
-        .select(",".join(FEATURE_COLS))
-        .limit(10000)
-        .execute()
-        .data
+        supabase.table("training_data").select(",".join(FEATURE_COLS)).limit(10000).execute().data
     ) or []
     out: dict[str, np.ndarray] = {}
     for feat in FEATURE_COLS:
@@ -136,7 +133,8 @@ def drift_result_to_alert(result: dict, *, threshold: int = 5) -> str | None:
     if n_drifted < threshold:
         return None
     drifted_names = [
-        name for name, info in (result.get("per_feature") or {}).items()
+        name
+        for name, info in (result.get("per_feature") or {}).items()
         if info.get("drift_detected")
     ][:10]
     lines = [

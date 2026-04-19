@@ -11,6 +11,7 @@ Design:
     - aggregate_clv_by_market: joins predictions + closing_odds + results (Task 10)
     - run_daily_clv_snapshot: cron entrypoint (Task 11)
 """
+
 from __future__ import annotations
 
 import logging
@@ -151,6 +152,7 @@ def _selections_for_market(market: str) -> list[str]:
 
 def _model_probs_for_market(pred: dict, market: str) -> list[float] | None:
     """Extrait [p1, p2, ...] en [0,1] depuis une row prediction_results."""
+
     def _norm(value) -> float | None:
         if value is None:
             return None
@@ -241,9 +243,7 @@ def _load_predictions_for_date(target: date) -> list[dict]:
             ) or []
             rows.extend(r)
         except Exception:
-            logger.exception(
-                "[_load_predictions_for_date] prediction_results chunk failed"
-            )
+            logger.exception("[_load_predictions_for_date] prediction_results chunk failed")
 
     return rows
 
@@ -302,24 +302,34 @@ def run_daily_clv_snapshot(*, target_date: date | None = None) -> dict:
 
     # Calculs Pinnacle
     p_1x2 = aggregate_clv_by_market(
-        predictions=predictions, closing_odds_rows=closing_rows,
-        market="1x2", bookmaker="pinnacle",
+        predictions=predictions,
+        closing_odds_rows=closing_rows,
+        market="1x2",
+        bookmaker="pinnacle",
     )
     p_btts = aggregate_clv_by_market(
-        predictions=predictions, closing_odds_rows=closing_rows,
-        market="btts", bookmaker="pinnacle",
+        predictions=predictions,
+        closing_odds_rows=closing_rows,
+        market="btts",
+        bookmaker="pinnacle",
     )
     p_over25 = aggregate_clv_by_market(
-        predictions=predictions, closing_odds_rows=closing_rows,
-        market="over_2_5", bookmaker="pinnacle",
+        predictions=predictions,
+        closing_odds_rows=closing_rows,
+        market="over_2_5",
+        bookmaker="pinnacle",
     )
     p_nhl_ml = aggregate_clv_by_market(
-        predictions=predictions, closing_odds_rows=closing_rows,
-        market="moneyline", bookmaker="pinnacle",
+        predictions=predictions,
+        closing_odds_rows=closing_rows,
+        market="moneyline",
+        bookmaker="pinnacle",
     )
     p_nhl_goals = aggregate_clv_by_market(
-        predictions=predictions, closing_odds_rows=closing_rows,
-        market="totals_nhl", bookmaker="pinnacle",
+        predictions=predictions,
+        closing_odds_rows=closing_rows,
+        market="totals_nhl",
+        bookmaker="pinnacle",
     )
 
     # Moyennes FR
@@ -347,6 +357,8 @@ def run_daily_clv_snapshot(*, target_date: date | None = None) -> dict:
     supabase.table("model_health_log").insert(row).execute()
     logger.info(
         "[clv_snapshot] variant=%s n=%d clv_1x2_vs_pinnacle=%s",
-        variant_id, n_total, p_1x2.get("clv_mean"),
+        variant_id,
+        n_total,
+        p_1x2.get("clv_mean"),
     )
     return row

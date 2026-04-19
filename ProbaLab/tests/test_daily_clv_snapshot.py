@@ -1,4 +1,5 @@
 """Tests end-to-end pour le daily CLV snapshot cron job."""
+
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -12,34 +13,78 @@ def test_run_daily_clv_snapshot_upserts_model_health_log(monkeypatch):
 
     # Fake predictions on 2 matches with closing Pinnacle + Betclic
     predictions = [
-        {"fixture_id": "fx1", "sport": "football", "league_id": 61,
-         "pred_home": 60.0, "pred_draw": 25.0, "pred_away": 15.0,
-         "actual_result": "H"},
-        {"fixture_id": "fx2", "sport": "football", "league_id": 61,
-         "pred_home": 30.0, "pred_draw": 30.0, "pred_away": 40.0,
-         "actual_result": "A"},
+        {
+            "fixture_id": "fx1",
+            "sport": "football",
+            "league_id": 61,
+            "pred_home": 60.0,
+            "pred_draw": 25.0,
+            "pred_away": 15.0,
+            "actual_result": "H",
+        },
+        {
+            "fixture_id": "fx2",
+            "sport": "football",
+            "league_id": 61,
+            "pred_home": 30.0,
+            "pred_draw": 30.0,
+            "pred_away": 40.0,
+            "actual_result": "A",
+        },
     ]
     closing_rows = [
-        {"fixture_id": "fx1", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "home", "odds": 1.80, "line": None},
-        {"fixture_id": "fx1", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "draw", "odds": 3.60, "line": None},
-        {"fixture_id": "fx1", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "away", "odds": 4.80, "line": None},
-        {"fixture_id": "fx2", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "home", "odds": 3.00, "line": None},
-        {"fixture_id": "fx2", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "draw", "odds": 3.40, "line": None},
-        {"fixture_id": "fx2", "bookmaker": "pinnacle", "market": "1x2",
-         "selection": "away", "odds": 2.50, "line": None},
+        {
+            "fixture_id": "fx1",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "home",
+            "odds": 1.80,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx1",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "draw",
+            "odds": 3.60,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx1",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "away",
+            "odds": 4.80,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx2",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "home",
+            "odds": 3.00,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx2",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "draw",
+            "odds": 3.40,
+            "line": None,
+        },
+        {
+            "fixture_id": "fx2",
+            "bookmaker": "pinnacle",
+            "market": "1x2",
+            "selection": "away",
+            "odds": 2.50,
+            "line": None,
+        },
     ]
 
-    monkeypatch.setattr(
-        clv_engine, "_load_predictions_for_date", lambda d: predictions
-    )
-    monkeypatch.setattr(
-        clv_engine, "_load_closing_odds_for_date", lambda d: closing_rows
-    )
+    monkeypatch.setattr(clv_engine, "_load_predictions_for_date", lambda d: predictions)
+    monkeypatch.setattr(clv_engine, "_load_closing_odds_for_date", lambda d: closing_rows)
 
     upserted: list[dict] = []
 
@@ -47,6 +92,7 @@ def test_run_daily_clv_snapshot_upserts_model_health_log(monkeypatch):
         def __init__(self, store, row):
             self._store = store
             self._row = row
+
         def execute(self):
             self._store.append(self._row)
             return MagicMock(data=[self._row])
@@ -147,10 +193,9 @@ def test_load_predictions_for_date_uses_match_date_not_created_at(monkeypatch):
                 # Verify it's an .in_ filter by fixture_id
                 assert "in_fixture_id" in self._filters
                 ids_requested = self._filters["in_fixture_id"]
-                return MagicMock(data=[
-                    r for r in prediction_rows
-                    if str(r["fixture_id"]) in ids_requested
-                ])
+                return MagicMock(
+                    data=[r for r in prediction_rows if str(r["fixture_id"]) in ids_requested]
+                )
             return MagicMock(data=[])
 
     class FakeSupabase:

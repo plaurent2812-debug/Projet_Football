@@ -9,6 +9,7 @@ Responsabilités :
 Module pur (parsing + helpers) + fonctions I/O (fetch, upsert).
 Les fonctions I/O utilisent supabase + httpx ; les helpers sont testables sans réseau.
 """
+
 from __future__ import annotations
 
 import logging
@@ -62,7 +63,9 @@ def _resolve_fixture_id(
     except Exception:
         logger.exception(
             "[_resolve_fixture_id] load failed sport=%s home=%s away=%s",
-            sport, home_team, away_team,
+            sport,
+            home_team,
+            away_team,
         )
         return None
 
@@ -166,16 +169,17 @@ def parse_odds_response(
         raw_commence = event["commence_time"]
         parsed_commence = datetime.fromisoformat(raw_commence.replace("Z", "+00:00"))
         if parsed_commence.tzinfo is None:
-            raise ValueError(
-                f"commence_time must be timezone-aware: {raw_commence!r}"
-            )
+            raise ValueError(f"commence_time must be timezone-aware: {raw_commence!r}")
         match_start = parsed_commence.astimezone(timezone.utc)
 
         fixture_id = _resolve_fixture_id(sport, home_team, away_team, match_start)
         if fixture_id is None:
             logger.debug(
                 "[parse_odds_response] unresolved event=%s home=%s away=%s kickoff=%s",
-                odds_api_event_id, home_team, away_team, match_start.isoformat(),
+                odds_api_event_id,
+                home_team,
+                away_team,
+                match_start.isoformat(),
             )
             continue
 
@@ -193,11 +197,21 @@ def parse_odds_response(
                         continue
                     overround = sum(to_implied_prob(p) for _, p in parsed)
                     for selection, odds in parsed:
-                        rows.append(_build_row(
-                            sport, fixture_id, match_start, bk, "1x2",
-                            selection, None, odds, overround, snapshot_type,
-                            source_request_id,
-                        ))
+                        rows.append(
+                            _build_row(
+                                sport,
+                                fixture_id,
+                                match_start,
+                                bk,
+                                "1x2",
+                                selection,
+                                None,
+                                odds,
+                                overround,
+                                snapshot_type,
+                                source_request_id,
+                            )
+                        )
 
                 elif mkey == "h2h" and sport == "nhl":
                     parsed_nhl: list[tuple[str, float]] = []
@@ -211,11 +225,21 @@ def parse_odds_response(
                         continue
                     overround = sum(to_implied_prob(p) for _, p in parsed_nhl)
                     for selection, odds in parsed_nhl:
-                        rows.append(_build_row(
-                            sport, fixture_id, match_start, bk, "moneyline",
-                            selection, None, odds, overround, snapshot_type,
-                            source_request_id,
-                        ))
+                        rows.append(
+                            _build_row(
+                                sport,
+                                fixture_id,
+                                match_start,
+                                bk,
+                                "moneyline",
+                                selection,
+                                None,
+                                odds,
+                                overround,
+                                snapshot_type,
+                                source_request_id,
+                            )
+                        )
 
                 elif mkey == "btts":
                     btts_parsed = []
@@ -227,11 +251,21 @@ def parse_odds_response(
                         continue
                     overround = sum(to_implied_prob(p) for _, p in btts_parsed)
                     for selection, odds in btts_parsed:
-                        rows.append(_build_row(
-                            sport, fixture_id, match_start, bk, "btts",
-                            selection, None, odds, overround, snapshot_type,
-                            source_request_id,
-                        ))
+                        rows.append(
+                            _build_row(
+                                sport,
+                                fixture_id,
+                                match_start,
+                                bk,
+                                "btts",
+                                selection,
+                                None,
+                                odds,
+                                overround,
+                                snapshot_type,
+                                source_request_id,
+                            )
+                        )
 
                 elif mkey == "totals":
                     by_line: dict[float, list[tuple[str, float]]] = {}
@@ -257,11 +291,21 @@ def parse_odds_response(
                         else:
                             market_name = "totals_nhl"
                         for selection, odds in pair:
-                            rows.append(_build_row(
-                                sport, fixture_id, match_start, bk, market_name,
-                                selection, line, odds, overround, snapshot_type,
-                                source_request_id,
-                            ))
+                            rows.append(
+                                _build_row(
+                                    sport,
+                                    fixture_id,
+                                    match_start,
+                                    bk,
+                                    market_name,
+                                    selection,
+                                    line,
+                                    odds,
+                                    overround,
+                                    snapshot_type,
+                                    source_request_id,
+                                )
+                            )
     return rows
 
 
@@ -271,9 +315,7 @@ _RETRY_DELAYS = [1.0, 2.0, 4.0]
 _HTTP_TIMEOUT = 30.0
 _UPSERT_CHUNK = 500
 
-assert len(_RETRY_DELAYS) >= _MAX_RETRIES, (
-    "_RETRY_DELAYS must have at least _MAX_RETRIES entries"
-)
+assert len(_RETRY_DELAYS) >= _MAX_RETRIES, "_RETRY_DELAYS must have at least _MAX_RETRIES entries"
 
 
 def fetch_odds(
@@ -312,9 +354,7 @@ def fetch_odds(
             continue
 
         if resp.status_code == 429:
-            raise OddsAPIQuotaExhausted(
-                f"The Odds API quota exhausted for sport={sport_key}"
-            )
+            raise OddsAPIQuotaExhausted(f"The Odds API quota exhausted for sport={sport_key}")
 
         if resp.status_code >= 500:
             last_error = RuntimeError(f"HTTP {resp.status_code}")
@@ -330,9 +370,7 @@ def fetch_odds(
         # CDN-stale 0-quota headers on 5xx turning transient errors fatal.
         remaining_header = resp.headers.get("x-requests-remaining")
         if remaining_header is not None and str(remaining_header) == "0":
-            raise OddsAPIQuotaExhausted(
-                f"x-requests-remaining=0 for sport={sport_key}"
-            )
+            raise OddsAPIQuotaExhausted(f"x-requests-remaining=0 for sport={sport_key}")
 
         resp.raise_for_status()
         if remaining_header is not None:
@@ -347,9 +385,7 @@ def fetch_odds(
                 pass
         return resp.json()
 
-    raise RuntimeError(
-        f"fetch_odds exhausted retries for sport={sport_key}: {last_error}"
-    )
+    raise RuntimeError(f"fetch_odds exhausted retries for sport={sport_key}: {last_error}")
 
 
 def upsert_odds(rows: list[dict]) -> int:
@@ -385,9 +421,7 @@ def upsert_odds(rows: list[dict]) -> int:
             )
             .execute()
         )
-        logger.debug(
-            "upsert_odds chunk=%d rows=%d", chunk_idx, len(chunk)
-        )
+        logger.debug("upsert_odds chunk=%d rows=%d", chunk_idx, len(chunk))
         total += len(chunk)
     return total
 
@@ -400,6 +434,7 @@ def _try_send_telegram(message: str) -> None:
     """Envoi Telegram tolérant (ne bloque jamais le flow principal)."""
     try:
         from src.notifications import send_telegram
+
         send_telegram(message)
     except Exception:
         logger.exception("[_try_send_telegram] failed to send alert")
@@ -422,9 +457,7 @@ def run_snapshot(*, snapshot_type: str) -> int:
         Nombre total de rows soumis à upsert (≠ inserts réussis).
     """
     api_key = _get_api_key()
-    bookmakers_param = ",".join(
-        ODDS_API_KEY_BY_BOOKMAKER[b] for b in BOOKMAKERS_FR
-    )
+    bookmakers_param = ",".join(ODDS_API_KEY_BY_BOOKMAKER[b] for b in BOOKMAKERS_FR)
     request_id = f"{snapshot_type}-{uuid.uuid4().hex[:12]}"
     total_rows = 0
 
@@ -442,9 +475,7 @@ def run_snapshot(*, snapshot_type: str) -> int:
                     bookmakers=bookmakers_param,
                 )
             except OddsAPIQuotaExhausted as exc:
-                logger.critical(
-                    "[odds_ingestor] Quota exhausted, stopping snapshot: %s", exc
-                )
+                logger.critical("[odds_ingestor] Quota exhausted, stopping snapshot: %s", exc)
                 _try_send_telegram(
                     f"\U0001f534 <b>CRITICAL — The Odds API quota exhausted</b>\n"
                     f"snapshot_type={snapshot_type}\n"
@@ -455,7 +486,8 @@ def run_snapshot(*, snapshot_type: str) -> int:
                 failures += 1
                 logger.exception(
                     "[odds_ingestor] fetch failed sport_key=%s err=%s",
-                    sport_key, exc,
+                    sport_key,
+                    exc,
                 )
                 continue
 
@@ -468,9 +500,7 @@ def run_snapshot(*, snapshot_type: str) -> int:
             if rows:
                 upsert_odds(rows)
                 total_rows += len(rows)
-                logger.info(
-                    "[odds_ingestor] sport_key=%s rows=%d", sport_key, len(rows)
-                )
+                logger.info("[odds_ingestor] sport_key=%s rows=%d", sport_key, len(rows))
 
     if total_sport_keys_attempted > 0 and failures == total_sport_keys_attempted:
         _try_send_telegram(
@@ -478,9 +508,7 @@ def run_snapshot(*, snapshot_type: str) -> int:
             f"snapshot_type={snapshot_type}\n"
             f"All {total_sport_keys_attempted} sport_keys failed. Check logs."
         )
-        raise RuntimeError(
-            f"run_snapshot failed on all {total_sport_keys_attempted} sport_keys"
-        )
+        raise RuntimeError(f"run_snapshot failed on all {total_sport_keys_attempted} sport_keys")
     return total_rows
 
 
@@ -494,9 +522,7 @@ def run_snapshot_for_fixtures(fixture_ids: list[str]) -> int:
         return 0
 
     api_key = _get_api_key()
-    bookmakers_param = ",".join(
-        ODDS_API_KEY_BY_BOOKMAKER[b] for b in BOOKMAKERS_FR
-    )
+    bookmakers_param = ",".join(ODDS_API_KEY_BY_BOOKMAKER[b] for b in BOOKMAKERS_FR)
     request_id = f"closing-{uuid.uuid4().hex[:12]}"
     fixture_ids_set = {str(f) for f in fixture_ids}
     total_rows = 0
@@ -512,9 +538,7 @@ def run_snapshot_for_fixtures(fixture_ids: list[str]) -> int:
                     bookmakers=bookmakers_param,
                 )
             except OddsAPIQuotaExhausted as exc:
-                logger.critical(
-                    "[odds_ingestor] closing quota exhausted: %s", exc
-                )
+                logger.critical("[odds_ingestor] closing quota exhausted: %s", exc)
                 _try_send_telegram(
                     f"\U0001f534 <b>CRITICAL — Quota exhausted on closing snapshot</b>\n{exc}"
                 )
@@ -522,7 +546,8 @@ def run_snapshot_for_fixtures(fixture_ids: list[str]) -> int:
             except Exception as exc:
                 logger.exception(
                     "[odds_ingestor] closing fetch failed sport_key=%s err=%s",
-                    sport_key, exc,
+                    sport_key,
+                    exc,
                 )
                 continue
 
@@ -543,7 +568,8 @@ def run_snapshot_for_fixtures(fixture_ids: list[str]) -> int:
             total_rows += len(rows)
             logger.info(
                 "[odds_ingestor] closing sport_key=%s rows=%d",
-                sport_key, len(rows),
+                sport_key,
+                len(rows),
             )
     return total_rows
 
@@ -573,10 +599,12 @@ def _load_today_fixtures_for_closing() -> list[dict]:
             k = datetime.fromisoformat(str(r["date"]).replace("Z", "+00:00"))
             if k.tzinfo is None:
                 continue
-            out.append({
-                "fixture_id": str(r["id"]),
-                "kickoff_utc": k.astimezone(timezone.utc),
-            })
+            out.append(
+                {
+                    "fixture_id": str(r["id"]),
+                    "kickoff_utc": k.astimezone(timezone.utc),
+                }
+            )
     except Exception:
         logger.exception("[_load_today_fixtures_for_closing] football load failed")
 
@@ -596,10 +624,12 @@ def _load_today_fixtures_for_closing() -> list[dict]:
             k = datetime.fromisoformat(str(r["game_date"]).replace("Z", "+00:00"))
             if k.tzinfo is None:
                 continue
-            out.append({
-                "fixture_id": str(r["game_id"]),
-                "kickoff_utc": k.astimezone(timezone.utc),
-            })
+            out.append(
+                {
+                    "fixture_id": str(r["game_id"]),
+                    "kickoff_utc": k.astimezone(timezone.utc),
+                }
+            )
     except Exception:
         logger.exception("[_load_today_fixtures_for_closing] nhl load failed")
 
@@ -627,7 +657,8 @@ def schedule_closing_snapshots_for_today(scheduler) -> int:
             # Match already started / very close; skip
             logger.debug(
                 "[schedule_closing_snapshots] skip past trigger fixture=%s kickoff=%s",
-                fx["fixture_id"], fx["kickoff_utc"],
+                fx["fixture_id"],
+                fx["kickoff_utc"],
             )
             continue
         job_id = f"closing_{fx['fixture_id']}"
@@ -649,6 +680,7 @@ def schedule_closing_snapshots_for_today(scheduler) -> int:
             )
     logger.info(
         "[schedule_closing_snapshots] scheduled=%d over %d fixtures",
-        scheduled, len(fixtures),
+        scheduled,
+        len(fixtures),
     )
     return scheduled

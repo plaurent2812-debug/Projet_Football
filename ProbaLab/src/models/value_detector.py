@@ -9,6 +9,7 @@ Used by:
     - Daily pipeline (job_brain) to flag value bets in DB
     - GET /api/value-bets endpoint (SS3 consumer)
 """
+
 from __future__ import annotations
 
 import logging
@@ -42,9 +43,7 @@ def best_odds_per_selection(rows: list[dict], *, market: str) -> dict[str, dict]
     return out
 
 
-def kelly_fractional(
-    *, edge: float, odds: float, fraction: float = KELLY_FRACTION
-) -> float:
+def kelly_fractional(*, edge: float, odds: float, fraction: float = KELLY_FRACTION) -> float:
     """Kelly fractional conservatrice.
 
     kelly_full = edge / (odds - 1)

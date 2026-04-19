@@ -8,6 +8,7 @@ Design:
 
 Critère de sélection : meilleur Brier sur holdout **ET** CLV ≥ baseline.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

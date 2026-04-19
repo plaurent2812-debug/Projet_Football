@@ -1,4 +1,5 @@
 """Tests pour GET /api/value-bets?date=YYYY-MM-DD."""
+
 from __future__ import annotations
 
 import pytest
@@ -8,15 +9,14 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client(monkeypatch):
     from api import main
+
     return TestClient(main.app)
 
 
 def test_value_bets_returns_empty_when_no_predictions(client, monkeypatch):
     from api.routers import value_bets
 
-    monkeypatch.setattr(
-        value_bets, "_load_day_matches", lambda d: []
-    )
+    monkeypatch.setattr(value_bets, "_load_day_matches", lambda d: [])
 
     resp = client.get("/api/value-bets?date=2026-04-20")
     assert resp.status_code == 200
@@ -44,10 +44,13 @@ def test_value_bets_returns_shape_from_spec(client, monkeypatch):
         },
         "value_bets": [
             {
-                "market": "1x2", "selection": "draw",
-                "proba_model": 22.1, "best_odds": 4.80,
+                "market": "1x2",
+                "selection": "draw",
+                "proba_model": 22.1,
+                "best_odds": 4.80,
                 "bookmaker": "betclic",
-                "edge_pct": 6.08, "kelly_fractional": 0.015,
+                "edge_pct": 6.08,
+                "kelly_fractional": 0.015,
             }
         ],
     }

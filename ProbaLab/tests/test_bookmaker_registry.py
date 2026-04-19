@@ -1,4 +1,5 @@
 """Tests pour le registre bookmakers — mapping noms internes ↔ The Odds API keys."""
+
 from __future__ import annotations
 
 import pytest

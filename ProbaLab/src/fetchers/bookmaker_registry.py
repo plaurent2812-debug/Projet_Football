@@ -3,6 +3,7 @@
 Source The Odds API v4 : https://the-odds-api.com/sports-odds-data/betting-markets.html
 Les clés bookmaker sont celles exposées par l'endpoint /v4/sports/{sport}/odds.
 """
+
 from __future__ import annotations
 
 BOOKMAKERS_FR: list[str] = [
@@ -26,14 +27,14 @@ ODDS_API_KEY_BY_BOOKMAKER: dict[str, str] = {
 # Sport keys The Odds API (v4)
 SPORT_KEYS: dict[str, list[str]] = {
     "football": [
-        "soccer_france_ligue_one",     # Ligue 1
-        "soccer_france_ligue_two",     # Ligue 2
-        "soccer_epl",                  # Premier League
-        "soccer_spain_la_liga",        # La Liga
-        "soccer_italy_serie_a",        # Serie A
-        "soccer_germany_bundesliga",   # Bundesliga
-        "soccer_uefa_champs_league",   # UCL
-        "soccer_uefa_europa_league",   # UEL
+        "soccer_france_ligue_one",  # Ligue 1
+        "soccer_france_ligue_two",  # Ligue 2
+        "soccer_epl",  # Premier League
+        "soccer_spain_la_liga",  # La Liga
+        "soccer_italy_serie_a",  # Serie A
+        "soccer_germany_bundesliga",  # Bundesliga
+        "soccer_uefa_champs_league",  # UCL
+        "soccer_uefa_europa_league",  # UEL
     ],
     "nhl": ["icehockey_nhl"],
 }

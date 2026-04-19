@@ -71,15 +71,19 @@ def test_team_strengths_computed_with_match_date_filter():
                 target = node
                 break
 
-    assert target is not None, (
-        "calculate_team_strengths function not found in stats_engine.py"
-    )
+    assert target is not None, "calculate_team_strengths function not found in stats_engine.py"
 
     param_names = {a.arg for a in target.args.args}
     param_names |= {a.arg for a in target.args.kwonlyargs}
 
-    date_params = {"as_of_date", "match_date", "kickoff_date", "fixture_date",
-                   "until_date", "before_date"}
+    date_params = {
+        "as_of_date",
+        "match_date",
+        "kickoff_date",
+        "fixture_date",
+        "until_date",
+        "before_date",
+    }
 
     assert param_names & date_params, (
         f"calculate_team_strengths has no date-filter parameter. "

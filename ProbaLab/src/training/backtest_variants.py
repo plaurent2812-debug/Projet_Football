@@ -8,6 +8,7 @@ Steps:
     2. For each variant: train XGBoost 1X2 → eval on holdout → Brier/LogLoss
     3. Print markdown report to stdout + write to --out
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,10 +24,18 @@ from src.training.variants import ALL_VARIANTS, MARKET_FEATURE_NAMES, get_varian
 logger = logging.getLogger("football_ia.backtest_variants")
 
 _FEATURE_NAMES_MIN = [
-    "xg_home", "xg_away", "home_elo", "away_elo", "elo_diff",
-    "home_form", "away_form", "form_diff",
-    "home_xg_per_shot", "away_xg_per_shot",
-    "league_avg_home_goals", "league_avg_away_goals",
+    "xg_home",
+    "xg_away",
+    "home_elo",
+    "away_elo",
+    "elo_diff",
+    "home_form",
+    "away_form",
+    "form_diff",
+    "home_xg_per_shot",
+    "away_xg_per_shot",
+    "league_avg_home_goals",
+    "league_avg_away_goals",
     *MARKET_FEATURE_NAMES,
 ]
 
@@ -58,43 +67,69 @@ def build_synthetic_dataset(
     u = rng.random(n)
     labels = np.where(u < p_home, 0, np.where(u < p_home + p_draw, 1, 2))
 
-    df = pd.DataFrame({
-        "match_date": pd.date_range("2024-01-01", periods=n, freq="D"),
-        "xg_home": rng.uniform(0.5, 3.0, n),
-        "xg_away": rng.uniform(0.5, 3.0, n),
-        "home_elo": rng.normal(1600, 100, n),
-        "away_elo": rng.normal(1600, 100, n),
-        "elo_diff": elo_diff,
-        "home_form": rng.uniform(0, 3, n),
-        "away_form": rng.uniform(0, 3, n),
-        "form_diff": form_diff,
-        "home_xg_per_shot": rng.uniform(0.08, 0.15, n),
-        "away_xg_per_shot": rng.uniform(0.08, 0.15, n),
-        "league_avg_home_goals": np.full(n, 1.5),
-        "league_avg_away_goals": np.full(n, 1.2),
-        # market features: implied probs avec bruit
-        "market_home_prob": p_home * 100 + rng.normal(0, 2, n),
-        "market_draw_prob": p_draw * 100 + rng.normal(0, 2, n),
-        "market_away_prob": p_away * 100 + rng.normal(0, 2, n),
-        "market_btts_prob": rng.uniform(40, 65, n),
-        "market_over25_prob": rng.uniform(40, 65, n),
-        "market_over15_prob": rng.uniform(60, 85, n),
-        "label_1x2": labels,
-    })
+    df = pd.DataFrame(
+        {
+            "match_date": pd.date_range("2024-01-01", periods=n, freq="D"),
+            "xg_home": rng.uniform(0.5, 3.0, n),
+            "xg_away": rng.uniform(0.5, 3.0, n),
+            "home_elo": rng.normal(1600, 100, n),
+            "away_elo": rng.normal(1600, 100, n),
+            "elo_diff": elo_diff,
+            "home_form": rng.uniform(0, 3, n),
+            "away_form": rng.uniform(0, 3, n),
+            "form_diff": form_diff,
+            "home_xg_per_shot": rng.uniform(0.08, 0.15, n),
+            "away_xg_per_shot": rng.uniform(0.08, 0.15, n),
+            "league_avg_home_goals": np.full(n, 1.5),
+            "league_avg_away_goals": np.full(n, 1.2),
+            # market features: implied probs avec bruit
+            "market_home_prob": p_home * 100 + rng.normal(0, 2, n),
+            "market_draw_prob": p_draw * 100 + rng.normal(0, 2, n),
+            "market_away_prob": p_away * 100 + rng.normal(0, 2, n),
+            "market_btts_prob": rng.uniform(40, 65, n),
+            "market_over25_prob": rng.uniform(40, 65, n),
+            "market_over15_prob": rng.uniform(60, 85, n),
+            "label_1x2": labels,
+        }
+    )
     # Compléter les autres FEATURE_COLS avec zéros (le modèle apprend à les ignorer)
     for col in [
-        "home_attack_strength", "home_defense_strength", "away_attack_strength",
-        "away_defense_strength", "home_rest_days", "away_rest_days",
-        "home_congestion_30d", "away_congestion_30d", "home_stakes", "away_stakes",
-        "h2h_home_winrate", "h2h_total_matches", "home_injury_count",
-        "away_injury_count", "home_momentum", "away_momentum",
-        "home_fatigue_index", "away_fatigue_index", "home_goal_diff_avg",
-        "away_goal_diff_avg", "home_result_variance", "away_result_variance",
-        "home_clean_sheet_rate", "away_clean_sheet_rate", "home_ppg_last5",
-        "away_ppg_last5", "home_btts_rate_last10", "away_btts_rate_last10",
-        "home_over25_rate_last10", "away_over25_rate_last10",
-        "league_avg_btts_rate", "league_avg_over25_rate",
-        "elo_diff_squared", "home_form_long", "away_form_long", "form_long_diff",
+        "home_attack_strength",
+        "home_defense_strength",
+        "away_attack_strength",
+        "away_defense_strength",
+        "home_rest_days",
+        "away_rest_days",
+        "home_congestion_30d",
+        "away_congestion_30d",
+        "home_stakes",
+        "away_stakes",
+        "h2h_home_winrate",
+        "h2h_total_matches",
+        "home_injury_count",
+        "away_injury_count",
+        "home_momentum",
+        "away_momentum",
+        "home_fatigue_index",
+        "away_fatigue_index",
+        "home_goal_diff_avg",
+        "away_goal_diff_avg",
+        "home_result_variance",
+        "away_result_variance",
+        "home_clean_sheet_rate",
+        "away_clean_sheet_rate",
+        "home_ppg_last5",
+        "away_ppg_last5",
+        "home_btts_rate_last10",
+        "away_btts_rate_last10",
+        "home_over25_rate_last10",
+        "away_over25_rate_last10",
+        "league_avg_btts_rate",
+        "league_avg_over25_rate",
+        "elo_diff_squared",
+        "home_form_long",
+        "away_form_long",
+        "form_long_diff",
     ]:
         df[col] = 0.0
     df["elo_diff_squared"] = df["elo_diff"] ** 2
@@ -137,9 +172,7 @@ def evaluate_variant(
     )
     model.fit(X_train, y_train)
     probs = model.predict_proba(X_hold)
-    brier = float(np.mean(
-        np.sum((probs - _one_hot(y_hold, 3)) ** 2, axis=1) / 3.0
-    ))
+    brier = float(np.mean(np.sum((probs - _one_hot(y_hold, 3)) ** 2, axis=1) / 3.0))
     ll = float(log_loss(y_hold, probs, labels=[0, 1, 2]))
 
     return {

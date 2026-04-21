@@ -66,28 +66,45 @@ def normalize_team_name(name: str) -> str:
       - strip + lowercase
       - suppression des ponctuations ('.', ',', '-')
       - normalisation des espaces multiples
-      - drop des suffixes NHL instables ("hockey club", "mammoth")
-      - rename map explicite pour les cas documentés (Utah rebrand 2025-26)
+      - drop des préfixes courants ("ca ", "rcd ", "rc ", "sc ", "ac ", "fc ")
+      - drop des suffixes NHL instables et foot ("hockey club", "mammoth", "fc", "cf", "club", "bilbao")
+      - rename map explicite pour les cas documentés (Utah rebrand, La Liga variants)
 
-    Reference : leçon 69 de tasks/lessons.md (NHL + foot cross-provider drift).
+    Reference : leçon 69 (NHL + foot cross-provider drift) + smoke test 2026-04-21
+    (Athletic Bilbao/Club, CA Osasuna/Osasuna).
     """
     if not isinstance(name, str):
         return ""
     s = name.strip().lower()
+
     # Ponctuations courantes
-    for ch in (".", ","):
-        s = s.replace(ch, "")
-    # Normaliser les espaces
+    for ch in (".", ",", "-"):
+        s = s.replace(ch, " ")
     s = " ".join(s.split())
-    # Suffixes NHL fragiles
-    for suffix in (" hockey club", " mammoth"):
+
+    # Préfixes courants foot
+    for prefix in ("ca ", "rcd ", "rc ", "sc ", "ac ", "fc ", "cd ", "ud "):
+        if s.startswith(prefix):
+            s = s[len(prefix) :].strip()
+            break
+
+    # Suffixes NHL fragiles + foot fréquents
+    for suffix in (
+        " hockey club",
+        " mammoth",
+        " fc",
+        " cf",
+        " club",
+        " bilbao",  # Athletic Bilbao → Athletic (pour matcher Athletic Club)
+    ):
         if s.endswith(suffix):
             s = s[: -len(suffix)].strip()
             break
-    # Renames explicites (Utah 2025-26)
+
+    # Renames explicites (cas non couverts par prefix/suffix)
     rename_map = {
-        "utah": "utah",  # placeholder — Utah est déjà canonique après drop suffix
         "paris saint germain": "paris saint-germain",
+        "psg": "paris saint-germain",
     }
     s = rename_map.get(s, s)
     return s

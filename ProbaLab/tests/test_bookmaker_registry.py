@@ -87,3 +87,36 @@ def test_teams_match_false_for_different_teams():
     from src.fetchers.bookmaker_registry import teams_match
 
     assert not teams_match("Arsenal", "Chelsea")
+
+
+def test_normalize_team_name_matches_athletic_bilbao_vs_athletic_club():
+    """Regression smoke 2026-04-21 — Odds API returns 'Athletic Bilbao',
+    API-Football DB has 'Athletic Club'."""
+    from src.fetchers.bookmaker_registry import teams_match
+
+    assert teams_match("Athletic Bilbao", "Athletic Club")
+
+
+def test_normalize_team_name_matches_ca_osasuna_vs_osasuna():
+    """Regression smoke 2026-04-21 — Odds API returns 'CA Osasuna',
+    API-Football DB has 'Osasuna'."""
+    from src.fetchers.bookmaker_registry import teams_match
+
+    assert teams_match("CA Osasuna", "Osasuna")
+
+
+def test_normalize_team_name_psg_variants():
+    """PSG peut apparaitre avec ou sans tiret."""
+    from src.fetchers.bookmaker_registry import teams_match
+
+    assert teams_match("Paris Saint Germain", "Paris Saint-Germain")
+    assert teams_match("PSG", "Paris Saint-Germain")
+
+
+def test_normalize_team_name_does_not_false_match():
+    """Les équipes différentes ne doivent PAS matcher (garde contre over-normalization)."""
+    from src.fetchers.bookmaker_registry import teams_match
+
+    assert not teams_match("Real Madrid", "Real Sociedad")
+    assert not teams_match("Brighton", "Brentford")
+    assert not teams_match("Manchester City", "Manchester United")

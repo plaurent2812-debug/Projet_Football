@@ -426,7 +426,9 @@ def upsert_odds(rows: list[dict]) -> int:
     return total
 
 
-_FOOT_MARKETS = "h2h,btts,totals"
+_FOOT_MARKETS = (
+    "h2h,totals"  # NB: btts requires per-event endpoint (not /odds) — see live test 2026-04-21
+)
 _NHL_MARKETS = "h2h,totals"
 
 

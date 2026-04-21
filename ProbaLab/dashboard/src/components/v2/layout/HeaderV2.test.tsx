@@ -66,6 +66,50 @@ describe('HeaderV2', () => {
     expect(badge.className).toMatch(/md:/);
   });
 
+  it('marks Accueil as current page when on /', () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <HeaderV2 userRole="free" />
+      </MemoryRouter>
+    );
+    const accueilLinks = screen.getAllByRole('link', { name: /accueil/i });
+    // The nav link (not the logo) should be aria-current
+    const current = accueilLinks.find((l) => l.getAttribute('aria-current') === 'page');
+    expect(current).toBeDefined();
+    const matchs = screen.getByRole('link', { name: /^matchs$/i });
+    expect(matchs).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks Matchs as current page when on /matchs', () => {
+    render(
+      <MemoryRouter initialEntries={['/matchs']}>
+        <HeaderV2 userRole="free" />
+      </MemoryRouter>
+    );
+    const matchs = screen.getByRole('link', { name: /^matchs$/i });
+    expect(matchs).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('marks Matchs as current page on nested /matchs/123', () => {
+    render(
+      <MemoryRouter initialEntries={['/matchs/123']}>
+        <HeaderV2 userRole="free" />
+      </MemoryRouter>
+    );
+    const matchs = screen.getByRole('link', { name: /^matchs$/i });
+    expect(matchs).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('marks Compte as current page when on /compte', () => {
+    render(
+      <MemoryRouter initialEntries={['/compte']}>
+        <HeaderV2 userRole="free" />
+      </MemoryRouter>
+    );
+    const compte = screen.getByRole('link', { name: /^compte$/i });
+    expect(compte).toHaveAttribute('aria-current', 'page');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <MemoryRouter>

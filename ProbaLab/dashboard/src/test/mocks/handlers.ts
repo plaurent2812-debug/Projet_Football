@@ -1,6 +1,11 @@
 import { http, HttpResponse } from 'msw';
 import type { Sport } from '@/types/v2/matches';
-import { mockMatches, mockPerformance, mockSafePick } from './fixtures';
+import {
+  mockMatches,
+  mockPerformance,
+  mockSafePick,
+  mockMatchDetailById,
+} from './fixtures';
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -43,4 +48,14 @@ export const handlers = [
   }),
 
   http.get(`${API}/api/performance/summary`, () => HttpResponse.json(mockPerformance)),
+
+  // Lot 4 — Match detail (predictions)
+  http.get(`${API}/api/predictions/:fixtureId`, ({ params }) => {
+    const fixtureId = String(params.fixtureId);
+    const payload = mockMatchDetailById[fixtureId];
+    if (!payload) {
+      return HttpResponse.json({ error: 'fixture_not_found' }, { status: 404 });
+    }
+    return HttpResponse.json(payload);
+  }),
 ];

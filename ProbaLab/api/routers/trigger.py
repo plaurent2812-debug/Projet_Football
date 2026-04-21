@@ -1,22 +1,18 @@
 """
 api/routers/trigger.py — Endpoints admin/trigger pour ProbaLab.
 
-IMPORTANT — SOURCE DE VÉRITÉ DU SCHEDULING :
-  APScheduler (worker.py) est la SEULE source de scheduling automatique.
-  Les endpoints ci-dessous sont des déclenchements AD-HOC manuels uniquement
-  (admin, debug, re-run, backtest).  Ne jamais en faire des crons depuis
-  Trigger.dev ou un scheduler externe — cela créerait une double source
-  silencieuse (leçon 64 NHL, 2026-04-17).
+SOURCE DE VÉRITÉ DU SCHEDULING (MAJ 2026-04-21) :
+  En production, Trigger.dev Cloud est le scheduler actif — il appelle
+  ces endpoints via HTTP POST authentifiés par CRON_SECRET.
+  `worker.py` (APScheduler) n'est PAS lancé sur Railway — les cron jobs
+  qui y sont définis sont dormants. Toute nouvelle routine périodique
+  doit passer par Trigger.dev + un endpoint ici, PAS par APScheduler.
 
-ENDPOINTS SUPPRIMÉS le 2026-04-17 (duplicates des crons APScheduler) :
-  - POST /update-live-scores       → remplacé par job_live (*/5 min)
-  - POST /nhl-update-live-scores   → remplacé par job_live (*/5 min, NHL branch)
-  - POST /run-daily-pipeline       → remplacé par job_data_pipeline + job_brain
-  - POST /daily-recap              → remplacé par job_results (*/15 min)
-  - POST /detect-value-bets        → remplacé par job_football_picks (12:00)
-  - POST /nhl-fetch-odds           → remplacé par job_nhl_fetch_odds (16:15/23:15)
-  - POST /nhl-run-pipeline         → remplacé par job_nhl_pipeline (16:00/23:00)
-  - POST /nhl-evaluate-performance → remplacé par job_nhl_evaluation (08:00)
+ENDPOINTS CLV (H2-SS1, ajoutés 2026-04-21) sous /api/trigger/clv/* :
+  - POST /clv/opening          → run_snapshot("opening")  [08:00 UTC]
+  - POST /clv/daily-snapshot   → run_daily_clv_snapshot() [09:00 UTC]
+  - POST /clv/drift            → run_feature_drift_check()[09:30 UTC]
+  - POST /clv/closing-tick     → snapshot closing T-30min [every 15 min]
 """
 
 from __future__ import annotations

@@ -1024,3 +1024,27 @@ def clv_opening_snapshot() -> dict:
     duration_ms = int((time.monotonic() - t0) * 1000)
     logger.info("[clv/opening] rows_submitted=%d duration_ms=%d", n, duration_ms)
     return {"status": "ok", "rows_submitted": n, "duration_ms": duration_ms}
+
+
+@router.post("/clv/daily-snapshot")
+def clv_daily_snapshot_endpoint() -> dict:
+    """09:00 UTC — CLV J-1 vs Pinnacle + moyenne FR, upsert model_health_log.
+
+    Déclenché par Trigger.dev (schedule `clv-daily-snapshot`).
+    """
+    from src.monitoring.clv_engine import run_daily_clv_snapshot
+
+    try:
+        payload = run_daily_clv_snapshot()
+    except Exception as exc:
+        logger.exception("[clv/daily-snapshot] run_daily_clv_snapshot failed")
+        raise HTTPException(
+            status_code=500, detail=f"run_daily_clv_snapshot failed: {exc}"
+        ) from exc
+
+    logger.info(
+        "[clv/daily-snapshot] n_matches=%d variant=%s",
+        payload.get("n_matches_clv", 0),
+        payload.get("variant_id", "?"),
+    )
+    return {"status": "ok", "payload": payload}

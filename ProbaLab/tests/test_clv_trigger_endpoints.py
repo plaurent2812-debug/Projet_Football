@@ -73,3 +73,50 @@ def test_clv_opening_calls_run_snapshot(client, auth_headers, monkeypatch):
     assert called_with["snapshot_type"] == "opening"
     assert isinstance(body["duration_ms"], int)
     assert body["duration_ms"] >= 0
+
+
+# ═══════════════════════════════════════════════════════════════
+#  /api/trigger/clv/daily-snapshot
+# ═══════════════════════════════════════════════════════════════
+
+
+def test_clv_daily_snapshot_requires_auth(client):
+    resp = client.post("/api/trigger/clv/daily-snapshot", json={})
+    assert resp.status_code == 401
+
+
+def test_clv_daily_snapshot_returns_payload(client, auth_headers, monkeypatch):
+    """Happy path : appelle run_daily_clv_snapshot() et renvoie le résultat
+    encapsulé sous 'payload'."""
+    from src.monitoring import clv_engine
+
+    fake_payload = {
+        "sport": "football",
+        "n_matches_clv": 12,
+        "clv_vs_pinnacle_1x2": 0.018,
+        "variant_id": "baseline",
+    }
+
+    def fake_run_daily() -> dict:
+        return fake_payload
+
+    monkeypatch.setattr(clv_engine, "run_daily_clv_snapshot", fake_run_daily)
+
+    resp = client.post("/api/trigger/clv/daily-snapshot", headers=auth_headers, json={})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["payload"] == fake_payload
+
+
+def test_clv_daily_snapshot_500_on_exception(client, auth_headers, monkeypatch):
+    """Si run_daily_clv_snapshot lève, renvoyer 500."""
+    from src.monitoring import clv_engine
+
+    def fake_run_daily() -> dict:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(clv_engine, "run_daily_clv_snapshot", fake_run_daily)
+
+    resp = client.post("/api/trigger/clv/daily-snapshot", headers=auth_headers, json={})
+    assert resp.status_code == 500

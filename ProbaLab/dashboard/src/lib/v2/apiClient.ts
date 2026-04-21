@@ -19,3 +19,23 @@ export async function apiGet<T>(
   }
   return (await res.json()) as T;
 }
+
+/**
+ * POST JSON body and parse JSON response.
+ * Throws `Error` on non-2xx — callers (TanStack Query mutations) surface it.
+ */
+export async function apiPost<TBody, TResponse>(
+  path: string,
+  body: TBody,
+): Promise<TResponse> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`POST ${path} failed: ${res.status}`);
+  }
+  return (await res.json()) as TResponse;
+}

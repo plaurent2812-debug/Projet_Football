@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { Sport } from '@/types/v2/matches';
+import type { AddBetRequest, AddBetResponse } from '@/types/v2/match-detail';
 import {
   mockMatches,
   mockPerformance,
@@ -68,5 +69,25 @@ export const handlers = [
       return HttpResponse.json({ error: 'analysis_not_found' }, { status: 404 });
     }
     return HttpResponse.json(payload);
+  }),
+
+  // Lot 4 — Add a bet to the user bankroll
+  http.post(`${API}/api/user/bets`, async ({ request }) => {
+    const body = (await request.json()) as AddBetRequest;
+    if (!body || typeof body.stake !== 'number' || body.stake <= 0) {
+      return HttpResponse.json({ error: 'invalid_stake' }, { status: 400 });
+    }
+    if (!body.fixture_id || !body.market_key || typeof body.odds !== 'number') {
+      return HttpResponse.json({ error: 'invalid_payload' }, { status: 400 });
+    }
+    const response: AddBetResponse = {
+      id: `bet_${body.fixture_id}_${body.market_key}`,
+      fixture_id: body.fixture_id,
+      market_key: body.market_key,
+      odds: body.odds,
+      stake: body.stake,
+      placed_at: '2026-04-22T10:00:00Z',
+    };
+    return HttpResponse.json(response, { status: 201 });
   }),
 ];

@@ -1,11 +1,16 @@
+import { ProfileForm } from '@/components/v2/account/profile/ProfileForm';
+
 /**
- * Profile tab wrapper. Filled in by Task 10 (Bloc B).
+ * "Profil" tab page — thin wrapper around {@link ProfileForm}.
+ *
+ * Kept separate from the form so the route element stays a page-level
+ * component and the form remains reusable (tests, Storybook).
  */
 export function ProfileTab() {
   return (
-    <section data-testid="tab-profile-stub" aria-label="Profil — WIP">
-      Profil WIP
-    </section>
+    <div data-testid="profile-tab">
+      <ProfileForm />
+    </div>
   );
 }
 

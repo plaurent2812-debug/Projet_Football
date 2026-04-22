@@ -372,30 +372,66 @@ function AppContent() {
         <Suspense fallback={<PageLoader />}>
           <div className="animate-fade-in-up">
             <Routes>
+              {/* ═══════════════════════════════════════════════════════════════
+                  LEGACY ROUTES — scheduled for removal in Lot 6 Task 12
+                  ─────────────────────────────────────────────────────────────
+                  These routes only run when VITE_FRONTEND_V2=false (rollback
+                  path). Under V2 they're already covered by AppV2 (home,
+                  matches, premium, account) and/or intercepted by the
+                  LegacyRedirect components in src/app/v2/routes.tsx +
+                  the FastAPI LegacyRedirectMiddleware.
+
+                  Task 12 will :
+                    1. Delete the corresponding page files under src/pages/
+                    2. Delete the lazy imports above
+                    3. Remove this whole AppLegacy file once the flag is
+                       permanent (T0 + 7 days per CHANGELOG-v2-frontend.md)
+                  ─────────────────────────────────────────────────────────── */}
+              {/* TODO Task 12 — retire: replaced by V2 HomeV2 at "/". */}
               <Route path="/" element={<HomePage />} />
+              {/* TODO Task 12 — retire: replaced by V2 MatchesV2?sport=foot. */}
               <Route path="/football" element={
                 <FootballPage
                   date={date} setDate={setDate}
                   selectedLeague={selectedLeague} setSelectedLeague={setSelectedLeague}
                 />
               } />
+              {/* TODO Task 12 — retire: replaced by V2 /matchs/:fixtureId. */}
               <Route path="/football/match/:id" element={<MatchDetail />} />
               <Route path="/match/:id" element={<MatchDetail />} />
+              {/* TODO Task 12 — retire: replaced by V2 MatchesV2?sport=nhl. */}
               <Route path="/nhl" element={<NHLPage date={date} setDate={setDate} />} />
+              {/* TODO Task 12 — retire: replaced by V2 /matchs/:fixtureId. */}
               <Route path="/nhl/match/:id" element={<NHLMatchDetail />} />
-              <Route path="/performance" element={<AdminGuard><PerformancePage /></AdminGuard>} />
+              {/* TODO Task 12 — retire: replaced by V2 /premium. */}
               <Route path="/premium" element={<PremiumPage />} />
               <Route path="/abonnement" element={<PremiumPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/equipe/:name" element={<TeamProfile />} />
-              <Route path="/admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
+              {/* TODO Task 12 — retire: replaced by V2 /compte/profil. */}
               <Route path="/profile" element={<Protected><ProfilePage /></Protected>} />
+              {/* TODO Task 12 — retire: replaced by V2 /compte/bankroll. */}
               <Route path="/watchlist" element={<WatchlistPage />} />
+              {/* TODO Task 12 — retire: replaced by V2 /matchs?signal=value. */}
               <Route path="/paris-du-soir" element={<ParisDuSoirPage />} />
+              {/* TODO Task 12 — retire: replaced by V2 "/". */}
+              <Route path="/hero-showcase" element={<HeroShowcase />} />
+              {/* TODO Task 12 — retire: team profile not in V2 spec (deferred
+                  to a later Lot if demand resurfaces). */}
+              <Route path="/equipe/:name" element={<TeamProfile />} />
+
+              {/* ═══════════════════════════════════════════════════════════════
+                  KEEP (V1 + V2) — admin, perf, legal, auth utilities
+                  ─────────────────────────────────────────────────────────────
+                  These pages are NOT rebuilt in the V2 design refresh and
+                  survive Task 12 unchanged. They remain reachable either
+                  via this legacy router (V2 off) or via AppV2 fallback
+                  routes once they're wired there (follow-up PR).
+                  ─────────────────────────────────────────────────────────── */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
+              <Route path="/performance" element={<AdminGuard><PerformancePage /></AdminGuard>} />
               <Route path="/update-password" element={<UpdatePasswordPage />} />
               <Route path="/cgu" element={<CGUPage />} />
               <Route path="/confidentialite" element={<ConfidentialitePage />} />
-              <Route path="/hero-showcase" element={<HeroShowcase />} />
             </Routes>
           </div>
         </Suspense>

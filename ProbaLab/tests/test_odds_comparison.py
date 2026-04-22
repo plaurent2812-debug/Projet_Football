@@ -23,7 +23,7 @@ def test_odds_comparison_shape(mock_supabase, fake_user):
     )
 
     out = get_odds_comparison.__wrapped__(
-        fixture_id="f1", request=MagicMock(), user=fake_user
+        fixture_id="f1", request=MagicMock()
     )
 
     assert out["fixture_id"] == "f1"
@@ -36,7 +36,7 @@ def test_odds_comparison_empty_when_no_rows(mock_supabase, fake_user):
     mock_supabase.execute.return_value = MagicMock(data=[])
 
     out = get_odds_comparison.__wrapped__(
-        fixture_id="unknown-fixture", request=MagicMock(), user=fake_user
+        fixture_id="unknown-fixture", request=MagicMock()
     )
 
     assert out["fixture_id"] == "unknown-fixture"
@@ -48,7 +48,7 @@ def test_odds_comparison_queries_closing_odds(mock_supabase, fake_user):
     mock_supabase.execute.return_value = MagicMock(data=[])
 
     get_odds_comparison.__wrapped__(
-        fixture_id="f42", request=MagicMock(), user=fake_user
+        fixture_id="f42", request=MagicMock()
     )
 
     # Pick up every .table(name) call regardless of chain position.

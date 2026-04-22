@@ -32,6 +32,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from api.auth import current_user
+from api.helpers import _get_league_map
 from api.rate_limit import _rate_limit
 from src.config import supabase
 from src.models.matches_aggregator import aggregate_matches
@@ -232,16 +233,26 @@ def _fetch_football_rows(
     for bet in best_bets:
         bets_by_fix.setdefault(str(bet.get("fixture_id")), []).append(bet)
 
+    # League names come from the separate ``leagues`` table (keyed by api_id)
+    # since ``fixtures.league_name`` is NULL for most rows.
+    league_map = _get_league_map()
+
     rows: list[dict[str, Any]] = []
     for fx in fixtures:
         fid = str(fx.get("id"))
         pred = pred_by_fix.get(fid)
         pending_bets = bets_by_fix.get(fid, [])
+        lid = fx.get("league_id")
+        league_name = (
+            fx.get("league_name")
+            or (league_map.get(str(lid)) if lid is not None else None)
+            or "Ligue"
+        )
         row = {
             "fixture_id": fid,
             "sport": "football",
-            "league_id": fx.get("league_id"),
-            "league_name": fx.get("league_name") or "",
+            "league_id": lid,
+            "league_name": league_name,
             "home_team": fx.get("home_team"),
             "away_team": fx.get("away_team"),
             "home_logo": fx.get("home_logo"),

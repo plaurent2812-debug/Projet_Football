@@ -31,6 +31,7 @@ if RATE_LIMITING:
     from slowapi import _rate_limit_exceeded_handler
     from slowapi.errors import RateLimitExceeded
 
+from api.middleware.legacy_redirects import LegacyRedirectMiddleware
 from api.response_models import HealthResponse
 from api.routers import admin as admin_router
 from api.routers import best_bets as best_bets_router
@@ -175,6 +176,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ─── Legacy V1 → V2 Redirect Middleware (Lot 6 Bloc A) ───────────
+# Added AFTER SecurityHeadersMiddleware in code = executes BEFORE it at
+# runtime (Starlette middleware stack is LIFO). We want the 301 to short-
+# circuit the pipeline early without running router matching.
+app.add_middleware(LegacyRedirectMiddleware)
 
 
 # ─── Request ID Middleware ───────────────────────────────────────

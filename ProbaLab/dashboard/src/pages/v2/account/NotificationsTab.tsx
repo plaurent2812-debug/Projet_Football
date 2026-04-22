@@ -19,7 +19,7 @@ export interface NotificationsTabProps {
  * and leave the modal orchestration here.
  */
 export function NotificationsTab({
-  'data-testid': dataTestId = 'tab-notifications',
+  'data-testid': dataTestId = 'notifications-tab',
 }: NotificationsTabProps = {}) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingRule, setEditingRule] = useState<NotificationRule | null>(null);

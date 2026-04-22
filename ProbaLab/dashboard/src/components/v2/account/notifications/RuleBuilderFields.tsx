@@ -180,6 +180,7 @@ export function ChannelsPicker({
             >
               <input
                 id={id}
+                data-testid={`rule-channel-${opt.value}`}
                 type="checkbox"
                 checked={isChecked}
                 onChange={() => onToggle(opt.value)}

@@ -40,6 +40,7 @@ export function RulesList({
         </h2>
         <button
           type="button"
+          data-testid="new-rule-button"
           onClick={onCreate}
           className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         >

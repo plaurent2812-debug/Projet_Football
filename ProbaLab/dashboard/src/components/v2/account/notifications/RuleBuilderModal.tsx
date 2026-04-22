@@ -180,6 +180,7 @@ export function RuleBuilderModal({
           </button>
           <button
             type="submit"
+            data-testid="rule-save"
             form="rule-builder-form"
             disabled={isPending}
             className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
@@ -191,6 +192,7 @@ export function RuleBuilderModal({
     >
       <form
         id="rule-builder-form"
+        data-testid="rule-form"
         onSubmit={onSubmit}
         className="space-y-5"
         noValidate
@@ -204,6 +206,7 @@ export function RuleBuilderModal({
           </label>
           <input
             id="rule-name"
+            data-testid="rule-name-input"
             type="text"
             {...form.register('name')}
             aria-invalid={nameError ? 'true' : 'false'}

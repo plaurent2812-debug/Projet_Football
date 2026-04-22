@@ -41,6 +41,7 @@ export function HomeV2() {
   if (user.isVisitor) {
     return (
       <main
+        data-testid="home-landing"
         aria-label="Accueil ProbaLab"
         className="mx-auto max-w-5xl px-4 md:px-8 pb-10 space-y-8"
       >
@@ -65,6 +66,7 @@ export function HomeV2() {
 
   return (
     <main
+      data-testid="home-v2"
       aria-label="Tableau de bord ProbaLab"
       className="mx-auto max-w-7xl px-4 md:px-8 py-6 space-y-6"
     >

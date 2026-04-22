@@ -48,6 +48,7 @@ export function ConditionValueField({ index, condition, onChange }: Props) {
         </label>
         <input
           id={id}
+          data-testid="rule-edge-input"
           type="number"
           min={0}
           max={100}

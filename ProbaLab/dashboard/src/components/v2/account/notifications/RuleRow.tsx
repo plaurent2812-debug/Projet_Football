@@ -75,7 +75,7 @@ export function RuleRow({
   rule,
   onEdit,
   onDeleteRequest,
-  'data-testid': dataTestId = 'rule-row',
+  'data-testid': dataTestId = 'rule-list-item',
 }: RuleRowProps) {
   const toggle = useToggleRule(rule.id ?? '');
   const [menuOpen, setMenuOpen] = useState(false);

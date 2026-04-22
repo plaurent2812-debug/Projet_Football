@@ -53,3 +53,40 @@ Plateforme de prédictions sportives avec value betting
 ## Déploiement
 - Railway avec nixpacks — vérifier le Procfile avant tout push
 - GitHub Actions CI — les tests doivent passer en local avant push
+
+## Workflow vélocité (priorité qualité + sécurité + dette tech, zéro waste)
+
+### Dimensionner le process à la tâche
+- **Fix trivial** (1 fichier, ≤ 30 lignes, pas de logique métier — typo, import, valeur par défaut) : edit direct, pas de subagent, pas de plan.
+- **Fix ciblé** (1-5 fichiers, logique claire) : 1 subagent implementer + **1 seule review combinée** (spec + qualité). Plan ≤ 50 lignes, pas de pseudo-code verbatim.
+- **Feature / architecture** : workflow complet avec plan détaillé + 2 reviews séparées.
+
+### Reviews : sévérité explicite obligatoire
+Tout reviewer doit classer chaque issue :
+- **BLOCKING** : bug de correctness, faille de sécurité, régression de test, contrat API cassé, RLS absente → rework immédiat.
+- **IMPORTANT** : duplication notable, perf hot-path, contrat OpenAPI malhonnête, dette tech tangible → rework immédiat.
+- **NITPICK** : naming subjectif, `Number()`/`String()` redondant sur type déjà narrowed, docstring imprécise, magic numbers évidents dans leur contexte → **loggé en follow-up, jamais fixé dans le même commit**.
+
+### Ne pas reworker pour
+- Docstrings cosmétiques (« pure function » au lieu de « synchronous »)
+- Wrappers de coercion redondants (`Number(x)` quand `typeof x === 'number'` est déjà prouvé)
+- Renommage de variable locale sans impact (`leg` vs `pick`)
+- Placement d'imports (function-scope vs module-scope) sans problème de side-effect
+
+Ces éléments vont dans un commit refactor séparé si utile.
+
+### Garde-fous non négociables (priment sur la vitesse)
+- **TDD** : tout fix de bug commence par un test rouge qui reproduit le bug.
+- **Tests verts obligatoires avant push** — pas de régression tolérée.
+- **Sécurité** : aucun secret en clair, aucun endpoint admin sans `Depends(verify_internal_auth)`, RLS vérifiées sur toute nouvelle table.
+- **Shape API ↔ Frontend** : tout endpoint doit avoir un contract test qui épingle la shape attendue par le frontend (leçon 77).
+- **ErrorBoundary** : toute app React de prod DOIT avoir un ErrorBoundary à la racine (leçon 79).
+- **Pas de rework silencieux** : si un fix révèle une dette tech ou un anti-pattern qui dépasse le scope, créer une issue/todo dédiée — ne pas mélanger dans le commit courant.
+
+### Choix du modèle subagent
+- `haiku` : vérifications, renommages, fixtures, alignements de mocks.
+- `sonnet` : implémentation d'un fichier, refactor local, tests de composant.
+- `opus` : logique backend complexe, endpoints avec calculs métier, architecture.
+
+### Leçons : apprendre à chaque fois
+Après tout fix non trivial, ajouter une ligne à `ProbaLab/tasks/lessons.md` avec format `| date | problème | règle |` — relire au démarrage de toute nouvelle session.

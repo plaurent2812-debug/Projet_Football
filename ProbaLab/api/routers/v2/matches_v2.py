@@ -174,7 +174,7 @@ def _fetch_football_rows(
         query = (
             supabase.table("fixtures")
             .select(
-                "id, api_fixture_id, home_team, away_team, home_logo, away_logo, "
+                "id, api_fixture_id, home_team, away_team, "
                 "date, status, home_goals, away_goals, league_id, league_name"
             )
             .gte("date", f"{iso}T00:00:00Z")

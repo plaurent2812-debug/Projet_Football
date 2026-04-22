@@ -100,9 +100,77 @@ class MockSupabase:
 
 
 @pytest.fixture
-def mock_supabase():
-    """Retourne un MockSupabase configurable."""
+def mock_supabase_tables():
+    """Retourne un MockSupabase configurable (routage par table)."""
     return MockSupabase()
+
+
+@pytest.fixture
+def mock_supabase(monkeypatch):
+    """Chainable mock of the Supabase client used across v2 routers.
+
+    Every chain method (``table``, ``select``, ``eq``, ``gte``…) returns the
+    same mock so that call sites can configure ``mock.execute.side_effect`` or
+    ``mock.execute.return_value`` to drive a sequence of queries.
+
+    The fixture patches both ``src.config.supabase`` and ``api.auth.supabase``
+    so that routers that read from either module pick up the mock.
+    """
+    mock = MagicMock()
+
+    def chain(*_args, **_kwargs):
+        return mock
+
+    for method in (
+        "table",
+        "select",
+        "eq",
+        "neq",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "in_",
+        "is_",
+        "or_",
+        "filter",
+        "order",
+        "limit",
+        "range",
+        "insert",
+        "update",
+        "upsert",
+        "delete",
+        "single",
+    ):
+        getattr(mock, method).side_effect = chain
+
+    mock.execute.return_value = MagicMock(data=[], count=0)
+    monkeypatch.setattr("src.config.supabase", mock)
+    monkeypatch.setattr("api.auth.supabase", mock, raising=False)
+    # Patch every already-imported module that re-exported ``supabase`` via
+    # ``from src.config import supabase`` — those modules hold their own
+    # reference, so patching ``src.config.supabase`` alone is not enough.
+    import sys
+
+    for mod_name, mod in list(sys.modules.items()):
+        if mod is None:
+            continue
+        if not (
+            mod_name.startswith("api.routers.v2")
+            or mod_name.startswith("src.models")
+            or mod_name.startswith("src.notifications")
+        ):
+            continue
+        if hasattr(mod, "supabase"):
+            monkeypatch.setattr(f"{mod_name}.supabase", mock, raising=False)
+    return mock
+
+
+@pytest.fixture
+def fake_user():
+    """User payload injected via Depends(current_user) in v2 routers."""
+    return {"id": "00000000-0000-0000-0000-000000000001", "role": "premium"}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -132,6 +200,7 @@ def _build_offline_supabase_mock() -> MagicMock:
         "gt",
         "lt",
         "in_",
+        "is_",
         "or_",
         "order",
         "limit",

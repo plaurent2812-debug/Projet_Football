@@ -31,6 +31,7 @@ if RATE_LIMITING:
     from slowapi import _rate_limit_exceeded_handler
     from slowapi.errors import RateLimitExceeded
 
+from api.middleware.legacy_redirects import LegacyRedirectMiddleware
 from api.response_models import HealthResponse
 from api.routers import admin as admin_router
 from api.routers import best_bets as best_bets_router
@@ -46,6 +47,12 @@ from api.routers import search as search_router
 from api.routers import teams as teams_router
 from api.routers import telegram as telegram_router
 from api.routers import value_bets as value_bets_router
+from api.routers.v2 import matches_v2 as v2_matches
+from api.routers.v2 import odds_comparison as v2_odds_comparison
+from api.routers.v2 import public_track_record as v2_public_tr
+from api.routers.v2 import safe_pick as v2_safe_pick
+from api.routers.v2 import user_bankroll as v2_user_bankroll
+from api.routers.v2 import user_notifications as v2_user_notifications
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +123,14 @@ app.include_router(search_router.router)
 app.include_router(teams_router.router)
 app.include_router(value_bets_router.router)
 
+# ─── V2 Routers (refonte frontend V1) ────────────────────────────
+app.include_router(v2_public_tr.router)
+app.include_router(v2_safe_pick.router)
+app.include_router(v2_matches.router)
+app.include_router(v2_odds_comparison.router)
+app.include_router(v2_user_bankroll.router)
+app.include_router(v2_user_notifications.router)
+
 # ─── CORS Middleware ─────────────────────────────────────────────
 
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "")
@@ -161,6 +176,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ─── Legacy V1 → V2 Redirect Middleware (Lot 6 Bloc A) ───────────
+# Added AFTER SecurityHeadersMiddleware in code = executes BEFORE it at
+# runtime (Starlette middleware stack is LIFO). We want the 301 to short-
+# circuit the pipeline early without running router matching.
+app.add_middleware(LegacyRedirectMiddleware)
 
 
 # ─── Request ID Middleware ───────────────────────────────────────

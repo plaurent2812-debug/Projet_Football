@@ -1,0 +1,78 @@
+/*
+ * ProbaLab V2 design tokens — palette fintech/trading.
+ * Dark par défaut, light activable via `data-theme="light"` sur <html>.
+ * Grille 4px stricte.
+ */
+
+:root {
+  /* Palette — dark default */
+  --bg: #0a0e1a;
+  --surface: #111827;
+  --surface-2: #1f2937;
+  --border: #1f2937;
+  --text: #e5e7eb;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --primary: #10b981;
+  --primary-soft: #064e3b;
+  --value: #fbbf24;
+  --danger: #ef4444;
+  --info: #60a5fa;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Spacing — 4px grid */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Focus & transitions */
+  --focus-ring: 2px solid var(--primary);
+  --transition-fast: 150ms ease-out;
+
+  /* Layout */
+  --container-max: 1200px;
+  --breakpoint-mobile: 375px;
+}
+
+[data-theme="light"] {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f4f4f1;
+  --border: #e5e5e0;
+  --text: #0a0a0a;
+  --text-muted: #6b7280;
+  --text-faint: #9ca3af;
+  --primary: #059669;
+  --primary-soft: #d1fae5;
+  --value: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+}
+
+/* Base V2 — applied to body when V2 enabled via .v2-root class */
+.v2-root {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.v2-root *:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}

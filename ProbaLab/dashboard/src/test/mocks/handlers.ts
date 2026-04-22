@@ -224,4 +224,13 @@ export const handlers = [
     }
     return HttpResponse.json(body);
   }),
+
+  // Lot 5 Bloc E — Notification channels + push subscription.
+  http.post(`${API}/api/user/notifications/push/subscribe`, () =>
+    HttpResponse.json({ ok: true }),
+  ),
+
+  http.delete(`${API}/api/user/notifications/push/unsubscribe`, () =>
+    new HttpResponse(null, { status: 204 }),
+  ),
 ];

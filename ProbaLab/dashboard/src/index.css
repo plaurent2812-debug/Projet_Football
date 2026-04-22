@@ -827,3 +827,28 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Match row value strip ─────────────────────────────────── */
+.fs-match-row.has-value {
+  background: hsl(160 84% 45% / 0.02);
+}
+
+.fs-match-row.has-value:hover {
+  background: hsl(160 84% 45% / 0.05);
+}
+
+/* ── Ticker tape (shimmer sweep) ───────────────────────────── */
+@keyframes ticker-slide {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ── Card hover elevation ──────────────────────────────────── */
+.card-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px hsl(var(--primary) / 0.08);
+}

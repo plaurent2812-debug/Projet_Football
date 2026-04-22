@@ -252,7 +252,6 @@ def get_safe_pick(
         default=None,
         description="Target UTC date (YYYY-MM-DD). Defaults to today UTC.",
     ),
-    user: dict = Depends(current_user),
 ) -> dict[str, Any]:
     """Return at most one safe pick for the given date.
 

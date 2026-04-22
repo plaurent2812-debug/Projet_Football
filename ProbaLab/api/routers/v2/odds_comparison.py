@@ -48,7 +48,6 @@ class OddsComparisonResponse(BaseModel):
 def get_odds_comparison(
     request: Request,
     fixture_id: str = Path(..., min_length=1),
-    user: dict = Depends(current_user),
 ) -> dict[str, Any]:
     """Read normalized odds rows for the fixture and delegate to the pure helper."""
     try:

@@ -123,7 +123,7 @@ def test_matches_v2_basic(mock_supabase, fake_user) -> None:
         leagues=None,
         signals=None,
         sort="time",
-        user=fake_user,
+        
     )
 
     assert out["date"] == "2026-04-21"
@@ -145,7 +145,7 @@ def test_matches_v2_empty(mock_supabase, fake_user) -> None:
         leagues=None,
         signals=None,
         sort="time",
-        user=fake_user,
+        
     )
 
     assert out["total"] == 0
@@ -203,7 +203,7 @@ def test_matches_v2_signal_filter_keeps_value_only(mock_supabase, fake_user) -> 
         leagues=None,
         signals="value",
         sort="edge",
-        user=fake_user,
+        
     )
 
     assert out["total"] == 1
@@ -235,7 +235,7 @@ def test_matches_v2_nhl_grouped_under_nhl_league(mock_supabase, fake_user) -> No
         leagues=None,
         signals=None,
         sort="time",
-        user=fake_user,
+        
     )
 
     assert out["total"] == 1
@@ -261,7 +261,7 @@ def test_matches_v2_league_filter_excludes_nhl(mock_supabase, fake_user) -> None
         leagues="61",
         signals=None,
         sort="time",
-        user=fake_user,
+        
     )
 
     # Leagues filter was specified → NHL branch returns nothing.

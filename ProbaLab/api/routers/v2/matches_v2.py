@@ -370,7 +370,6 @@ def get_matches(
         default="time",
         description="Sort strategy applied inside each league group.",
     ),
-    user: dict = Depends(current_user),
 ) -> dict[str, Any]:
     """Return the day's matches grouped by league, UTC timestamps preserved."""
     target = date if date is not None else datetime.now(timezone.utc).date()

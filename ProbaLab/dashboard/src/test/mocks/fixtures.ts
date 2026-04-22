@@ -128,7 +128,7 @@ export const mockSafePickEmptyResponse = {
 export const mockPerformance: PerformanceSummary = {
   roi30d: { value: 12.4, deltaVs7d: 0.8 },
   accuracy: { value: 54.2, deltaVs7d: -0.3 },
-  brier7d: { value: 0.189, deltaVs7d: -0.004 },
+  brier7d: { value: 0.214, deltaVs7d: -0.002 },
   bankroll: { value: 1240, currency: 'EUR' },
 };
 

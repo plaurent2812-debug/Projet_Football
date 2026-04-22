@@ -70,6 +70,24 @@ describe('AppV2', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders the NotificationsTab at /compte/notifications (not the stub)', async () => {
+    vi.spyOn(v2User, 'useV2User').mockReturnValue({
+      role: 'premium',
+      isVisitor: false,
+    });
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/compte/notifications']}>
+        <AppV2Content />
+      </MemoryRouter>,
+    );
+    // The full page exposes its own h1 — the stub only rendered a
+    // dashed WIP block with no heading.
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /^notifications$/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('tab-notifications-stub')).not.toBeInTheDocument();
+  });
+
   it('renders LoginV2 at /login', () => {
     render(
       <MemoryRouter initialEntries={['/login']}>

@@ -55,13 +55,19 @@ describe('AppV2', () => {
     expect(screen.getByText(/PremiumV2 WIP/i)).toBeInTheDocument();
   });
 
-  it('renders AccountV2 at /compte', () => {
-    render(
+  it('renders AccountV2 with ProfileTab at /compte (index redirect)', () => {
+    vi.spyOn(v2User, 'useV2User').mockReturnValue({
+      role: 'premium',
+      isVisitor: false,
+    });
+    renderWithProviders(
       <MemoryRouter initialEntries={['/compte']}>
         <AppV2Content />
       </MemoryRouter>
     );
-    expect(screen.getByText(/AccountV2 WIP/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: /mon compte/i }),
+    ).toBeInTheDocument();
   });
 
   it('renders LoginV2 at /login', () => {

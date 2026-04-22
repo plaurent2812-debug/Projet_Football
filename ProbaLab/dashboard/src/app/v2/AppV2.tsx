@@ -19,7 +19,19 @@ export function AppV2Content() {
       <LayoutShell>
         <Routes>
           {v2Routes.map((route) => (
-            <Route key={route.path} path={route.path} element={route.element} />
+            <Route key={route.path} path={route.path} element={route.element}>
+              {route.children?.map((child, idx) =>
+                child.index ? (
+                  <Route key={`idx-${route.path}`} index element={child.element} />
+                ) : (
+                  <Route
+                    key={`${route.path}-${child.path ?? idx}`}
+                    path={child.path}
+                    element={child.element}
+                  />
+                ),
+              )}
+            </Route>
           ))}
         </Routes>
       </LayoutShell>

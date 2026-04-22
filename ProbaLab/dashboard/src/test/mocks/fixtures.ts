@@ -8,6 +8,10 @@ import type { TrackRecordLive } from '@/hooks/v2/useTrackRecordLive';
 import type { ProfileData } from '@/hooks/v2/useProfile';
 import type { SubscriptionData } from '@/hooks/v2/useSubscription';
 import type { Invoice } from '@/hooks/v2/useInvoices';
+import type { BankrollSummary } from '@/hooks/v2/useBankroll';
+import type { BetRow } from '@/hooks/v2/useBankrollBets';
+import type { ROIByMarketItem } from '@/hooks/v2/useROIByMarket';
+import type { BankrollSettings } from '@/lib/v2/schemas';
 
 export const leagueL1: LeagueRef = {
   id: 'fr-l1',
@@ -357,3 +361,110 @@ export const mockInvoices: Invoice[] = [
     pdfUrl: 'https://invoices.probalab.net/in_002.pdf',
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Lot 5 Bloc C — Bankroll (summary, bets, ROI by market, settings)
+// ---------------------------------------------------------------------------
+
+export const mockBankroll: BankrollSummary = {
+  current_balance: 1284,
+  initial_balance: 1000,
+  roi_30d: 12.4,
+  roi_90d: 9.8,
+  win_rate: 58.7,
+  drawdown_max_pct: -4.2,
+  kelly_fraction_active: 0.25,
+  total_bets: 48,
+  wins: 26,
+  losses: 19,
+  voids: 3,
+};
+
+export const mockBets: BetRow[] = [
+  {
+    id: 'bet-001',
+    fixture_id: 'fx-1',
+    match_title: 'PSG - Lens',
+    market: '1X2',
+    selection: 'Home',
+    odds: 1.85,
+    stake: 25,
+    result: 'WIN',
+    placed_at: '2026-04-19T10:00:00Z',
+    resolved_at: '2026-04-19T21:00:00Z',
+  },
+  {
+    id: 'bet-002',
+    fixture_id: 'fx-2',
+    match_title: 'Arsenal - Chelsea',
+    market: 'O/U',
+    selection: 'Over 2.5',
+    odds: 1.92,
+    stake: 30,
+    result: 'WIN',
+    placed_at: '2026-04-20T11:00:00Z',
+    resolved_at: '2026-04-20T20:30:00Z',
+  },
+  {
+    id: 'bet-003',
+    fixture_id: 'fx-3',
+    match_title: 'Inter - Milan',
+    market: 'BTTS',
+    selection: 'Yes',
+    odds: 1.7,
+    stake: 20,
+    result: 'LOSS',
+    placed_at: '2026-04-20T12:00:00Z',
+    resolved_at: '2026-04-20T22:45:00Z',
+  },
+  {
+    id: 'bet-004',
+    fixture_id: 'fx-4',
+    match_title: 'Bayern - Dortmund',
+    market: '1X2',
+    selection: 'Draw',
+    odds: 3.4,
+    stake: 15,
+    result: 'LOSS',
+    placed_at: '2026-04-21T09:00:00Z',
+    resolved_at: '2026-04-21T20:30:00Z',
+  },
+  {
+    id: 'bet-005',
+    fixture_id: 'fx-5',
+    match_title: 'OL - Rennes',
+    market: 'DC',
+    selection: '1X',
+    odds: 1.4,
+    stake: 40,
+    result: 'PENDING',
+    placed_at: '2026-04-22T08:00:00Z',
+    resolved_at: null,
+  },
+  {
+    id: 'bet-006',
+    fixture_id: 'fx-6',
+    match_title: 'Man City - Liverpool',
+    market: 'Score',
+    selection: '2-1',
+    odds: 9.5,
+    stake: 10,
+    result: 'PENDING',
+    placed_at: '2026-04-22T09:00:00Z',
+    resolved_at: null,
+  },
+];
+
+export const mockROIByMarket: ROIByMarketItem[] = [
+  { market: '1X2', roi_pct: 14.2, n: 18, wins: 11, losses: 6, voids: 1 },
+  { market: 'O/U', roi_pct: 8.5, n: 12, wins: 7, losses: 5, voids: 0 },
+  { market: 'BTTS', roi_pct: 4.1, n: 8, wins: 4, losses: 4, voids: 0 },
+  { market: 'DC', roi_pct: -1.8, n: 6, wins: 3, losses: 3, voids: 0 },
+  { market: 'Score', roi_pct: -12.3, n: 4, wins: 1, losses: 3, voids: 0 },
+];
+
+export const mockBankrollSettings: BankrollSettings = {
+  initialStake: 1000,
+  kellyFraction: 0.25,
+  stakeCapPct: 5,
+};

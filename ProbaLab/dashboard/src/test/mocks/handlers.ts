@@ -2,6 +2,12 @@ import { http, HttpResponse } from 'msw';
 import type { Sport } from '@/types/v2/matches';
 import type { AddBetRequest, AddBetResponse } from '@/types/v2/match-detail';
 import type { ProfileData, UpdateProfileInput, ChangePasswordInput } from '@/hooks/v2/useProfile';
+import type { BankrollSettings } from '@/lib/v2/schemas';
+import type {
+  AddBetPayload,
+  BetRow,
+  UpdateBetPayload,
+} from '@/hooks/v2/useBankrollBets';
 import {
   mockMatches,
   mockPerformance,
@@ -12,6 +18,10 @@ import {
   mockProfile,
   mockSubscription,
   mockInvoices,
+  mockBankroll,
+  mockBets,
+  mockROIByMarket,
+  mockBankrollSettings,
 } from './fixtures';
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
@@ -110,16 +120,38 @@ export const handlers = [
 
   http.get(`${API}/api/user/invoices`, () => HttpResponse.json(mockInvoices)),
 
-  // Lot 4 — Add a bet to the user bankroll
+  // Add a bet to the user bankroll. Accepts two shapes:
+  //   - Lot 4 legacy: `{ fixture_id, market_key, odds, stake }` (predictions CTA)
+  //   - Lot 5 Bloc C: `{ fixture_id, match_title, market, selection, odds, stake, placed_at }` (bankroll page)
   http.post(`${API}/api/user/bets`, async ({ request }) => {
-    const body = (await request.json()) as AddBetRequest;
+    const body = (await request.json()) as Partial<AddBetRequest & AddBetPayload>;
     if (!body || typeof body.stake !== 'number' || body.stake <= 0) {
       return HttpResponse.json({ error: 'invalid_stake' }, { status: 400 });
     }
-    if (!body.fixture_id || !body.market_key || typeof body.odds !== 'number') {
+    if (!body.fixture_id || typeof body.odds !== 'number') {
       return HttpResponse.json({ error: 'invalid_payload' }, { status: 400 });
     }
-    const response: AddBetResponse = {
+    // Lot 5 Bloc C shape — richer payload.
+    if (typeof body.market === 'string' && typeof body.selection === 'string') {
+      const response: BetRow = {
+        id: `bet-new-${body.fixture_id}`,
+        fixture_id: body.fixture_id,
+        match_title: body.match_title ?? '',
+        market: body.market,
+        selection: body.selection,
+        odds: body.odds,
+        stake: body.stake,
+        result: 'PENDING',
+        placed_at: body.placed_at ?? '2026-04-22T10:00:00Z',
+        resolved_at: null,
+      };
+      return HttpResponse.json(response, { status: 201 });
+    }
+    // Lot 4 legacy shape.
+    if (typeof body.market_key !== 'string') {
+      return HttpResponse.json({ error: 'invalid_payload' }, { status: 400 });
+    }
+    const legacy: AddBetResponse = {
       id: `bet_${body.fixture_id}_${body.market_key}`,
       fixture_id: body.fixture_id,
       market_key: body.market_key,
@@ -127,6 +159,69 @@ export const handlers = [
       stake: body.stake,
       placed_at: '2026-04-22T10:00:00Z',
     };
-    return HttpResponse.json(response, { status: 201 });
+    return HttpResponse.json(legacy, { status: 201 });
+  }),
+
+  // Lot 5 Bloc C — Bankroll summary / bets / ROI by market / settings
+  http.get(`${API}/api/user/bankroll`, () => HttpResponse.json(mockBankroll)),
+
+  http.get(`${API}/api/user/bets`, ({ request }) => {
+    const url = new URL(request.url);
+    const filter = url.searchParams.get('filter') ?? 'all';
+    let rows: BetRow[] = mockBets;
+    if (filter === 'won') rows = mockBets.filter((b) => b.result === 'WIN');
+    else if (filter === 'lost') rows = mockBets.filter((b) => b.result === 'LOSS');
+    else if (filter === 'pending') rows = mockBets.filter((b) => b.result === 'PENDING');
+    return HttpResponse.json(rows);
+  }),
+
+  http.patch(`${API}/api/user/bets/:id`, async ({ params, request }) => {
+    const id = String(params.id);
+    const body = (await request.json()) as UpdateBetPayload;
+    const existing = mockBets.find((b) => b.id === id);
+    if (!existing) {
+      // Keep a sensible echo so tests can assert the merged shape.
+      return HttpResponse.json({
+        id,
+        fixture_id: 'fx-unknown',
+        match_title: '',
+        market: '',
+        selection: '',
+        odds: 0,
+        stake: 0,
+        result: body.result,
+        placed_at: '2026-04-22T10:00:00Z',
+        resolved_at: body.resolved_at ?? null,
+      } satisfies BetRow);
+    }
+    return HttpResponse.json({
+      ...existing,
+      result: body.result,
+      resolved_at: body.resolved_at ?? existing.resolved_at,
+    } satisfies BetRow);
+  }),
+
+  http.delete(`${API}/api/user/bets/:id`, () => new HttpResponse(null, { status: 204 })),
+
+  http.get(`${API}/api/user/bankroll/roi-by-market`, () =>
+    HttpResponse.json(mockROIByMarket),
+  ),
+
+  http.get(`${API}/api/user/bankroll/settings`, () =>
+    HttpResponse.json(mockBankrollSettings),
+  ),
+
+  http.put(`${API}/api/user/bankroll/settings`, async ({ request }) => {
+    const body = (await request.json()) as BankrollSettings;
+    if (![0.1, 0.25, 0.5].includes(body.kellyFraction)) {
+      return HttpResponse.json({ error: 'invalid_fraction' }, { status: 400 });
+    }
+    if (body.stakeCapPct < 0.5 || body.stakeCapPct > 25) {
+      return HttpResponse.json({ error: 'invalid_cap' }, { status: 400 });
+    }
+    if (body.initialStake <= 0) {
+      return HttpResponse.json({ error: 'invalid_stake' }, { status: 400 });
+    }
+    return HttpResponse.json(body);
   }),
 ];

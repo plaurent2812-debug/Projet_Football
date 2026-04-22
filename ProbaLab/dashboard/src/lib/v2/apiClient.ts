@@ -60,6 +60,25 @@ export async function apiPatch<TBody, TResponse>(
 }
 
 /**
+ * PUT JSON body and parse JSON response. Same error contract as apiPost.
+ */
+export async function apiPut<TBody, TResponse>(
+  path: string,
+  body: TBody,
+): Promise<TResponse> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`PUT ${path} failed: ${res.status}`);
+  }
+  return (await res.json()) as TResponse;
+}
+
+/**
  * DELETE a resource. Returns `void` — any 2xx counts as success.
  */
 export async function apiDelete(path: string): Promise<void> {

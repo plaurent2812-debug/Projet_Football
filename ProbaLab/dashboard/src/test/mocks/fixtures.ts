@@ -84,6 +84,72 @@ export const mockMatches: MatchRowData[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Backend-shaped matches response (GET /api/matches) — grouped by league,
+// snake_case, probabilities in 0-100 range (useMatchesOfDay divides by 100).
+// Keep in sync with BackendMatchesV2Response in useMatchesOfDay.ts.
+// ---------------------------------------------------------------------------
+export const mockMatchesBackendResponse = {
+  date: '2026-04-21',
+  total: 3,
+  groups: [
+    {
+      league_id: 61,
+      league_name: 'Ligue 1',
+      matches: [
+        {
+          fixture_id: 'fx-1',
+          sport: 'football' as const,
+          league_id: 61,
+          league_name: 'Ligue 1',
+          home_team: 'Paris Saint-Germain',
+          away_team: 'RC Lens',
+          kickoff_utc: '2026-04-21T19:00:00Z',
+          prediction: { proba_home: 58, proba_draw: 24, proba_away: 18 },
+          signals: ['safe'],
+          edge_pct: 0,
+        },
+      ],
+    },
+    {
+      league_id: 39,
+      league_name: 'Premier League',
+      matches: [
+        {
+          fixture_id: 'fx-2',
+          sport: 'football' as const,
+          league_id: 39,
+          league_name: 'Premier League',
+          home_team: 'Arsenal',
+          away_team: 'Chelsea',
+          kickoff_utc: '2026-04-21T18:30:00Z',
+          prediction: { proba_home: 51, proba_draw: 26, proba_away: 23 },
+          signals: ['value', 'confidence'],
+          edge_pct: 5.4,
+        },
+      ],
+    },
+    {
+      league_id: 135,
+      league_name: 'Serie A',
+      matches: [
+        {
+          fixture_id: 'fx-3',
+          sport: 'football' as const,
+          league_id: 135,
+          league_name: 'Serie A',
+          home_team: 'Inter Milan',
+          away_team: 'AC Milan',
+          kickoff_utc: '2026-04-21T20:45:00Z',
+          prediction: { proba_home: 42, proba_draw: 27, proba_away: 31 },
+          signals: ['value'],
+          edge_pct: 7.2,
+        },
+      ],
+    },
+  ],
+};
+
 export const mockSafePick: SafePick = {
   fixtureId: 'fx-1',
   league: leagueL1,
@@ -97,6 +163,8 @@ export const mockSafePick: SafePick = {
     "PSG enchaîne 5 victoires à domicile avec xG moyen 2.3. Lens absent de ses 3 cadres défensifs. La cote 1.85 reste intéressante face à notre probabilité de 58% : signal modèle +7.3%.",
 };
 
+// Wrapper shape returned by the real backend (GET /api/safe-pick).
+// Keep this as the single source of truth for MSW.
 export const mockSafePickResponse = {
   date: '2026-04-21',
   safe_pick: {
@@ -117,10 +185,16 @@ export const mockSafePickResponse = {
   fallback_message: null,
 };
 
+export const mockSafePickEmptyResponse = {
+  date: '2026-04-22',
+  safe_pick: null,
+  fallback_message: "Aucun pari Safe ne correspond aux critères aujourd'hui. Revenez demain.",
+};
+
 export const mockPerformance: PerformanceSummary = {
   roi30d: { value: 12.4, deltaVs7d: 0.8 },
   accuracy: { value: 54.2, deltaVs7d: -0.3 },
-  brier7d: { value: 0.189, deltaVs7d: -0.004 },
+  brier7d: { value: 0.214, deltaVs7d: -0.002 },
   bankroll: { value: 1240, currency: 'EUR' },
 };
 

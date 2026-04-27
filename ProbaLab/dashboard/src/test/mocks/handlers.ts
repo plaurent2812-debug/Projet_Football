@@ -11,9 +11,10 @@ import type {
 import type { NotificationRule } from '@/lib/v2/schemas/rules';
 import type { CreateRuleInput } from '@/hooks/v2/useNotificationRules';
 import {
-  mockMatches,
+  mockMatchesBackendResponse,
   mockPerformance,
   mockSafePickResponse,
+  mockSafePickEmptyResponse,
   mockMatchDetailById,
   mockAnalysisById,
   mockTrackRecordLive,
@@ -30,64 +31,44 @@ import {
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-function toBackendMatch(match: (typeof mockMatches)[number]) {
-  return {
-    fixture_id: match.fixtureId,
-    sport: match.sport,
-    league_id: match.league.id,
-    league_name: match.league.name,
-    home_team: match.home.name,
-    away_team: match.away.name,
-    home_logo: match.home.logoUrl ?? null,
-    away_logo: match.away.logoUrl ?? null,
-    kickoff_utc: match.kickoffUtc,
-    prediction: {
-      proba_home: match.prob1x2.home * 100,
-      proba_draw: match.prob1x2.draw * 100,
-      proba_away: match.prob1x2.away * 100,
-      confidence_score: match.signals.includes('high_confidence') ? 8 : 6,
-    },
-    edge_pct: match.topValueBet?.edgePct ?? 0,
-    signals: match.signals.map((signal) =>
-      signal === 'high_confidence' ? 'confidence' : signal,
-    ),
-  };
-}
-
 export const handlers = [
-  http.get(`${API}/api/safe-pick`, () => HttpResponse.json(mockSafePickResponse)),
+  http.get(`${API}/api/safe-pick`, ({ request }) => {
+    const url = new URL(request.url);
+    if (url.searchParams.get('date') === '2026-04-22-empty') {
+      return HttpResponse.json(mockSafePickEmptyResponse);
+    }
+    return HttpResponse.json(mockSafePickResponse);
+  }),
 
+  // Returns the real backend shape (grouped by league, snake_case) — the
+  // `useMatchesOfDay` hook owns the flattening + camelCase adaptation.
   http.get(`${API}/api/matches`, ({ request }) => {
     const url = new URL(request.url);
     const sports = url.searchParams.get('sports')?.split(',').filter(Boolean);
     const valueOnly = url.searchParams.get('value_only') === 'true';
 
-    let matches = mockMatches;
-    if (sports && sports.length) {
-      const allowed = new Set<Sport>(sports as Sport[]);
-      matches = matches.filter((m) => allowed.has(m.sport));
-    }
-    if (valueOnly) {
-      matches = matches.filter((m) => m.signals.includes('value'));
-    }
+    // Apply filters at the group level. Each group may or may not match
+    // the requested sports / value-only filter; empty groups are dropped.
+    const filteredGroups = mockMatchesBackendResponse.groups
+      .map((g) => {
+        let matches = g.matches;
+        if (sports && sports.length) {
+          const allowed = new Set<Sport>(sports as Sport[]);
+          matches = matches.filter((m) => allowed.has(m.sport));
+        }
+        if (valueOnly) {
+          matches = matches.filter((m) => (m.signals ?? []).includes('value'));
+        }
+        return { ...g, matches };
+      })
+      .filter((g) => g.matches.length > 0);
 
-    const groupsByLeague = matches.reduce<
-      Record<string, { league_id: string; league_name: string; matches: ReturnType<typeof toBackendMatch>[] }>
-    >((acc, m) => {
-      const key = m.league.id;
-      acc[key] ??= {
-        league_id: key,
-        league_name: m.league.name,
-        matches: [],
-      };
-      acc[key].matches.push(toBackendMatch(m));
-      return acc;
-    }, {});
+    const total = filteredGroups.reduce((acc, g) => acc + g.matches.length, 0);
 
     return HttpResponse.json({
-      date: url.searchParams.get('date') ?? '2026-04-21',
-      total: matches.length,
-      groups: Object.values(groupsByLeague),
+      date: url.searchParams.get('date') ?? mockMatchesBackendResponse.date,
+      total,
+      groups: filteredGroups,
     });
   }),
 

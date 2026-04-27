@@ -25,17 +25,7 @@ describe('useSafePick', () => {
   });
 
   it('returns null when the backend has no safe pick', async () => {
-    server.use(
-      http.get(`${API}/api/safe-pick`, () =>
-        HttpResponse.json({
-          date: '2026-04-22',
-          safe_pick: null,
-          fallback_message: 'Aucun pari Safe disponible aujourd’hui.',
-        }),
-      ),
-    );
-
-    const { result } = renderHook(() => useSafePick('2026-04-22'), { wrapper });
+    const { result } = renderHook(() => useSafePick('2026-04-22-empty'), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toBeNull();
   });

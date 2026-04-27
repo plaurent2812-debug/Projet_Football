@@ -28,10 +28,9 @@ from datetime import date as date_type
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.auth import current_user
 from api.helpers import _get_league_map
 from api.rate_limit import _rate_limit
 from src.config import supabase
@@ -172,12 +171,7 @@ def _fetch_football_rows(
 ) -> list[dict[str, Any]]:
     """Fetch football fixtures + predictions + pending best_bets for the day."""
     try:
-        query = (
-            supabase.table("fixtures")
-            .select("*")
-            .gte("date", iso)
-            .lt("date", next_day_iso)
-        )
+        query = supabase.table("fixtures").select("*").gte("date", iso).lt("date", next_day_iso)
         if league_filter:
             query = query.in_("league_id", league_filter)
         fixtures = query.execute().data or []
@@ -400,12 +394,11 @@ def get_matches(
     safe_fixture_id: str | None = None
     try:
         # Lazy import to avoid a circular dep at module import time.
-        from api.routers.v2.safe_pick import get_safe_pick  # noqa: WPS433
+        from api.routers.v2.safe_pick import get_safe_pick  # noqa: PLC0415
 
         safe_payload = get_safe_pick.__wrapped__(  # type: ignore[attr-defined]
             request=request,
             date=target,
-            user=user,
         )
         pick = safe_payload.get("safe_pick") if isinstance(safe_payload, dict) else None
         if isinstance(pick, dict):

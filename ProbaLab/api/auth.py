@@ -47,12 +47,7 @@ def current_user(authorization: str | None = Header(default=None)) -> dict:
 
     try:
         profile_data = (
-            supabase.table("profiles")
-            .select("role")
-            .eq("id", str(user_id))
-            .single()
-            .execute()
-            .data
+            supabase.table("profiles").select("role").eq("id", str(user_id)).single().execute().data
         )
     except Exception:
         logger.exception("USER_AUTH_FAIL: profile lookup error")

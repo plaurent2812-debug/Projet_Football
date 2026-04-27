@@ -1,7 +1,7 @@
 // Minimal typed fetcher for V2 TanStack Query hooks.
 // Base URL comes from VITE_API_URL. Undefined params are dropped.
 
-const BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000') as string;
+const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000') as string;
 
 export async function apiGet<T>(
   path: string,

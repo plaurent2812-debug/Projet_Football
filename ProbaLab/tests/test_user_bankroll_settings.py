@@ -18,7 +18,6 @@ from api.routers.v2.user_bankroll import (
     put_bankroll_settings,
 )
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Pydantic contract
 # ──────────────────────────────────────────────────────────────────────
@@ -26,9 +25,7 @@ from api.routers.v2.user_bankroll import (
 
 def test_payload_accepts_valid_values():
     """Canonical values from the plan build a valid payload."""
-    payload = BankrollSettings(
-        stake_initial=100.0, kelly_fraction=0.25, stake_cap_pct=0.05
-    )
+    payload = BankrollSettings(stake_initial=100.0, kelly_fraction=0.25, stake_cap_pct=0.05)
     assert payload.stake_initial == 100.0
     assert payload.kelly_fraction == 0.25
     assert payload.stake_cap_pct == 0.05
@@ -63,9 +60,7 @@ def test_payload_rejects_invalid_stake_cap():
 def test_payload_rejects_extra_fields():
     """ConfigDict(extra='forbid') must reject unknown keys."""
     with pytest.raises(ValidationError):
-        BankrollSettings(
-            stake_initial=100.0, kelly_fraction=0.25, stake_cap_pct=0.05, foo="bar"
-        )
+        BankrollSettings(stake_initial=100.0, kelly_fraction=0.25, stake_cap_pct=0.05, foo="bar")
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -75,13 +70,9 @@ def test_payload_rejects_extra_fields():
 
 def test_put_settings_upserts(mock_supabase, fake_user):
     """PUT upserts into user_bankroll_settings with user_id from auth context."""
-    payload = BankrollSettings(
-        stake_initial=250.0, kelly_fraction=0.25, stake_cap_pct=0.05
-    )
+    payload = BankrollSettings(stake_initial=250.0, kelly_fraction=0.25, stake_cap_pct=0.05)
 
-    out = put_bankroll_settings.__wrapped__(
-        request=MagicMock(), payload=payload, user=fake_user
-    )
+    out = put_bankroll_settings.__wrapped__(request=MagicMock(), payload=payload, user=fake_user)
 
     assert out["stake_initial"] == 250.0
     assert out["kelly_fraction"] == 0.25
@@ -102,13 +93,9 @@ def test_put_settings_user_id_from_auth_not_body(mock_supabase, fake_user):
     The ``BankrollSettings`` schema forbids ``user_id`` so the upsert helper
     injects it from the authenticated context.
     """
-    payload = BankrollSettings(
-        stake_initial=100.0, kelly_fraction=0.25, stake_cap_pct=0.05
-    )
+    payload = BankrollSettings(stake_initial=100.0, kelly_fraction=0.25, stake_cap_pct=0.05)
 
-    put_bankroll_settings.__wrapped__(
-        request=MagicMock(), payload=payload, user=fake_user
-    )
+    put_bankroll_settings.__wrapped__(request=MagicMock(), payload=payload, user=fake_user)
 
     record = mock_supabase.upsert.call_args.args[0]
     assert record["user_id"] == fake_user["id"]

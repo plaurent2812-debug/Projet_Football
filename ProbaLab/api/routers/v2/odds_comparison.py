@@ -18,10 +18,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Path, Request
+from fastapi import APIRouter, Path, Request
 from pydantic import BaseModel, ConfigDict
 
-from api.auth import current_user
 from api.rate_limit import _rate_limit
 from src.config import supabase
 from src.models.odds_comparator import build_comparison

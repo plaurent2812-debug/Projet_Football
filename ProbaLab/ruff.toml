@@ -24,6 +24,7 @@ ignore = [
     "N806",   # variable in function should be lowercase (X, K etc.)
     "B904",   # raise without from (contextuel)
     "B905",   # zip without strict (Python 3.10+ feature, pas critique)
+    "B008",   # function call in defaults — idiome FastAPI (Depends, Query, Body, Path)
     "SIM102", # collapsible-if (lisibilité préférée)
     "SIM105", # suppressible-exception (try/except plus explicite)
     "SIM114", # if-with-same-arms (contextuel)

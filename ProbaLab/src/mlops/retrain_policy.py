@@ -90,11 +90,19 @@ def should_retrain(context: dict[str, Any]) -> dict[str, Any]:
             reasons.append("brier_drift")
 
     clv_7d = _float(context, "clv_7d")
-    if clv_7d is not None and clv_7d < CLV_DRIFT_THRESHOLD and new_results_count >= min_drift_results:
+    if (
+        clv_7d is not None
+        and clv_7d < CLV_DRIFT_THRESHOLD
+        and new_results_count >= min_drift_results
+    ):
         reasons.append("negative_clv")
 
     ece_30d = _float(context, "ece_30d")
-    if ece_30d is not None and ece_30d > ECE_DEGRADED_THRESHOLD and new_results_count >= min_drift_results:
+    if (
+        ece_30d is not None
+        and ece_30d > ECE_DEGRADED_THRESHOLD
+        and new_results_count >= min_drift_results
+    ):
         reasons.append("ece_degraded")
 
     should_run = bool(reasons) and not blocked_by

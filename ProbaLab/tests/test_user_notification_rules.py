@@ -29,7 +29,6 @@ from api.routers.v2.user_notifications import (
     update_rule,
 )
 
-
 # ═══════════════════════════════════════════════════════════════════
 #  Pydantic contract — individual condition types
 # ═══════════════════════════════════════════════════════════════════
@@ -101,14 +100,14 @@ def test_condition_bankroll_drawdown_rejects_zero_pct():
 
 
 def _valid_payload(**overrides):
-    base = dict(
-        name="Value foot",
-        conditions=[{"type": "edge_min", "min_pct": 5.0}],
-        logic="and",
-        channels=["telegram"],
-        secondary_actions=[],
-        enabled=True,
-    )
+    base = {
+        "name": "Value foot",
+        "conditions": [{"type": "edge_min", "min_pct": 5.0}],
+        "logic": "and",
+        "channels": ["telegram"],
+        "secondary_actions": [],
+        "enabled": True,
+    }
     base.update(overrides)
     return NotificationRuleCreate(**base)
 

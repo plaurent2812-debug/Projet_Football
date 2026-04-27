@@ -18,7 +18,10 @@ pytestmark = [
 def test_ligue_1_player_statistics_shape_probe():
     resp = requests.get(
         "https://v3.football.api-sports.io/players",
-        headers={"x-rapidapi-host": "v3.football.api-sports.io", "x-rapidapi-key": API_FOOTBALL_KEY},
+        headers={
+            "x-rapidapi-host": "v3.football.api-sports.io",
+            "x-rapidapi-key": API_FOOTBALL_KEY,
+        },
         params={"team": 85, "season": 2024},
         timeout=20,
     ).json()

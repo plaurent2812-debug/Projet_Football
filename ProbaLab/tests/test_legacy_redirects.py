@@ -48,9 +48,7 @@ DYNAMIC_REDIRECTS: list[tuple[str, str]] = [
 @pytest.mark.parametrize("source,target", STATIC_REDIRECTS)
 def test_legacy_static_returns_301(source: str, target: str) -> None:
     resp = client.get(source)
-    assert resp.status_code == 301, (
-        f"{source} should return 301, got {resp.status_code}"
-    )
+    assert resp.status_code == 301, f"{source} should return 301, got {resp.status_code}"
     assert resp.headers["location"] == target, (
         f"{source} should redirect to {target}, got {resp.headers['location']}"
     )

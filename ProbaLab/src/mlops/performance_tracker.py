@@ -110,13 +110,17 @@ def _clv(rows: list[dict]) -> tuple[float | None, float | None]:
 
 
 def _fallback_rate(rows: list[dict]) -> float | None:
-    values = [row.get("ml_fallback_used") for row in rows if row.get("ml_fallback_used") is not None]
+    values = [
+        row.get("ml_fallback_used") for row in rows if row.get("ml_fallback_used") is not None
+    ]
     if not values:
         return None
     return sum(1 for value in values if bool(value)) / len(values)
 
 
-def _ece(records: list[tuple[float, bool]], *, n_bins: int = 10, min_samples: int = 10) -> float | None:
+def _ece(
+    records: list[tuple[float, bool]], *, n_bins: int = 10, min_samples: int = 10
+) -> float | None:
     if len(records) < min_samples:
         return None
     total = len(records)

@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 from src.models.roi_by_market import compute_roi_by_market
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Pure logic
 # ──────────────────────────────────────────────────────────────────────
@@ -108,9 +107,7 @@ def test_route_returns_breakdown(mock_supabase, fake_user):
         data=[{"market": "1X2", "odds": 2.0, "stake": 10, "result": "WIN"}]
     )
 
-    out = get_roi_by_market.__wrapped__(
-        window=30, request=MagicMock(), user=fake_user
-    )
+    out = get_roi_by_market.__wrapped__(window=30, request=MagicMock(), user=fake_user)
 
     assert out["window_days"] == 30
     assert out["rows"][0]["market"] == "1X2"
@@ -125,9 +122,7 @@ def test_route_queries_best_bets_for_current_user(mock_supabase, fake_user):
 
     mock_supabase.execute.return_value = MagicMock(data=[])
 
-    get_roi_by_market.__wrapped__(
-        window=30, request=MagicMock(), user=fake_user
-    )
+    get_roi_by_market.__wrapped__(window=30, request=MagicMock(), user=fake_user)
 
     table_calls = [c.args[0] for c in mock_supabase.table.call_args_list if c.args]
     assert "best_bets" in table_calls
@@ -147,9 +142,7 @@ def test_route_defaults_to_30_day_window(mock_supabase, fake_user):
 
     mock_supabase.execute.return_value = MagicMock(data=[])
 
-    out = get_roi_by_market.__wrapped__(
-        window=30, request=MagicMock(), user=fake_user
-    )
+    out = get_roi_by_market.__wrapped__(window=30, request=MagicMock(), user=fake_user)
 
     assert out["window_days"] == 30
     assert out["rows"] == []

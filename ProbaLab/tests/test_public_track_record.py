@@ -80,9 +80,9 @@ def test_track_record_live_empty_tables(mock_supabase):
     _CACHE.clear()
 
     mock_supabase.execute.side_effect = [
-        MagicMock(data=[]),   # model_health_log CLV — empty
-        MagicMock(data=[]),   # model_health_log Brier — empty
-        MagicMock(data=[]),   # best_bets — empty
+        MagicMock(data=[]),  # model_health_log CLV — empty
+        MagicMock(data=[]),  # model_health_log Brier — empty
+        MagicMock(data=[]),  # best_bets — empty
     ]
 
     out = get_track_record_live.__wrapped__(request=MagicMock())

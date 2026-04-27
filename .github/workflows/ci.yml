@@ -93,6 +93,8 @@ jobs:
           cache-dependency-path: ProbaLab/dashboard/package-lock.json
       - run: npm ci
       - name: Run Vitest
+        env:
+          VITE_API_URL: 'http://localhost:8000'
         run: npm run test:ci
 
   e2e:

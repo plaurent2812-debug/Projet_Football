@@ -55,9 +55,7 @@ def test_performance_summary_rejects_invalid_window(client: TestClient):
     assert res.status_code == 422
 
 
-def test_performance_summary_returns_zeros_when_db_empty(
-    client: TestClient, monkeypatch
-):
+def test_performance_summary_returns_zeros_when_db_empty(client: TestClient, monkeypatch):
     """Even with no finished fixtures, the endpoint must return well-typed zeros,
     never 500 or a partial payload. This is what unblocks the landing when the
     DB is seeded from scratch (lesson 60)."""

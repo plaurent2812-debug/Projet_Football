@@ -25,7 +25,6 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 from starlette.types import ASGIApp
 
-
 # ─── Redirect table (source of truth mirror) ──────────────────────────
 
 #: Static exact-match redirects.
@@ -92,7 +91,7 @@ class LegacyRedirectMiddleware(BaseHTTPMiddleware):
         # Dynamic prefix match
         for prefix, target_prefix in _DYNAMIC_REDIRECTS:
             if path.startswith(prefix):
-                suffix = path[len(prefix):]
+                suffix = path[len(prefix) :]
                 # Only treat as dynamic when there IS a suffix (no empty path).
                 # That protects against `/football/match/` with trailing slash.
                 if suffix:

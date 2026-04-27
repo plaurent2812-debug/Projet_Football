@@ -125,9 +125,7 @@ def get_roi_by_market(
             or []
         )
     except Exception:
-        logger.exception(
-            "roi_by_market: best_bets lookup failed for user=%s", user.get("id")
-        )
+        logger.exception("roi_by_market: best_bets lookup failed for user=%s", user.get("id"))
         rows = []
 
     return {"window_days": window, "rows": compute_roi_by_market(rows)}
@@ -154,9 +152,7 @@ def get_bankroll_settings(
             or []
         )
     except Exception:
-        logger.exception(
-            "bankroll_settings GET: lookup failed for user=%s", user.get("id")
-        )
+        logger.exception("bankroll_settings GET: lookup failed for user=%s", user.get("id"))
         data = []
 
     if not data:
@@ -193,13 +189,9 @@ def put_bankroll_settings(
     record["user_id"] = user["id"]
 
     try:
-        supabase.table("user_bankroll_settings").upsert(
-            record, on_conflict="user_id"
-        ).execute()
+        supabase.table("user_bankroll_settings").upsert(record, on_conflict="user_id").execute()
     except Exception:
-        logger.exception(
-            "bankroll_settings PUT: upsert failed for user=%s", user.get("id")
-        )
+        logger.exception("bankroll_settings PUT: upsert failed for user=%s", user.get("id"))
         # Surface a generic 500 so the client sees the failure instead of a
         # silent "no-op OK".
         from fastapi import HTTPException

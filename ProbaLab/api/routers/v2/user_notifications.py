@@ -18,7 +18,7 @@ an ``and``/``or`` logic. Persistence lives in ``notification_rules``
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response
@@ -87,14 +87,12 @@ class RuleConditionBankrollDrawdown(BaseModel):
 
 
 RuleCondition = Annotated[
-    Union[
-        RuleConditionEdgeMin,
-        RuleConditionLeagueIn,
-        RuleConditionSport,
-        RuleConditionConfidence,
-        RuleConditionKickoffWithin,
-        RuleConditionBankrollDrawdown,
-    ],
+    RuleConditionEdgeMin
+    | RuleConditionLeagueIn
+    | RuleConditionSport
+    | RuleConditionConfidence
+    | RuleConditionKickoffWithin
+    | RuleConditionBankrollDrawdown,
     Field(discriminator="type"),
 ]
 
@@ -212,9 +210,7 @@ def create_rule(
         )
         current_count = getattr(count_result, "count", 0) or 0
     except Exception:
-        logger.exception(
-            "create_rule: count lookup failed for user=%s", user.get("id")
-        )
+        logger.exception("create_rule: count lookup failed for user=%s", user.get("id"))
         current_count = 0
 
     if current_count >= _MAX_RULES_PER_USER:

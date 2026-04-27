@@ -27,10 +27,9 @@ from datetime import date as date_type
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.auth import current_user
 from api.rate_limit import _rate_limit
 from src.config import supabase
 from src.models.safe_pick_selector import (
@@ -210,7 +209,10 @@ def _build_nhl_candidates(nhl_fixtures: list[dict[str, Any]]) -> list[dict[str, 
         for pl in players:
             if not isinstance(pl, dict):
                 continue
-            for market, prob_key in (("Player Points", "prob_point"), ("Player Assists", "prob_assist")):
+            for market, prob_key in (
+                ("Player Points", "prob_point"),
+                ("Player Assists", "prob_assist"),
+            ):
                 prob = _pct_to_decimal(pl.get(prob_key))
                 if prob is None:
                     continue
@@ -272,7 +274,9 @@ def get_safe_pick(
     try:
         fixtures = (
             supabase.table("fixtures")
-            .select("id, api_fixture_id, home_team, away_team, date, status, league_id, league_name")
+            .select(
+                "id, api_fixture_id, home_team, away_team, date, status, league_id, league_name"
+            )
             .gte("date", iso)
             .lt("date", next_day_iso)
             .execute()
@@ -332,7 +336,9 @@ def get_safe_pick(
             logger.exception("safe_pick: failed to fetch odds for date=%s", iso)
             odds_rows = []
 
-    odds_by_api_id = {str(o.get("fixture_api_id")): o for o in odds_rows if o.get("fixture_api_id") is not None}
+    odds_by_api_id = {
+        str(o.get("fixture_api_id")): o for o in odds_rows if o.get("fixture_api_id") is not None
+    }
 
     football_candidates = _build_football_candidates(predictions, fixtures_by_id, odds_by_api_id)
 

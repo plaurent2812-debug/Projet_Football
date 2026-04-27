@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
+from typing import Any
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,7 +41,9 @@ class TrackRecordLive(BaseModel):
     roi_90d: float = Field(..., description="Average ROI over the last 90 days (%)")
     brier_30d: float = Field(..., description="Average Brier score over the last 30 days")
     safe_rate_90d: float = Field(..., description="Safe picks hit rate over the last 90 days (0-1)")
-    roi_curve_90d: list[RoiPoint] = Field(..., description="Cumulative ROI daily points over 90 days")
+    roi_curve_90d: list[RoiPoint] = Field(
+        ..., description="Cumulative ROI daily points over 90 days"
+    )
 
 
 def _avg(values: list[float], digits: int) -> float:
@@ -87,11 +89,17 @@ def get_track_record_live(request: Request) -> dict[str, Any]:
             or []
         )
         clv_30d = _avg(
-            [float(r["clv_best_mean_30d"]) for r in clv_rows if r.get("clv_best_mean_30d") is not None],
+            [
+                float(r["clv_best_mean_30d"])
+                for r in clv_rows
+                if r.get("clv_best_mean_30d") is not None
+            ],
             2,
         )
     except Exception:
-        logger.warning("track-record/live: failed to fetch CLV from model_health_log", exc_info=True)
+        logger.warning(
+            "track-record/live: failed to fetch CLV from model_health_log", exc_info=True
+        )
 
     # ── 2. Brier 30d — from model_health_log.brier_30d (pre-computed) ────
     brier_30d: float = 0.0
@@ -109,7 +117,9 @@ def get_track_record_live(request: Request) -> dict[str, Any]:
             3,
         )
     except Exception:
-        logger.warning("track-record/live: failed to fetch Brier from model_health_log", exc_info=True)
+        logger.warning(
+            "track-record/live: failed to fetch Brier from model_health_log", exc_info=True
+        )
 
     # ── 3. ROI 90d + safe_rate 90d + ROI curve — from best_bets ──────────
     # best_bets columns: result (WIN/LOSS/VOID/PENDING), odds, market, created_at
@@ -133,14 +143,14 @@ def get_track_record_live(request: Request) -> dict[str, Any]:
 
         # Global ROI 90d
         total_staked = len(bet_rows)
-        total_returned = sum(
-            float(r.get("odds") or 1.0) for r in bet_rows if r["result"] == "WIN"
-        )
+        total_returned = sum(float(r.get("odds") or 1.0) for r in bet_rows if r["result"] == "WIN")
         if total_staked > 0:
             roi_90d = round((total_returned - total_staked) / total_staked * 100, 2)
 
         # Safe-rate 90d: WIN rate for SAFE market bets specifically
-        safe_bets = [r for r in bet_rows if (r.get("market") or "").lower() in ("safe_football", "safe_nhl")]
+        safe_bets = [
+            r for r in bet_rows if (r.get("market") or "").lower() in ("safe_football", "safe_nhl")
+        ]
         safe_resolved = len(safe_bets)
         safe_wins = sum(1 for r in safe_bets if r["result"] == "WIN")
         if safe_resolved > 0:
@@ -164,13 +174,17 @@ def get_track_record_live(request: Request) -> dict[str, Any]:
         for day in sorted(daily_staked.keys()):
             running_staked += daily_staked[day]
             running_returned += daily_returned.get(day, 0.0)
-            cum_roi = round(
-                (running_returned - running_staked) / running_staked * 100, 2
-            ) if running_staked > 0 else 0.0
+            cum_roi = (
+                round((running_returned - running_staked) / running_staked * 100, 2)
+                if running_staked > 0
+                else 0.0
+            )
             roi_curve_90d.append({"date": day, "cumulative_roi": cum_roi})
 
     except Exception:
-        logger.warning("track-record/live: failed to compute ROI/curve from best_bets", exc_info=True)
+        logger.warning(
+            "track-record/live: failed to compute ROI/curve from best_bets", exc_info=True
+        )
 
     payload: dict[str, Any] = {
         "clv_30d": clv_30d,

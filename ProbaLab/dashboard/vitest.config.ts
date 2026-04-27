@@ -9,6 +9,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // CI and headless runs do not load .env; MSW + fetch need a valid absolute URL.
+    env: {
+      VITE_API_URL: 'http://localhost:8000',
+    },
   },
   resolve: {
     alias: {

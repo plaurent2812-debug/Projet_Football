@@ -29,9 +29,7 @@ ODDS_MAX = 2.20
 MIN_CONFIDENCE_SINGLE = 0.60
 
 # User-facing message returned when nothing qualifies.
-_FALLBACK_MESSAGE = (
-    "Aucun pari Safe ne correspond aux critères aujourd'hui. Revenez demain."
-)
+_FALLBACK_MESSAGE = "Aucun pari Safe ne correspond aux critères aujourd'hui. Revenez demain."
 
 
 def select_safe_pick(candidates: list[dict[str, Any]]) -> dict[str, Any]:

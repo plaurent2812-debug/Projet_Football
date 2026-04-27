@@ -132,7 +132,6 @@ def test_safe_pick_uses_real_schema(mock_supabase, fake_user) -> None:
     out = get_safe_pick.__wrapped__(
         request=MagicMock(),
         date=date_type(2026, 4, 22),
-        
     )
 
     assert out["safe_pick"] is not None
@@ -153,7 +152,6 @@ def test_safe_pick_empty_returns_fallback(mock_supabase, fake_user) -> None:
     out = get_safe_pick.__wrapped__(
         request=MagicMock(),
         date=date_type(2026, 4, 22),
-        
     )
 
     assert out["safe_pick"] is None
@@ -210,7 +208,6 @@ def test_safe_pick_falls_back_to_combo_with_low_odds(mock_supabase, fake_user) -
     out = get_safe_pick.__wrapped__(
         request=MagicMock(),
         date=date_type(2026, 4, 22),
-        
     )
 
     assert out["safe_pick"] is not None

@@ -52,7 +52,7 @@ describe('MatchesV2', () => {
     await waitFor(() => {
       expect(screen.getByTestId('matches-table-desktop')).toBeInTheDocument();
     });
-    expect(screen.getAllByTestId('match-row-desktop').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('match-row').length).toBeGreaterThan(0);
   });
 
   it('frames the desktop page as a premium daily analysis dashboard', async () => {

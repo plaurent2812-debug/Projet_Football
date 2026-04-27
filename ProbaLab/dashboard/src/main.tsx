@@ -8,7 +8,10 @@ async function enableMocksIfNeeded() {
   const enabled = import.meta.env.VITE_MSW_ENABLED === 'true'
   const apiUrl = (import.meta.env.VITE_API_URL ?? '') as string
   const isLocal = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')
-  if (!enabled || !isLocal || !import.meta.env.DEV) return
+  const allowPreview =
+    import.meta.env.VITE_MSW_PREVIEW === 'true' && import.meta.env.VITE_E2E === 'true'
+  if (!enabled || !isLocal) return
+  if (!import.meta.env.DEV && !allowPreview) return
   const { worker } = await import('./test/mocks/browser')
   await worker.start({ onUnhandledRequest: 'bypass' })
 }

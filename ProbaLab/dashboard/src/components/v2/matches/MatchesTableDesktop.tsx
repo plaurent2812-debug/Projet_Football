@@ -38,7 +38,7 @@ function DesktopRow({ match }: { match: MatchRowData }) {
   const { home, away, prob1x2, signals, topValueBet } = match;
   return (
     <div
-      data-testid="match-row-desktop"
+      data-testid="match-row"
       className="grid gap-4 p-4 text-sm lg:grid-cols-[minmax(230px,0.9fr)_minmax(260px,1fr)_minmax(230px,0.8fr)_auto] lg:items-center"
       style={{ borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.018)' }}
     >

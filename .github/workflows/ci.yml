@@ -119,6 +119,8 @@ jobs:
         env:
           VITE_FRONTEND_V2: 'true'
           VITE_MSW_ENABLED: 'true'
+          VITE_MSW_PREVIEW: 'true'
+          VITE_E2E: 'true'
           VITE_API_URL: 'http://localhost:8000'
           VITE_SUPABASE_URL: 'https://placeholder.supabase.co'
           VITE_SUPABASE_ANON_KEY: 'placeholder-key'

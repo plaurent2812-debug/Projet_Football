@@ -107,6 +107,17 @@ export function Hero() {
         <motion.p variants={fadeUp} className="mt-5 text-xs text-slate-500">
           Sans engagement · Résiliation en 1 clic · Aucune carte requise pour l'essai
         </motion.p>
+
+        {/* Stable E2E hook — primary hero CTAs go to /premium and /matchs */}
+        <motion.p variants={fadeUp} className="mt-4">
+          <Link
+            to="/register"
+            data-testid="cta-register-trial"
+            className="text-sm font-medium text-emerald-400/90 underline-offset-4 transition hover:text-emerald-300 hover:underline"
+          >
+            Créer un compte (essai gratuit)
+          </Link>
+        </motion.p>
       </motion.div>
     </section>
   );

@@ -19,7 +19,7 @@ describe('MatchesTableDesktop', () => {
   it('renders one row per match grouped by league', () => {
     renderTable();
     // 3 fixtures, 3 distinct leagues, so 3 LeagueGroups each with one row
-    expect(screen.getAllByTestId('match-row-desktop')).toHaveLength(3);
+    expect(screen.getAllByTestId('match-row')).toHaveLength(3);
   });
 
   it('shows kickoff time, team shorts and odd for each row', () => {
@@ -38,7 +38,7 @@ describe('MatchesTableDesktop', () => {
 
   it('renders each match as a decision card with clear sections', () => {
     renderTable();
-    const firstRow = screen.getAllByTestId('match-row-desktop')[0];
+    const firstRow = screen.getAllByTestId('match-row')[0];
 
     expect(within(firstRow).getByText(/probabilités/i)).toBeInTheDocument();
     expect(within(firstRow).getByText(/lecture rapide/i)).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe('MatchesTableDesktop', () => {
 
   it('renders a detail link per row', () => {
     renderTable();
-    const rows = screen.getAllByTestId('match-row-desktop');
+    const rows = screen.getAllByTestId('match-row');
     rows.forEach((row) => {
       expect(within(row).getAllByRole('link').length).toBeGreaterThan(0);
     });

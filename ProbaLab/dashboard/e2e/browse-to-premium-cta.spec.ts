@@ -30,10 +30,13 @@ test.describe('Browse to premium CTA', () => {
     await page.waitForURL(/\/matchs(\?|$)/, { timeout: 10_000 });
     await expect(page.getByTestId('matches-v2-page')).toBeVisible();
 
-    // Click into the first available match row.
-    const firstMatch = page.getByTestId('match-row').first();
-    await expect(firstMatch).toBeVisible();
-    await firstMatch.click();
+    // Navigation is on the row's "Ouvrir l'analyse" link, not the whole row.
+    const firstRow = page.getByTestId('match-row').first();
+    await expect(firstRow).toBeVisible();
+    await firstRow
+      .getByRole('link', { name: /ouvrir l'analyse/i })
+      .click();
+    await page.waitForURL(/\/matchs\/[^/]+/, { timeout: 10_000 });
 
     // Match detail with a visitor-gated (blurred) zone.
     await expect(page.getByTestId('match-detail-v2')).toBeVisible();

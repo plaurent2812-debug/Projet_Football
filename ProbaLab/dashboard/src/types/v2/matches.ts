@@ -20,9 +20,9 @@ export interface LeagueRef {
 }
 
 export interface Prob1x2 {
-  home: number; // 0..1
-  draw: number; // 0..1 (absent for NHL)
-  away: number;
+  home: number | null; // 0..1
+  draw: number | null; // 0..1 (absent for NHL)
+  away: number | null;
 }
 
 export interface ValueBet {
@@ -40,6 +40,11 @@ export interface MatchRowData {
   kickoffUtc: string; // ISO 8601
   home: TeamRef;
   away: TeamRef;
+  status?: string | null;
+  score?: {
+    home: number | null;
+    away: number | null;
+  };
   prob1x2: Prob1x2;
   signals: SignalKind[];
   topValueBet?: ValueBet; // best edge when present

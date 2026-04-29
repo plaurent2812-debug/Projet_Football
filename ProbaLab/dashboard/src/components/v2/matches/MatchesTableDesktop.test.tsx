@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import { MatchesTableDesktop } from './MatchesTableDesktop';
 import { mockMatches } from '@/test/mocks/fixtures';
+import type { MatchRowData } from '@/types/v2/matches';
 
 expect.extend(toHaveNoViolations);
 
@@ -56,6 +57,35 @@ describe('MatchesTableDesktop', () => {
   it('shows empty message when no matches', () => {
     renderTable([]);
     expect(screen.getByText(/Aucun match/i)).toBeInTheDocument();
+  });
+
+  it('does not present missing probabilities as a dead 0 percent scenario', () => {
+    const missingProbMatch = {
+      ...mockMatches[0],
+      prob1x2: { home: null, draw: null, away: null },
+    } as unknown as MatchRowData;
+
+    renderTable([missingProbMatch]);
+
+    const row = screen.getByTestId('match-row');
+    expect(within(row).getAllByText(/Analyse bientôt disponible/i).length).toBeGreaterThan(0);
+    expect(within(row).queryByText('0%')).not.toBeInTheDocument();
+    expect(within(row).queryByText(/en tête \(0%\)/i)).not.toBeInTheDocument();
+  });
+
+  it('shows live or final score when the backend provides score metadata', () => {
+    renderTable([
+      {
+        ...mockMatches[0],
+        status: 'LIVE',
+        score: { home: 2, away: 1 },
+      },
+    ]);
+
+    const row = screen.getByTestId('match-row');
+    expect(within(row).getByText('2')).toBeInTheDocument();
+    expect(within(row).getByText('1')).toBeInTheDocument();
+    expect(within(row).getByText(/LIVE/i)).toBeInTheDocument();
   });
 
   it('accepts data-testid prop', () => {

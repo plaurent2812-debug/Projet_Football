@@ -211,7 +211,7 @@ def test_matches_v2_signal_filter_keeps_value_only(mock_supabase, fake_user) -> 
 
 
 def test_matches_v2_nhl_grouped_under_nhl_league(mock_supabase, fake_user) -> None:
-    """NHL fixtures cluster under a synthetic ``NHL`` league group."""
+    """NHL fixtures expose their stored win probabilities in the listing."""
     nhl_fx = [
         {
             "id": "nhl-1",
@@ -219,6 +219,11 @@ def test_matches_v2_nhl_grouped_under_nhl_league(mock_supabase, fake_user) -> No
             "away_team": "NYR",
             "date": "2026-04-21T23:00:00+00:00",
             "status": "NS",
+            "home_score": None,
+            "away_score": None,
+            "proba_home": 57.5,
+            "proba_away": 42.5,
+            "confidence_score": 7,
         }
     ]
     mock_supabase.execute.side_effect = _build_execute_side_effect(
@@ -236,7 +241,15 @@ def test_matches_v2_nhl_grouped_under_nhl_league(mock_supabase, fake_user) -> No
 
     assert out["total"] == 1
     assert out["groups"][0]["league_id"] == "NHL"
-    assert out["groups"][0]["matches"][0]["sport"] == "nhl"
+    match = out["groups"][0]["matches"][0]
+    assert match["sport"] == "nhl"
+    assert match["prediction"] == {
+        "proba_home": 57.5,
+        "proba_draw": None,
+        "proba_away": 42.5,
+        "confidence_score": 7,
+    }
+    assert match["confidence"] == 70.0
 
 
 def test_matches_v2_league_filter_excludes_nhl(mock_supabase, fake_user) -> None:

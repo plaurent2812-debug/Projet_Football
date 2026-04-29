@@ -30,9 +30,9 @@ interface BackendMatchRow {
   away_goals?: number | null;
   kickoff_utc: string;
   prediction?: {
-    proba_home?: number;
-    proba_draw?: number;
-    proba_away?: number;
+    proba_home?: number | null;
+    proba_draw?: number | null;
+    proba_away?: number | null;
     confidence_score?: number;
   } | null;
   confidence?: number;
@@ -111,9 +111,11 @@ function buildLeague(
 
 function buildProb1x2(row: BackendMatchRow): Prob1x2 {
   const pred = row.prediction ?? {};
-  const home = (pred.proba_home ?? 0) / 100;
-  const draw = (pred.proba_draw ?? 0) / 100;
-  const away = (pred.proba_away ?? 0) / 100;
+  const toUnit = (value: number | null | undefined): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value / 100 : null;
+  const home = toUnit(pred.proba_home);
+  const draw = toUnit(pred.proba_draw);
+  const away = toUnit(pred.proba_away);
   return { home, draw, away };
 }
 
@@ -147,6 +149,11 @@ function adaptRow(row: BackendMatchRow, fallbackLeague: { id: number | string; n
     kickoffUtc: row.kickoff_utc,
     home: buildTeam(row.home_team, row.home_logo),
     away: buildTeam(row.away_team, row.away_logo),
+    status: row.status ?? null,
+    score: {
+      home: row.home_goals ?? null,
+      away: row.away_goals ?? null,
+    },
     prob1x2: buildProb1x2(row),
     signals: buildSignals(row.signals),
     topValueBet: buildTopValueBet(row),

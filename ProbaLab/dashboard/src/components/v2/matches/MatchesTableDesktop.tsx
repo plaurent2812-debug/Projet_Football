@@ -23,19 +23,50 @@ function fmtTime(iso: string): string {
   });
 }
 
+function isFiniteProbability(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function formatPct(value: number | null | undefined): string {
+  return isFiniteProbability(value) ? `${Math.round(value * 100)}%` : '—';
+}
+
+function hasAnyProbability(match: MatchRowData): boolean {
+  return (
+    isFiniteProbability(match.prob1x2.home) ||
+    isFiniteProbability(match.prob1x2.draw) ||
+    isFiniteProbability(match.prob1x2.away)
+  );
+}
+
+function hasScore(match: MatchRowData): boolean {
+  return match.score?.home != null && match.score.away != null;
+}
+
 function mainScenario(match: MatchRowData): string {
   const entries = [
     { label: match.home.short, value: match.prob1x2.home },
     { label: 'Nul', value: match.prob1x2.draw },
     { label: match.away.short, value: match.prob1x2.away },
-  ].sort((a, b) => b.value - a.value);
+  ]
+    .filter((entry): entry is { label: string; value: number } =>
+      isFiniteProbability(entry.value),
+    )
+    .sort((a, b) => b.value - a.value);
   const [first, second] = entries;
 
+  if (!first) {
+    return 'Analyse bientôt disponible.';
+  }
+  if (!second) {
+    return `${first.label} à suivre (${Math.round(first.value * 100)}%).`;
+  }
   return `${first.label} en tête (${Math.round(first.value * 100)}%), ${second.label.toLowerCase()} à surveiller.`;
 }
 
 function DesktopRow({ match }: { match: MatchRowData }) {
   const { home, away, prob1x2, signals, topValueBet } = match;
+  const probabilitiesAvailable = hasAnyProbability(match);
   return (
     <div
       data-testid="match-row"
@@ -59,6 +90,21 @@ function DesktopRow({ match }: { match: MatchRowData }) {
           <span className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-faint)' }}>vs</span>
           <span className="truncate text-xl">{away.short}</span>
         </div>
+        {hasScore(match) && (
+          <div className="mt-2 flex items-center gap-2">
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em]"
+              style={{ background: 'rgba(16,185,129,0.12)', color: 'var(--primary)' }}
+            >
+              {match.status ?? 'Score'}
+            </span>
+            <span className="flex items-center gap-1 text-lg font-black tabular-nums" style={{ color: 'var(--text)' }}>
+              <span>{match.score?.home}</span>
+              <span style={{ color: 'var(--text-faint)' }}>-</span>
+              <span>{match.score?.away}</span>
+            </span>
+          </div>
+        )}
         <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
           {home.name} - {away.name}
         </div>
@@ -79,9 +125,15 @@ function DesktopRow({ match }: { match: MatchRowData }) {
           className="mt-1 flex justify-between text-[11px] tabular-nums"
           style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
         >
-          <span>{Math.round(prob1x2.home * 100)}%</span>
-          <span>{Math.round(prob1x2.draw * 100)}%</span>
-          <span>{Math.round(prob1x2.away * 100)}%</span>
+          {probabilitiesAvailable ? (
+            <>
+              <span>{formatPct(prob1x2.home)}</span>
+              {isFiniteProbability(prob1x2.draw) && <span>{formatPct(prob1x2.draw)}</span>}
+              <span>{formatPct(prob1x2.away)}</span>
+            </>
+          ) : (
+            <span>Analyse bientôt disponible</span>
+          )}
         </div>
       </div>
 

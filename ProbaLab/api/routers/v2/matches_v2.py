@@ -134,6 +134,20 @@ def _compute_edge_pct(row: dict[str, Any]) -> float:
     return best
 
 
+def _build_nhl_prediction(fixture: dict[str, Any]) -> dict[str, Any] | None:
+    """Expose stored NHL win probabilities in the common listing shape."""
+    proba_home = fixture.get("proba_home")
+    proba_away = fixture.get("proba_away")
+    if proba_home is None and proba_away is None:
+        return None
+    return {
+        "proba_home": proba_home,
+        "proba_draw": None,
+        "proba_away": proba_away,
+        "confidence_score": fixture.get("confidence_score"),
+    }
+
+
 def _derive_signals(
     prediction: dict[str, Any] | None,
     pending_bets: list[dict[str, Any]],
@@ -316,6 +330,7 @@ def _fetch_nhl_rows(
     for fx in fixtures:
         fid = str(fx.get("id"))
         pending_bets = bets_by_fix.get(fid, [])
+        prediction = _build_nhl_prediction(fx)
         row = {
             "fixture_id": fid,
             "sport": "nhl",
@@ -325,11 +340,17 @@ def _fetch_nhl_rows(
             "home_team": fx.get("home_team"),
             "away_team": fx.get("away_team"),
             "status": fx.get("status"),
-            "home_goals": fx.get("home_goals"),
-            "away_goals": fx.get("away_goals"),
+            "home_goals": fx.get("home_goals")
+            if fx.get("home_goals") is not None
+            else fx.get("home_score"),
+            "away_goals": fx.get("away_goals")
+            if fx.get("away_goals") is not None
+            else fx.get("away_score"),
             "kickoff_utc": fx.get("date"),
-            "prediction": None,
-            "confidence": 0.0,
+            "prediction": prediction,
+            "confidence": _confidence_pct(
+                prediction.get("confidence_score") if prediction else None
+            ),
             "_best_bets": pending_bets,
         }
         row["edge_pct"] = _compute_edge_pct(row)

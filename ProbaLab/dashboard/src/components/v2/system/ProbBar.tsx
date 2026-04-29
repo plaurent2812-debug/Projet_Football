@@ -1,7 +1,7 @@
 export interface ProbBarProps {
-  home: number;
-  draw: number;
-  away: number;
+  home: number | null | undefined;
+  draw: number | null | undefined;
+  away: number | null | undefined;
   homeLabel: string;
   awayLabel: string;
   'data-testid'?: string;
@@ -9,6 +9,10 @@ export interface ProbBarProps {
 
 function pct(n: number): number {
   return Math.round(n * 100);
+}
+
+function finiteOrZero(n: number | null | undefined): number {
+  return typeof n === 'number' && Number.isFinite(n) ? n : 0;
 }
 
 export function ProbBar({
@@ -21,7 +25,11 @@ export function ProbBar({
 }: ProbBarProps) {
   // Tolerate missing probabilities (e.g. NHL fixtures without a prediction yet).
   // Normalize small rounding errors silently; treat sum=0 as a neutral bar.
-  const rawSum = home + draw + away;
+  const hasDraw = typeof draw === 'number' && Number.isFinite(draw);
+  let safeHome = finiteOrZero(home);
+  let safeDraw = finiteOrZero(draw);
+  let safeAway = finiteOrZero(away);
+  const rawSum = safeHome + safeDraw + safeAway;
   if (rawSum <= 0) {
     return (
       <div
@@ -34,15 +42,14 @@ export function ProbBar({
     );
   }
   // Normalize if off from 1 (rounding) by renormalizing proportionally.
-  const normHome = home / rawSum;
-  const normDraw = draw / rawSum;
-  const normAway = away / rawSum;
-  home = normHome;
-  draw = normDraw;
-  away = normAway;
-  const max = Math.max(home, draw, away);
-  const dominant = home === max ? 'home' : draw === max ? 'draw' : 'away';
-  const label = `${homeLabel} ${pct(home)}%, Nul ${pct(draw)}%, ${awayLabel} ${pct(away)}%`;
+  safeHome = safeHome / rawSum;
+  safeDraw = safeDraw / rawSum;
+  safeAway = safeAway / rawSum;
+  const max = Math.max(safeHome, safeDraw, safeAway);
+  const dominant = safeHome === max ? 'home' : safeDraw === max ? 'draw' : 'away';
+  const label = hasDraw
+    ? `${homeLabel} ${pct(safeHome)}%, Nul ${pct(safeDraw)}%, ${awayLabel} ${pct(safeAway)}%`
+    : `${homeLabel} ${pct(safeHome)}%, ${awayLabel} ${pct(safeAway)}%`;
 
   const bg = (isDom: boolean, muted: boolean): string => {
     if (isDom) return 'var(--primary)';
@@ -67,19 +74,21 @@ export function ProbBar({
         data-segment="home"
         data-testid="segment-home"
         data-dominant={dominant === 'home'}
-        style={{ width: `${pct(home)}%`, background: bg(dominant === 'home', false) }}
+        style={{ width: `${pct(safeHome)}%`, background: bg(dominant === 'home', false) }}
       />
-      <span
-        data-segment="draw"
-        data-testid="segment-draw"
-        data-dominant={dominant === 'draw'}
-        style={{ width: `${pct(draw)}%`, background: bg(dominant === 'draw', true) }}
-      />
+      {hasDraw && (
+        <span
+          data-segment="draw"
+          data-testid="segment-draw"
+          data-dominant={dominant === 'draw'}
+          style={{ width: `${pct(safeDraw)}%`, background: bg(dominant === 'draw', true) }}
+        />
+      )}
       <span
         data-segment="away"
         data-testid="segment-away"
         data-dominant={dominant === 'away'}
-        style={{ width: `${pct(away)}%`, background: bg(dominant === 'away', false) }}
+        style={{ width: `${pct(safeAway)}%`, background: bg(dominant === 'away', false) }}
       />
     </div>
   );

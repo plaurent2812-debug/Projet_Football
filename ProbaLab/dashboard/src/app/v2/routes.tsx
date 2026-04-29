@@ -1,26 +1,27 @@
-import type { ReactElement } from 'react';
+import { lazy, type ReactElement } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import HomeV2 from '../../pages/v2/HomeV2';
-import MatchesV2 from '../../pages/v2/MatchesV2';
-import MatchDetailV2 from '../../pages/v2/MatchDetailV2';
-import PremiumV2 from '../../pages/v2/PremiumV2';
-import AccountV2 from '../../pages/v2/AccountV2';
-import ProfileTab from '../../pages/v2/account/ProfileTab';
-import SubscriptionTab from '../../pages/v2/account/SubscriptionTab';
-import BankrollTab from '../../pages/v2/account/BankrollTab';
-import NotificationsTab from '../../pages/v2/account/NotificationsTab';
 // ── Legacy pages wired into AppV2 (Lot 6 — cutover prep) ────────────
 // These pages are NOT rebuilt in the V2 design refresh but must stay
 // reachable once VITE_FRONTEND_V2=true. They import @/lib/auth which
 // is already provided by AppV2, so no extra provider plumbing needed.
-import AdminPage from '../../pages/Admin';
-import PerformancePage from '../../pages/Performance';
-import LoginLegacy from '../../pages/Login';
-import UpdatePasswordPage from '../../pages/UpdatePassword';
-import CGUPage from '../../pages/CGU';
-import ConfidentialitePage from '../../pages/Confidentialite';
 import { Protected } from '../../lib/auth';
 import { V2_REDIRECTS, buildRedirectTarget, type RedirectEntry } from './redirects';
+
+const HomeV2 = lazy(() => import('../../pages/v2/HomeV2'));
+const MatchesV2 = lazy(() => import('../../pages/v2/MatchesV2'));
+const MatchDetailV2 = lazy(() => import('../../pages/v2/MatchDetailV2'));
+const PremiumV2 = lazy(() => import('../../pages/v2/PremiumV2'));
+const AccountV2 = lazy(() => import('../../pages/v2/AccountV2'));
+const ProfileTab = lazy(() => import('../../pages/v2/account/ProfileTab'));
+const SubscriptionTab = lazy(() => import('../../pages/v2/account/SubscriptionTab'));
+const BankrollTab = lazy(() => import('../../pages/v2/account/BankrollTab'));
+const NotificationsTab = lazy(() => import('../../pages/v2/account/NotificationsTab'));
+const AdminPage = lazy(() => import('../../pages/Admin'));
+const PerformancePage = lazy(() => import('../../pages/Performance'));
+const LoginLegacy = lazy(() => import('../../pages/Login'));
+const UpdatePasswordPage = lazy(() => import('../../pages/UpdatePassword'));
+const CGUPage = lazy(() => import('../../pages/CGU'));
+const ConfidentialitePage = lazy(() => import('../../pages/Confidentialite'));
 
 export interface V2Route {
   path: string;

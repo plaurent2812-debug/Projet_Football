@@ -19,6 +19,14 @@ function fmtTime(iso: string): string {
   });
 }
 
+function isFiniteProbability(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function formatPct(value: number | null | undefined): string {
+  return isFiniteProbability(value) ? `${Math.round(value * 100)}%` : '—';
+}
+
 export function MatchRow({
   match,
   onClick,
@@ -26,11 +34,11 @@ export function MatchRow({
   'data-testid': dataTestId = 'match-row',
 }: Props) {
   const { prob1x2, home, away, signals, topValueBet } = match;
-  const pct = {
-    home: Math.round(prob1x2.home * 100),
-    draw: Math.round(prob1x2.draw * 100),
-    away: Math.round(prob1x2.away * 100),
-  };
+  const hasProbabilities =
+    isFiniteProbability(prob1x2.home) ||
+    isFiniteProbability(prob1x2.draw) ||
+    isFiniteProbability(prob1x2.away);
+  const hasScore = match.score?.home != null && match.score.away != null;
 
   return (
     <Link
@@ -56,6 +64,12 @@ export function MatchRow({
           <span style={{ color: 'var(--text-faint)' }}>vs</span>
           <span className="truncate text-right">{away.short}</span>
         </div>
+        {hasScore && (
+          <div className="mt-1 flex items-center justify-center gap-2 text-xs font-bold tabular-nums">
+            <span style={{ color: 'var(--primary)' }}>{match.status ?? 'Score'}</span>
+            <span>{match.score?.home} - {match.score?.away}</span>
+          </div>
+        )}
         <div className="mt-2">
           <ProbBar
             home={prob1x2.home}
@@ -69,9 +83,15 @@ export function MatchRow({
           className="mt-1 flex justify-between text-[11px] tabular-nums"
           style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}
         >
-          <span>{pct.home}%</span>
-          <span>{pct.draw}%</span>
-          <span>{pct.away}%</span>
+          {hasProbabilities ? (
+            <>
+              <span>{formatPct(prob1x2.home)}</span>
+              {isFiniteProbability(prob1x2.draw) && <span>{formatPct(prob1x2.draw)}</span>}
+              <span>{formatPct(prob1x2.away)}</span>
+            </>
+          ) : (
+            <span>Analyse bientôt disponible</span>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">

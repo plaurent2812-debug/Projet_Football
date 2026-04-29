@@ -2,6 +2,7 @@ import '@testing-library/jest-dom';
 import { afterAll, afterEach, beforeAll, expect, vi } from 'vitest';
 import { toHaveNoViolations } from 'jest-axe';
 import { server } from './mocks/server';
+import { resetNotificationRulesHandlerState } from './mocks/handlers';
 
 expect.extend(toHaveNoViolations);
 
@@ -50,5 +51,8 @@ if (typeof window !== 'undefined' && !('IntersectionObserver' in window)) {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  resetNotificationRulesHandlerState();
+});
 afterAll(() => server.close());

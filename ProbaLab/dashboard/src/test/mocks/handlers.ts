@@ -31,6 +31,18 @@ import {
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
+function cloneNotificationRules(): NotificationRule[] {
+  return structuredClone(mockNotificationRules);
+}
+
+/** Mutable copy so POST + invalidation show the new rule in GET (E2E + unit). */
+let notificationRulesData = cloneNotificationRules();
+
+/** Reset alongside `server.resetHandlers()` in Vitest so tests do not leak state. */
+export function resetNotificationRulesHandlerState() {
+  notificationRulesData = cloneNotificationRules();
+}
+
 export const handlers = [
   http.get(`${API}/api/safe-pick`, ({ request }) => {
     const url = new URL(request.url);
@@ -249,7 +261,7 @@ export const handlers = [
 
   // Rules CRUD
   http.get(`${API}/api/user/notifications/rules`, () =>
-    HttpResponse.json(mockNotificationRules),
+    HttpResponse.json([...notificationRulesData]),
   ),
 
   http.post(`${API}/api/user/notifications/rules`, async ({ request }) => {
@@ -261,6 +273,7 @@ export const handlers = [
       ...body,
       id: `rule-${Math.random().toString(36).slice(2, 8)}`,
     };
+    notificationRulesData.push(created);
     return HttpResponse.json(created, { status: 201 });
   }),
 
@@ -272,6 +285,14 @@ export const handlers = [
         ...body,
         id: String(params.id),
       };
+      const idx = notificationRulesData.findIndex(
+        (r) => r.id === String(params.id),
+      );
+      if (idx >= 0) {
+        notificationRulesData[idx] = updated;
+      } else {
+        notificationRulesData.push(updated);
+      }
       return HttpResponse.json(updated);
     },
   ),
@@ -280,7 +301,7 @@ export const handlers = [
     `${API}/api/user/notifications/rules/:id`,
     async ({ request, params }) => {
       const body = (await request.json()) as Partial<NotificationRule>;
-      const existing = mockNotificationRules.find(
+      const existing = notificationRulesData.find(
         (r) => r.id === String(params.id),
       );
       const base: NotificationRule = existing ?? {
@@ -292,17 +313,28 @@ export const handlers = [
         action: { notify: true, pauseSuggestion: false },
         enabled: true,
       };
-      return HttpResponse.json({
+      const merged: NotificationRule = {
         ...base,
         ...body,
         id: String(params.id),
-      } satisfies NotificationRule);
+      };
+      const idx = notificationRulesData.findIndex(
+        (r) => r.id === String(params.id),
+      );
+      if (idx >= 0) {
+        notificationRulesData[idx] = merged;
+      } else {
+        notificationRulesData.push(merged);
+      }
+      return HttpResponse.json(merged);
     },
   ),
 
-  http.delete(`${API}/api/user/notifications/rules/:id`, () =>
-    new HttpResponse(null, { status: 204 }),
-  ),
+  http.delete(`${API}/api/user/notifications/rules/:id`, ({ params }) => {
+    const id = String(params.id);
+    notificationRulesData = notificationRulesData.filter((r) => r.id !== id);
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   // Telegram connect flow
   http.post(`${API}/api/user/notifications/telegram/connect-start`, () => {

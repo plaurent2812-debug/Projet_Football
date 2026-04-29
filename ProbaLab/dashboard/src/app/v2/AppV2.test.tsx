@@ -46,16 +46,16 @@ describe('AppV2', () => {
     );
   });
 
-  it('renders PremiumV2 at /premium', () => {
+  it('renders PremiumV2 at /premium', async () => {
     renderWithProviders(
       <MemoryRouter initialEntries={['/premium']}>
         <AppV2Content />
       </MemoryRouter>
     );
-    expect(screen.getByTestId('premium-v2-page')).toBeInTheDocument();
+    expect(await screen.findByTestId('premium-v2-page')).toBeInTheDocument();
   });
 
-  it('renders AccountV2 with ProfileTab at /compte (index redirect)', () => {
+  it('renders AccountV2 with ProfileTab at /compte (index redirect)', async () => {
     vi.spyOn(v2User, 'useV2User').mockReturnValue({
       role: 'premium',
       isVisitor: false,
@@ -66,7 +66,7 @@ describe('AppV2', () => {
       </MemoryRouter>
     );
     expect(
-      screen.getByRole('heading', { level: 1, name: /mon compte/i }),
+      await screen.findByRole('heading', { level: 1, name: /mon compte/i }),
     ).toBeInTheDocument();
   });
 
